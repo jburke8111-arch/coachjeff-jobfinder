@@ -883,6 +883,23 @@ async function fetchUSAJobs(keyword, location){
     return [];
   }
 }
+// Fetch broader job-aggregator results from our own Netlify serverless function (Adzuna).
+// The function holds the Adzuna app id/key server-side. Returns [] on any failure
+// so it never breaks the rest of the search.
+async function fetchAdzuna(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('keyword', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/adzuna?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    return (data && data.ok && Array.isArray(data.jobs)) ? data.jobs : [];
+  } catch(e){
+    return [];
+  }
+}
+
 
 async function fetchBoardResilient(c){
   const doFetch = ()=> withTimeout(c.ats==='gh' ? fetchGreenhouse(c) : fetchLever(c), 15000);
@@ -1066,6 +1083,7 @@ function sponsorshipLabel(j){
   return {text:'Sponsorship unknown', cls:'gray'};
 }
 function salaryEstimate(j){
+  if(j && j.salary) return j.salary;
   const t = (j.title||'').toLowerCase();
   const prefix = 'Typical entry-level range for this field';
   if(/software|engineer|developer|data scientist|machine learning|ml\b/.test(t)) return prefix + ': $75K\u2013$120K';
@@ -1107,6 +1125,8 @@ function renderJob(j, kw, loc){
             <span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>
             ${(j.score || 0) >= 8 ? '<span class="tag strong">high-priority lead</span>' : ''}
             ${j.expFlag ? '<span class="tag warn">may require experience</span>' : ''}
+            ${j.source === 'adzuna' ? '<span class="tag gray">Adzuna</span>' : ''}
+            ${j.source === 'usajobs' ? '<span class="tag gray">USAJobs</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
           <div class="why"><strong>Why this job?</strong><div class="why-list">${why}</div></div>
@@ -1260,6 +1280,33 @@ async function search(){
       if(fedJobs.length){ jobs = jobs.concat(fedJobs); }
     } catch(e){ /* ignore federal errors, keep board results */ }
 
+    // Also pull broader job-aggregator results from Adzuna (our serverless function)
+    // and merge them into the same filtering/scoring pipeline.
+    // Skip Adzuna when the user has selected one specific employer, because
+    // Adzuna is not tied to the curated employer dropdown.
+    try {
+      if(company === 'any'){
+        statusEl.innerHTML = `<span class="loading">Adding broader Adzuna matches…</span>`;
+        const adzunaJobs = await fetchAdzuna(kw, loc);
+        if(adzunaJobs.length){ jobs = jobs.concat(adzunaJobs); }
+      }
+    } catch(e){ /* ignore Adzuna errors, keep board + federal results */ }
+
+    // Deduplicate after merging employer boards + USAJobs + Adzuna.
+    // Prefer the first source returned when title/company/location/url look identical.
+    const seenJobs = new Set();
+    jobs = jobs.filter(j => {
+      const key = [
+        normalizeForSearch(j.title || ''),
+        normalizeForSearch(j.company || ''),
+        normalizeForSearch(j.location || ''),
+        normalizeForSearch(j.url || '')
+      ].join('|');
+      if(seenJobs.has(key)) return false;
+      seenJobs.add(key);
+      return true;
+    });
+
     const totalFetched = jobs.length;
     let afterLevel = 0, afterKeyword = 0, afterLocation = 0, afterSector = 0, afterWork = 0, afterClear = 0, afterUS = 0, afterDegree = 0;
 
@@ -1365,6 +1412,7 @@ async function search(){
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
 
     statusEl.innerHTML = `${okCos} employer job board${okCos===1?'':'s'} searched` +
+      (company === 'any' ? ' · USAJobs + Adzuna checked' : ' · USAJobs checked') +
       (failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ' · all responding');
 
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
