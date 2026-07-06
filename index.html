@@ -168,6 +168,7 @@
 
   .tag.risk{background:rgba(185,88,35,.12);color:#9a4b1f}
   .tag.strong{background:rgba(31,122,77,.12);color:#1f7a4d}
+  .tag.warn{background:rgba(217,138,43,.15);color:#b6701c}
   .job.direct{background:#fff;border:1px solid var(--line);padding-left:14px;padding-right:14px;margin-top:10px}
   .direct-heading{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:24px 0 4px}
 
@@ -844,7 +845,8 @@ async function fetchGreenhouse(c){
   return (d.jobs||[]).map(j=>({
     title:j.title, company:c.slug, sector:c.sector,
     location:(j.location&&j.location.name)||'—',
-    url:j.absolute_url, posted:j.updated_at?Date.parse(j.updated_at):null
+    url:j.absolute_url, posted:j.updated_at?Date.parse(j.updated_at):null,
+    id:j.id, ats:'gh'
   }));
 }
 async function fetchLever(c){
@@ -855,7 +857,8 @@ async function fetchLever(c){
   return (d||[]).map(j=>({
     title:j.text, company:c.slug, sector:c.sector,
     location:(j.categories&&j.categories.location)||'—',
-    url:j.hostedUrl, posted:j.createdAt||null
+    url:j.hostedUrl, posted:j.createdAt||null,
+    id:j.id, ats:'lever'
   }));
 }
 
@@ -1101,6 +1104,7 @@ function renderJob(j, kw, loc){
             <span class="tag blue">${esc(freshnessText(j.posted))}</span>
             <span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>
             ${(j.score || 0) >= 8 ? '<span class="tag strong">high-priority lead</span>' : ''}
+            ${j.expFlag ? '<span class="tag warn">may require experience</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
           <div class="why"><strong>Why this job?</strong><div class="why-list">${why}</div></div>
@@ -1327,6 +1331,36 @@ async function search(){
     } else {
       jobs.sort((a,b)=> a.company.localeCompare(b.company) || a.title.localeCompare(b.title));
     }
+
+    // ---- Description check (server-side) --------------------------------------
+    // For "suspicious" ambiguous titles, fetch the real description via our
+    // checkjobs function and drop clear non-degree/hourly roles, flag borderline
+    // experience ones. Only Greenhouse/Lever jobs with an id can be checked.
+    try {
+      const SUSPICIOUS_RX = /\b(operations|fulfillment|warehouse|logistics|hub|depot|fleet|store|retail|field|floor|shift|crew|team member|associate|coordinator|specialist|representative|assistant|agent|clerk)\b/i;
+      const checkable = jobs.filter(j =>
+        j && j.id != null && (j.ats === 'gh' || j.ats === 'lever') &&
+        SUSPICIOUS_RX.test(j.title || '')
+      );
+      if(checkable.length){
+        statusEl.innerHTML = `<span class="loading">Verifying ${checkable.length} role${checkable.length===1?'':'s'} against their descriptions…</span>`;
+        const payload = checkable.map(j => ({ id:j.id, url:j.url, ats:j.ats, company:j.company }));
+        const resp = await fetch('/.netlify/functions/checkjobs', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ jobs: payload })
+        });
+        if(resp.ok){
+          const data = await resp.json();
+          const verdicts = (data && data.verdicts) || {};
+          // Drop the clear non-degree/hourly ones; flag the borderline ones.
+          jobs = jobs.filter(j => verdicts[j.id] !== 'drop');
+          jobs.forEach(j => { if(verdicts[j.id] === 'flag') j.expFlag = true; });
+        }
+      }
+    } catch(e){ /* fail-open: if the checker errors, show everything */ }
+
+    countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
 
     statusEl.innerHTML = `${okCos} employer job board${okCos===1?'':'s'} searched` +
       (failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ' · all responding');
