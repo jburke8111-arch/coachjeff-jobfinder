@@ -899,6 +899,23 @@ async function fetchLever(c){
 // Fetch one board with a longer timeout and a single retry, so slow/flaky
 // boards aren't silently dropped from results. Resolves to [] on failure
 // rather than throwing, so one bad board never aborts the run.
+// Fetch federal jobs from our own Netlify serverless function (USAJobs).
+// The function holds the API key server-side. Returns [] on any failure
+// so it never breaks the rest of the search.
+async function fetchUSAJobs(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('keyword', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/usajobs?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    return (data && data.ok && Array.isArray(data.jobs)) ? data.jobs : [];
+  } catch(e){
+    return [];
+  }
+}
+
 async function fetchBoardResilient(c){
   const doFetch = ()=> withTimeout(c.ats==='gh' ? fetchGreenhouse(c) : fetchLever(c), 15000);
   try {
@@ -1266,6 +1283,13 @@ async function search(){
       statusEl.innerHTML = `<span class="loading">Searched ${Math.min(i+BATCH,pool.length)} / ${pool.length} employer job boards…</span>`;
       await new Promise(r=>setTimeout(r, 80));
     }
+
+    // Also pull federal jobs from USAJobs (our serverless function) and merge them in.
+    try {
+      statusEl.innerHTML = `<span class="loading">Adding federal (USAJobs) roles…</span>`;
+      const fedJobs = await fetchUSAJobs(kw, loc);
+      if(fedJobs.length){ jobs = jobs.concat(fedJobs); }
+    } catch(e){ /* ignore federal errors, keep board results */ }
 
     const totalFetched = jobs.length;
     let afterLevel = 0, afterKeyword = 0, afterLocation = 0, afterSector = 0, afterWork = 0, afterClear = 0, afterUS = 0, afterDegree = 0;
