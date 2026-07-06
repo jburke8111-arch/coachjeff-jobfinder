@@ -183,9 +183,6 @@
   .searchlink-arrow{color:var(--amber-deep);font-weight:700;transition:transform .12s;display:inline-block}
   .searchlink-card:hover .searchlink-arrow{transform:translateX(3px)}
   .searchlink-meta{font-size:12.5px;color:var(--mute);line-height:1.35}
-  .roadmap{margin-top:16px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px 16px}
-  .roadmap h4{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--navy);margin-bottom:8px}
-  .roadmap ul{margin-left:18px;color:var(--mute);font-size:13px;line-height:1.55}
 
   .suggestions{margin-top:28px;border-top:1px solid var(--line);padding-top:20px}
   .suggestion-note{font-size:13.5px;color:var(--mute);max-width:72ch;margin:0 0 12px}
@@ -205,25 +202,8 @@
   .note{font-size:13px;color:var(--faint);border-top:1px solid var(--line);
     padding:20px 0 44px;max-width:62ch;line-height:1.5;text-wrap:pretty}
   .src-fail{color:var(--amber-deep);font-weight:600}
-  .diag{margin:8px 0 60px;border:1px solid var(--line);border-radius:8px;background:#fff}
-  .diag summary{cursor:pointer;padding:14px 18px;font-size:13.5px;font-weight:600;
     color:var(--mute);list-style:none;user-select:none}
-  .diag summary::-webkit-details-marker{display:none}
-  .diag summary::before{content:"▸ ";color:var(--faint)}
-  .diag[open] summary::before{content:"▾ "}
-  .diag-body{padding:0 18px 18px}
-  .diag-intro{font-size:13px;color:var(--mute);margin-bottom:12px;max-width:62ch}
-  .diag-body button{width:auto;display:inline-block}
-  #diag-out{margin-top:14px;font-size:12.5px}
-  .diag-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-  .diag-card{flex:1;min-width:220px;border:1px solid var(--line);border-radius:7px;padding:12px 14px}
-  .diag-card h4{font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
-  .diag-card.ok h4{color:#1f7a4d}
-  .diag-card.fix h4{color:#2563a8}
-  .diag-card.bad h4{color:var(--amber-deep)}
-  .diag-list{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11.5px;
     color:var(--mute);line-height:1.7;word-break:break-word}
-  .diag-copy{margin-top:8px}
 @media(max-width:560px){.job-top{flex-direction:column;gap:2px}.co{white-space:normal}}
 
 
@@ -533,23 +513,7 @@
 
   <p class="note">Listings come from employers' own public job boards. Roles link directly to each company's application page.</p>
 
-  <details class="diag">
-    <summary>Board diagnostics</summary>
-    <div class="diag-body">
-      <p class="diag-intro">Pings all live Greenhouse/Lever boards and reports which resolve. Priority employers using Workday/iCIMS/USAJobs/custom systems are shown as targeted search links.</p>
-      <div class="roadmap">
-        <h4>Serverless roadmap</h4>
-        <ul>
-          <li><strong>Phase 1:</strong> keep Greenhouse/Lever in browser code.</li>
-          <li><strong>Phase 2:</strong> add a Netlify function for USAJobs and a broad jobs API such as Adzuna.</li>
-          <li><strong>Phase 3:</strong> add employer-specific Workday/iCIMS connectors only where stable and permitted.</li>
-          <li><strong>Phase 4:</strong> merge all sources into one scored result list with source labels and sponsorship warnings.</li>
-        </ul>
-      </div>
-      <button id="diag-run" class="secondary" type="button">Run check</button>
-      <div id="diag-out"></div>
-    </div>
-  </details>
+
 </div>
 
 <!--
@@ -677,7 +641,6 @@ const COMPANIES = [
 
   // ===== EXPANSION BATCH =====
   // ---- more tech / AI ----
-  // {slug:"retool", ats:"gh", sector:"tech"}, // removed: latest diagnostics reported truly dead
   {slug:"amplitude", ats:"gh", sector:"tech"},
   {slug:"mixpanel", ats:"gh", sector:"tech"},
   {slug:"postman", ats:"gh", sector:"tech"},
@@ -1477,7 +1440,6 @@ goBtn.addEventListener('click', search);
 document.addEventListener('keydown', e=>{ if(e.key==='Enter') search(); });
 
 
-// Visible startup marker so failures are easier to diagnose in the browser.
 window.addEventListener('DOMContentLoaded', () => {
   const s = document.getElementById('status');
   if (s && (s.textContent.includes('Ready') || s.textContent.includes('script loaded'))) s.textContent = '';
@@ -1584,134 +1546,7 @@ document.getElementById('reset').addEventListener('click', ()=>{
   document.getElementById('kw').focus();
 });
 
-// ---- Board diagnostics ----
-const diagTotalEl = document.getElementById('diag-total'); if(diagTotalEl) diagTotalEl.textContent = COMPANIES.length;
 
-function ghUrl(s){ return `https://boards-api.greenhouse.io/v1/boards/${s}/jobs`; }
-function leverUrl(s){ return `https://api.lever.co/v0/postings/${s}?mode=json`; }
-
-async function tryUrl(url, ats){
-  try{
-    const r = await withTimeout(fetch(url), 8000);
-    if(!r.ok) return null;
-    const d = await r.json();
-    const n = ats==='gh' ? (d.jobs||[]).length : (Array.isArray(d)?d.length:0);
-    return {ok:true, count:n};
-  }catch(e){ return null; }
-}
-
-// slug variants to attempt when the original fails
-function slugVariants(slug){
-  const base = slug.replace(/[^a-z0-9]/gi,'');
-  const v = new Set([
-    slug, base,
-    slug.replace(/-/g,''),
-    slug+'inc', slug+'hq', slug+'io', slug+'ai',
-    slug+'health', slug+'energy', slug+'labs', slug+'technologies',
-    slug.replace(/health$/,''), slug.replace(/energy$/,''),
-    slug.replace(/securities$/,''), slug.replace(/space$/,''),
-  ]);
-  return [...v].filter(Boolean);
-}
-
-async function pingBoard(c){
-  // 1) try as configured
-  const primary = await tryUrl(c.ats==='gh'?ghUrl(c.slug):leverUrl(c.slug), c.ats);
-  if(primary) return {c, ok:true, count:primary.count};
-
-  // 2) try the OTHER ats with same slug
-  const otherAts = c.ats==='gh'?'lever':'gh';
-  const other = await tryUrl(otherAts==='gh'?ghUrl(c.slug):leverUrl(c.slug), otherAts);
-  if(other) return {c, ok:false, fix:{slug:c.slug, ats:otherAts, count:other.count}};
-
-  // 3) try slug variants on BOTH ats
-  for(const s of slugVariants(c.slug)){
-    if(s===c.slug) continue;
-    for(const a of ['gh','lever']){
-      const res = await tryUrl(a==='gh'?ghUrl(s):leverUrl(s), a);
-      if(res) return {c, ok:false, fix:{slug:s, ats:a, count:res.count}};
-    }
-  }
-  return {c, ok:false, why:'not found on Greenhouse or Lever'};
-}
-
-document.getElementById('diag-run').addEventListener('click', async ()=>{
-  const btn = document.getElementById('diag-run');
-  const out = document.getElementById('diag-out');
-  btn.disabled = true; btn.textContent = 'Checking…';
-  out.innerHTML = `<span class="loading">Pinging ${COMPANIES.length} boards and auto-retrying fixes… (this takes a minute)</span>`;
-
-  try {
-    const res = [];
-    const batch = 6;
-    for(let i=0;i<COMPANIES.length;i+=batch){
-      // allSettled + per-board catch so one bad board can't abort the whole run
-      const settled = await Promise.allSettled(
-        COMPANIES.slice(i,i+batch).map(c =>
-          pingBoard(c).catch(()=>({c, ok:false, why:'error during check'}))
-        )
-      );
-      settled.forEach(s=>{
-        if(s.status==='fulfilled' && s.value) res.push(s.value);
-      });
-      out.innerHTML = `<span class="loading">Checked ${Math.min(i+batch,COMPANIES.length)} / ${COMPANIES.length}…</span>`;
-      await new Promise(r=>setTimeout(r,120));
-    }
-
-    const live = res.filter(r=>r.ok);
-    const fixable = res.filter(r=>!r.ok && r.fix);
-    const dead = res.filter(r=>!r.ok && !r.fix);
-
-    const liveList = live.sort((a,b)=>a.c.slug.localeCompare(b.c.slug))
-      .map(r=>`${r.c.slug} (${r.count})`).join('  ·  ');
-
-    const fixLines = fixable.sort((a,b)=>a.c.slug.localeCompare(b.c.slug)).map(r=>
-      `{slug:"${r.fix.slug}", ats:"${r.fix.ats}", sector:"${r.c.sector}"}, // was ${r.c.slug}/${r.c.ats} → ${r.fix.count} jobs`
-    ).join('\n');
-    const fixHtml = fixable.sort((a,b)=>a.c.slug.localeCompare(b.c.slug)).map(r=>
-      `${r.c.slug}: use ats="${r.fix.ats}"${r.fix.slug!==r.c.slug?` slug="${r.fix.slug}"`:''} (${r.fix.count} jobs)`
-    ).join('<br>');
-
-    const deadSlugs = dead.map(r=>r.c.slug).sort();
-    const deadList = deadSlugs.join('<br>');
-
-    out.innerHTML = `
-      <div class="diag-row">
-        <div class="diag-card ok">
-          <h4>${live.length} live</h4>
-          <div class="diag-list">${liveList || '—'}</div>
-        </div>
-      </div>
-      <div class="diag-row">
-        <div class="diag-card fix">
-          <h4>${fixable.length} fixable — verified corrections</h4>
-          <div class="diag-list">${fixHtml || '— none'}</div>
-          ${fixable.length?'<button class="secondary diag-copy" id="diag-copy-fix" type="button">Copy corrected code lines</button>':''}
-        </div>
-        <div class="diag-card bad">
-          <h4>${dead.length} truly dead — remove these</h4>
-          <div class="diag-list">${deadList || '— none'}</div>
-          ${dead.length?'<button class="secondary diag-copy" id="diag-copy-dead" type="button">Copy dead slugs</button>':''}
-        </div>
-      </div>`;
-
-    const copyFix = document.getElementById('diag-copy-fix');
-    if(copyFix) copyFix.addEventListener('click', ()=>{
-      navigator.clipboard?.writeText(fixLines).then(
-        ()=>{ copyFix.textContent='Copied ✓'; setTimeout(()=>copyFix.textContent='Copy corrected code lines',1500); });
-    });
-    const copyDead = document.getElementById('diag-copy-dead');
-    if(copyDead) copyDead.addEventListener('click', ()=>{
-      navigator.clipboard?.writeText(deadSlugs.join('\n')).then(
-        ()=>{ copyDead.textContent='Copied ✓'; setTimeout(()=>copyDead.textContent='Copy dead slugs',1500); });
-    });
-  } catch(err){
-    out.innerHTML = `<div class="empty"><strong>Diagnostics hit an error.</strong><br>${esc(err && err.message ? err.message : String(err))}<br>Try again, or reload the page.</div>`;
-  } finally {
-    btn.disabled = false; btn.textContent = 'Run check again';
-    if(statusEl && res && Array.isArray(res)){ statusEl.innerHTML = `Diagnostics complete · ${live.length} live · ${dead.length} dead`; }
-  }
-});
 </script>
 </body>
 </html>
