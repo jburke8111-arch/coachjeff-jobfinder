@@ -514,7 +514,7 @@
 
   <div class="results" id="results"></div>
 
-  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, and Ashby-hosted job boards. Roles link directly to the application page.</p>
+  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, and Greenhouse-hosted job boards. Roles link directly to the application page.</p>
 
 
 </div>
@@ -919,6 +919,22 @@ async function fetchAshby(keyword, location){
   }
 }
 
+// Fetch Greenhouse-hosted roles through our Netlify function.
+// This adds a server-side Greenhouse source alongside the direct employer-board scan.
+async function fetchGreenhouseAPI(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('keyword', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/greenhouse?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    return (data && data.ok && Array.isArray(data.jobs)) ? data.jobs : [];
+  } catch(e){
+    return [];
+  }
+}
+
 
 async function fetchBoardResilient(c){
   const doFetch = ()=> withTimeout(c.ats==='gh' ? fetchGreenhouse(c) : fetchLever(c), 15000);
@@ -1145,6 +1161,7 @@ function renderJob(j, kw, loc){
             ${j.expFlag ? '<span class="tag warn">may require experience</span>' : ''}
             ${j.source === 'adzuna' ? '<span class="tag gray">Adzuna</span>' : ''}
             ${j.source === 'ashby' ? '<span class="tag gray">Ashby</span>' : ''}
+            ${j.source === 'greenhouse' ? '<span class="tag gray">Greenhouse</span>' : ''}
             ${j.source === 'usajobs' ? '<span class="tag gray">USAJOBS</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
@@ -1312,6 +1329,13 @@ async function search(){
       const ashbyJobs = await fetchAshby(kw, loc);
       if(ashbyJobs.length){ jobs = jobs.concat(ashbyJobs); }
     } catch(e){ /* ignore Ashby errors, keep other results */ }
+
+    // Also pull server-side Greenhouse results and merge them in.
+    try {
+      statusEl.innerHTML = `<span class="loading">Adding Greenhouse roles…</span>`;
+      const greenhouseJobs = await fetchGreenhouseAPI(kw, loc);
+      if(greenhouseJobs.length){ jobs = jobs.concat(greenhouseJobs); }
+    } catch(e){ /* ignore Greenhouse errors, keep other results */ }
 
     // Deduplicate after all sources are merged.
     const seenJobKeys = new Set();
