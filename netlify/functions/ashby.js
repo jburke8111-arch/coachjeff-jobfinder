@@ -43,7 +43,7 @@ export default async (request) => {
         const resp = await fetch(apiUrl);
         if (!resp.ok) continue;
 
-        const data = await resp.json();
+        const data = await resp.json();  if (board === "cursor") {    return new Response(      JSON.stringify(data, null, 2),      {        status: 200,        headers: cors      }    );  }
         const jobs = Array.isArray(data.jobs) ? data.jobs : [];
 
         for (const j of jobs) {
