@@ -64,7 +64,7 @@ export default async (request) => {
             company,
             sector: "tech",
             location: loc,
-            url: j.applyUrl || j.jobUrl || `https://jobs.ashbyhq.com/${board}`,
+            url: board === "cursor"   ? `https://cursor.com/careers/${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`   : (j.applyUrl || j.jobUrl || `https://jobs.ashbyhq.com/${board}`),
             posted: j.publishedAt ? Date.parse(j.publishedAt) : null,
             salary: "",
             source: "ashby"
