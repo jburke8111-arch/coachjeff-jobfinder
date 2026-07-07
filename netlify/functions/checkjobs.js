@@ -47,6 +47,40 @@ function scanDescription(text){
   return 'ok';
 }
 
+// Sponsorship signals. NO_SPONSOR (red) beats AVAILABLE (green) beats unknown,
+// because an explicit "we do not sponsor" is the decisive fact for a candidate.
+const NO_SPONSOR_RX = [
+  /\bno (visa |work )?sponsorship\b/i,
+  /\bwithout sponsorship\b/i,
+  /\b(are |is )?not (able|willing) to sponsor\b/i,
+  /\bdo(es)? not (offer|provide) sponsorship\b/i,
+  /\bsponsorship is not (available|offered|provided)\b/i,
+  /\bunable to (provide|offer|support)\b[^.]*\bsponsor(ship)?\b/i,
+  /\bunable to sponsor\b/i,
+  /\bmust be (a )?(us|u\.s\.) (citizen|person)\b/i,
+  /\bcitizenship (is )?required\b/i,
+  /\bmust be authorized to work[^.]*without\b/i,
+  /\bno (current or future )?(visa )?sponsorship\b/i,
+];
+const AVAILABLE_RX = [
+  /\bvisa sponsorship (is )?(available|offered|provided)\b/i,
+  /\bsponsorship (is )?(available|offered|provided)\b/i,
+  /\bwill(ing to)? sponsor\b/i,
+  /\bwe sponsor\b/i,
+  /\bh-?1b\b/i,
+  /\bopt\b/i,
+  /\bcpt\b/i,
+  /\be-?verify.*sponsor\b/i,
+];
+
+function scanSponsorship(text){
+  if(!text) return 'unknown';
+  const t = String(text);
+  for(const rx of NO_SPONSOR_RX){ if(rx.test(t)) return 'none'; }
+  for(const rx of AVAILABLE_RX){ if(rx.test(t)) return 'available'; }
+  return 'unknown';
+}
+
 // ---- Description fetchers ----------------------------------------------------
 
 // Strip HTML tags so we scan plain text.
@@ -124,25 +158,34 @@ export default async (request) => {
   try {
     const body = await request.json();
     const jobs = (body && Array.isArray(body.jobs)) ? body.jobs : [];
+    // When the user has ticked "Work Authorization Requirements", the browser
+    // sends checkSponsorship:true and a larger job list (all results, not just
+    // suspicious titles). We raise the cap in that case so coverage is thorough.
+    const checkSponsorship = !!(body && body.checkSponsorship);
+    const cap = checkSponsorship ? 60 : 30;
 
-    // Safety cap: never check more than 30 descriptions per request, so a huge
-    // search can't make this crawl. (The browser only sends suspicious ones.)
-    const toCheck = jobs.slice(0, 30);
+    const toCheck = jobs.slice(0, cap);
 
-    const verdicts = {};
+    const verdicts = {};      // id -> "drop" | "flag" | "ok"
+    const sponsorship = {};   // id -> "available" | "none" | "unknown"
     const BATCH = 8;
     for(let i = 0; i < toCheck.length; i += BATCH){
       const slice = toCheck.slice(i, i + BATCH);
       const results = await Promise.all(slice.map(async (job) => {
         const desc = await fetchDescription(job);
-        // If we couldn't get the description, don't drop the job — treat as ok.
         const verdict = desc ? scanDescription(desc) : 'ok';
-        return { id: job.id, verdict };
+        const sp = (checkSponsorship && desc) ? scanSponsorship(desc) : 'unknown';
+        return { id: job.id, verdict, sp };
       }));
-      results.forEach(r => { if(r.id != null) verdicts[r.id] = r.verdict; });
+      results.forEach(r => {
+        if(r.id != null){
+          verdicts[r.id] = r.verdict;
+          if(checkSponsorship) sponsorship[r.id] = r.sp;
+        }
+      });
     }
 
-    return new Response(JSON.stringify({ ok: true, verdicts }), { status: 200, headers: cors });
+    return new Response(JSON.stringify({ ok: true, verdicts, sponsorship }), { status: 200, headers: cors });
   } catch(err){
     // On any failure, return empty verdicts so the browser just shows everything
     // (fail-open: never hide jobs because the checker had a problem).
