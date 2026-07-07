@@ -514,7 +514,7 @@
 
   <div class="results" id="results"></div>
 
-  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, and Greenhouse-hosted job boards. Roles link directly to the application page.</p>
+  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, and Greenhouse. Roles link directly to the application page.</p>
 
 
 </div>
@@ -839,17 +839,10 @@ async function withTimeout(promise, ms){
   finally { clearTimeout(t); }
 }
 
+// Legacy direct Greenhouse board fetch disabled.
+// Greenhouse results now come through /.netlify/functions/greenhouse.
 async function fetchGreenhouse(c){
-  const url = `https://boards-api.greenhouse.io/v1/boards/${c.slug}/jobs`;
-  const r = await fetch(url);
-  if(!r.ok) throw new Error('gh '+c.slug);
-  const d = await r.json();
-  return (d.jobs||[]).map(j=>({
-    title:j.title, company:c.slug, sector:c.sector,
-    location:(j.location&&j.location.name)||'—',
-    url:j.absolute_url, posted:j.updated_at?Date.parse(j.updated_at):null,
-    id:j.id, ats:'gh'
-  }));
+  return [];
 }
 async function fetchLever(c){
   const url = `https://api.lever.co/v0/postings/${c.slug}?mode=json`;
@@ -920,7 +913,7 @@ async function fetchAshby(keyword, location){
 }
 
 // Fetch Greenhouse-hosted roles through our Netlify function.
-// This adds a server-side Greenhouse source alongside the direct employer-board scan.
+// Keeps Greenhouse calls server-side and avoids dozens of browser requests.
 async function fetchGreenhouseAPI(keyword, location){
   try {
     const params = new URLSearchParams();
@@ -1282,7 +1275,7 @@ async function search(){
   countEl.textContent = '';
 
   try {
-    const liveCompanies = COMPANIES.filter(c => c.ats === 'gh' || c.ats === 'lever');
+    const liveCompanies = COMPANIES.filter(c => c.ats === 'lever');
     const directCompanies = MANUAL_COMPANIES || [];
 
     const pool = company === 'any'
@@ -1293,7 +1286,7 @@ async function search(){
       ? directCompanies
       : directCompanies.filter(c => c.slug === company);
 
-    statusEl.innerHTML = `<span class="loading">Searching ${pool.length} employer job board${pool.length===1?'':'s'}…</span>`;
+    statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'}…</span>`;
 
     let jobs = [];
     let okCos = 0, failCos = 0;
@@ -1305,7 +1298,7 @@ async function search(){
         if(r.ok){ okCos++; jobs = jobs.concat(Array.isArray(r.jobs)?r.jobs:[]); }
         else { failCos++; }
       });
-      statusEl.innerHTML = `<span class="loading">Searched ${Math.min(i+BATCH,pool.length)} / ${pool.length} employer job boards…</span>`;
+      statusEl.innerHTML = `<span class="loading">Searched ${Math.min(i+BATCH,pool.length)} / ${pool.length} direct employer job boards…</span>`;
       await new Promise(r=>setTimeout(r, 80));
     }
 
@@ -1330,7 +1323,7 @@ async function search(){
       if(ashbyJobs.length){ jobs = jobs.concat(ashbyJobs); }
     } catch(e){ /* ignore Ashby errors, keep other results */ }
 
-    // Also pull server-side Greenhouse results and merge them in.
+    // Also pull Greenhouse-hosted roles through our Netlify function and merge them in.
     try {
       statusEl.innerHTML = `<span class="loading">Adding Greenhouse roles…</span>`;
       const greenhouseJobs = await fetchGreenhouseAPI(kw, loc);
@@ -1455,8 +1448,8 @@ async function search(){
 
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
 
-    statusEl.innerHTML = `${okCos} employer job board${okCos===1?'':'s'} searched` +
-      (failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ' · all responding');
+    statusEl.innerHTML = `${okCos} direct employer job board${okCos===1?'':'s'} searched` +
+      (failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ' · live sources added');
 
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
 
