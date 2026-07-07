@@ -169,6 +169,9 @@
   .tag.risk{background:rgba(185,88,35,.12);color:#9a4b1f}
   .tag.strong{background:rgba(31,122,77,.12);color:#1f7a4d}
   .tag.warn{background:rgba(217,138,43,.15);color:#b6701c}
+  .tag.sp-yes{background:rgba(31,122,77,.14);color:#1f7a4d;font-weight:700}
+  .tag.sp-no{background:rgba(185,45,45,.12);color:#a12b2b;font-weight:700}
+  .tag.sp-unk{background:#f4f1ea;color:#8a7d5f;font-weight:600}
   .job.direct{background:#fff;border:1px solid var(--line);padding-left:14px;padding-right:14px;margin-top:10px}
   .direct-heading{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:24px 0 4px}
 
@@ -486,7 +489,7 @@
             <input id="noclear" type="checkbox">
             <span class="chk-text">
               <label for="noclear" class="inline">Work Authorization Requirements</label>
-              <span class="hint">Best-effort scan using title/location text. Full sponsorship analysis needs a server-side job-description fetch.</span>
+              <span class="hint">Reads each role's full description for visa/sponsorship language, badges every result 🟢/🔴/🟡, and hides roles that explicitly won't sponsor. Slower, but thorough — best for international students.</span>
             </span>
           </span>
           <span class="chk">
@@ -1149,9 +1152,13 @@ function freshnessText(posted){
   return 'Posted 30+ days ago';
 }
 function sponsorshipLabel(j){
+  // If we did a real description-based scan (work-auth box on), use that result.
+  if(j.sponsorScan === 'available') return {text:'🟢 Sponsorship available', cls:'sp-yes'};
+  if(j.sponsorScan === 'none')      return {text:'🔴 No sponsorship', cls:'sp-no'};
+  if(j.sponsorScan === 'unknown')   return {text:'🟡 Sponsorship unknown', cls:'sp-unk'};
+  // Otherwise fall back to the light title/location guess.
   const blob = ((j.title||'') + ' ' + (j.location||'') + ' ' + (j.company||'')).toLowerCase();
   if(NO_SPONSOR_RX.test(blob) || CLEAR_RX.test(blob)) return {text:'No sponsorship / citizenship risk', cls:'risk'};
-  if(/intern|new ?grad|university|campus|early career/i.test(blob)) return {text:'Sponsorship unknown', cls:'blue'};
   return {text:'Sponsorship unknown', cls:'gray'};
 }
 function salaryEstimate(j){
@@ -1488,24 +1495,38 @@ async function search(){
     // experience ones. Only Greenhouse/Lever jobs with an id can be checked.
     try {
       const SUSPICIOUS_RX = /\b(operations|fulfillment|warehouse|logistics|hub|depot|fleet|store|retail|field|floor|shift|crew|team member|associate|coordinator|specialist|representative|assistant|agent|clerk)\b/i;
-      const checkable = jobs.filter(j =>
-        j && j.id != null && (j.ats === 'gh' || j.ats === 'lever') &&
-        SUSPICIOUS_RX.test(j.title || '')
-      );
+      // Which jobs can have their description fetched (Greenhouse/Lever with an id).
+      const fetchable = jobs.filter(j => j && j.id != null && (j.ats === 'gh' || j.ats === 'lever'));
+
+      // When the user ticks "Work Authorization Requirements", do a THOROUGH scan:
+      // fetch descriptions for ALL fetchable jobs (for real sponsorship detection),
+      // not just the suspicious titles. Otherwise, only the suspicious ones.
+      const checkable = hideClear ? fetchable : fetchable.filter(j => SUSPICIOUS_RX.test(j.title || ''));
+
       if(checkable.length){
-        statusEl.innerHTML = `<span class="loading">Verifying ${checkable.length} role${checkable.length===1?'':'s'} against their descriptions…</span>`;
+        statusEl.innerHTML = hideClear
+          ? `<span class="loading">Checking ${checkable.length} roles for work-authorization &amp; sponsorship…</span>`
+          : `<span class="loading">Verifying ${checkable.length} role${checkable.length===1?'':'s'} against their descriptions…</span>`;
         const payload = checkable.map(j => ({ id:j.id, url:j.url, ats:j.ats, company:j.company }));
         const resp = await fetch('/.netlify/functions/checkjobs', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ jobs: payload })
+          body: JSON.stringify({ jobs: payload, checkSponsorship: hideClear })
         });
         if(resp.ok){
           const data = await resp.json();
           const verdicts = (data && data.verdicts) || {};
+          const sponsorship = (data && data.sponsorship) || {};
           // Drop the clear non-degree/hourly ones; flag the borderline ones.
           jobs = jobs.filter(j => verdicts[j.id] !== 'drop');
           jobs.forEach(j => { if(verdicts[j.id] === 'flag') j.expFlag = true; });
+
+          if(hideClear){
+            // Attach real (description-based) sponsorship status to each job.
+            jobs.forEach(j => { if(sponsorship[j.id]) j.sponsorScan = sponsorship[j.id]; });
+            // Filter OUT jobs whose description explicitly says no sponsorship.
+            jobs = jobs.filter(j => j.sponsorScan !== 'none');
+          }
         }
       }
     } catch(e){ /* fail-open: if the checker errors, show everything */ }
