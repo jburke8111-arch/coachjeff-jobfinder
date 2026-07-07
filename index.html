@@ -854,6 +854,29 @@ const statusEl = document.getElementById('status');
 const countEl = document.getElementById('count');
 const goBtn = document.getElementById('go');
 
+// Keep experience-level controls from contradicting each other.
+// If Level = All levels, college-grad filtering turns off and experienced jobs are shown.
+// If Level = any early-career bucket, experienced jobs are hidden by default.
+function syncExperienceControls(){
+  const lvl = document.getElementById('lvl');
+  const degree = document.getElementById('degreeonly');
+  const showExp = document.getElementById('showexperienced');
+  if(!lvl || !degree || !showExp) return;
+
+  if(lvl.value === 'all'){
+    degree.checked = false;
+    degree.disabled = true;
+    showExp.disabled = false;
+    showExp.checked = true;
+  } else {
+    degree.disabled = false;
+    degree.checked = true;
+    showExp.checked = false;
+    showExp.disabled = true;
+  }
+}
+
+
 async function withTimeout(promise, ms){
   let t;
   const timeout = new Promise((_,rej)=>{ t=setTimeout(()=>rej(new Error('timeout')), ms); });
@@ -1283,6 +1306,7 @@ function isStateSearch(input){
 }
 
 async function search(){
+  syncExperienceControls();
   const kw = document.getElementById('kw').value.trim().toLowerCase();
   const loc = document.getElementById('loc').value.trim().toLowerCase();
   const level = document.getElementById('lvl').value;
@@ -1621,6 +1645,7 @@ function applySearchState(st){
     if(el.type === 'checkbox') el.checked = !!v;
     else el.value = v;
   }
+  syncExperienceControls();
 }
 function savedSearches(){
   try { return JSON.parse(localStorage.getItem('coachJeffSavedSearches') || '[]'); }
@@ -1667,6 +1692,7 @@ function renderSavedSearches(){
 document.querySelectorAll('.quick').forEach(btn=>btn.addEventListener('click',()=>{
   document.getElementById('kw').value = btn.dataset.kw || '';
   document.getElementById('lvl').value = 'early';
+  syncExperienceControls();
   search();
 }));
 document.getElementById('saveSearch').addEventListener('click',()=>{
@@ -1678,6 +1704,9 @@ document.getElementById('saveSearch').addEventListener('click',()=>{
   renderSavedSearches();
 });
 renderSavedSearches();
+
+document.getElementById('lvl').addEventListener('change', syncExperienceControls);
+syncExperienceControls();
 
 document.getElementById('reset').addEventListener('click', ()=>{
   document.getElementById('kw').value = '';
@@ -1692,6 +1721,7 @@ document.getElementById('reset').addEventListener('click', ()=>{
   if(document.getElementById('showexperienced')) document.getElementById('showexperienced').checked = false;
   document.getElementById('noclear').checked = false;
   document.getElementById('showsuggest').checked = false;
+  syncExperienceControls();
   results.innerHTML = '';
   countEl.textContent = '';
   statusEl.textContent = '';
