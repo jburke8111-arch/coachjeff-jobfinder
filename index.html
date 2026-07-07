@@ -902,6 +902,24 @@ async function fetchAdzuna(keyword, location){
   }
 }
 
+
+// Fetch Ashby-hosted job boards through our Netlify function.
+// Ashby's lightweight public job posting API does not require a browser API key,
+// but proxying through Netlify keeps CORS/network failures from breaking search.
+async function fetchAshby(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('keyword', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/ashby?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    return (data && data.ok && Array.isArray(data.jobs)) ? data.jobs : [];
+  } catch(e){
+    return [];
+  }
+}
+
 async function fetchBoardResilient(c){
   const doFetch = ()=> withTimeout(c.ats==='gh' ? fetchGreenhouse(c) : fetchLever(c), 15000);
   try {
@@ -1126,6 +1144,7 @@ function renderJob(j, kw, loc){
             ${(j.score || 0) >= 8 ? '<span class="tag strong">high-priority lead</span>' : ''}
             ${j.expFlag ? '<span class="tag warn">may require experience</span>' : ''}
             ${j.source === 'adzuna' ? '<span class="tag gray">Adzuna</span>' : ''}
+            ${j.source === 'ashby' ? '<span class="tag gray">Ashby</span>' : ''}
             ${j.source === 'usajobs' ? '<span class="tag gray">USAJOBS</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
@@ -1286,6 +1305,13 @@ async function search(){
       const adzunaJobs = await fetchAdzuna(kw, loc);
       if(adzunaJobs.length){ jobs = jobs.concat(adzunaJobs); }
     } catch(e){ /* ignore Adzuna errors, keep other results */ }
+
+    // Also pull roles from Ashby-powered job boards and merge them in.
+    try {
+      statusEl.innerHTML = `<span class="loading">Adding Ashby job board roles…</span>`;
+      const ashbyJobs = await fetchAshby(kw, loc);
+      if(ashbyJobs.length){ jobs = jobs.concat(ashbyJobs); }
+    } catch(e){ /* ignore Ashby errors, keep other results */ }
 
     // Deduplicate after all sources are merged.
     const seenJobKeys = new Set();
