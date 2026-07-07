@@ -476,6 +476,13 @@
             </span>
           </span>
           <span class="chk">
+            <input id="showexperienced" type="checkbox">
+            <span class="chk-text">
+              <label for="showexperienced" class="inline">Show experienced jobs</label>
+              <span class="hint">Default off. Hides senior, lead, manager, director, and level II+ roles.</span>
+            </span>
+          </span>
+          <span class="chk">
             <input id="noclear" type="checkbox">
             <span class="chk-text">
               <label for="noclear" class="inline">Work Authorization Requirements</label>
@@ -767,11 +774,26 @@ const MANAGER_SENIOR_RX = /\bmanager\b/i;
 const MANAGER_EXEMPT_RX = /\b(associate (product |program |project )?manager|apm|assistant manager|manager (trainee|in training)|management (trainee|associate|development program))\b/i;
 
 // Single source of truth for "is this title senior / not early-career?"
+// This is now a gate, not just a score adjustment. By default, these roles
+// are hidden unless the user checks "Show experienced jobs."
 function isSeniorTitle(title){
   const t = title || '';
   if(SENIOR_RX.test(t)) return true;
   if(MANAGER_SENIOR_RX.test(t) && !MANAGER_EXEMPT_RX.test(t)) return true;
   return false;
+}
+
+function experiencedPenalty(title){
+  const t = title || '';
+  if(/\b(director|vp|vice president|head of|chief|executive)\b/i.test(t)) return 100;
+  if(/\b(senior|sr\.?|staff|principal|lead|manager|architect|supervisor)\b/i.test(t) && !MANAGER_EXEMPT_RX.test(t)) return 70;
+  if(/\b(ii|iii|iv|v|level [2-9]|l[2-9])\b/i.test(t)) return 45;
+  return isSeniorTitle(t) ? 60 : 0;
+}
+
+function hasEntrySignal(title){
+  const t = title || '';
+  return INTERN_RX.test(t) || NEWGRAD_RX.test(t) || ENTRYLVL_RX.test(t) || REALISTIC_GRAD_RX.test(t) || ANY_EARLY_RX.test(t);
 }
 
 // Roles whose titles strongly signal non-degree / hourly / trade work.
@@ -1071,16 +1093,15 @@ function scoreJob(j, kw, loc){
   }
 
   // 5) Penalties — soft signals the role may not fit a new grad
-  if(isSeniorTitle(title)) s -= 4;                                  // shouldn't survive filters, but guard anyway
+  if(isSeniorTitle(title)) s -= experiencedPenalty(title);             // experienced roles should rank far below true early-career roles
   if(CLEAR_RX.test(title + ' ' + locText)) s -= 1;                  // clearance/sponsorship friction
   if(/\b([2-9]|1[0-9])\s*\+?\s*years?\b/i.test(title)) s -= 5;       // explicit experience requirement in title
 
   // Guard: a role with NO genuine early-career signal in its title shouldn't
   // reach the "high-priority lead" badge on circumstantial points alone
   // (keyword + location + US). Cap it just below the badge threshold.
-  const hasEarlySignal = INTERN_RX.test(title) || NEWGRAD_RX.test(title) ||
-                         ENTRYLVL_RX.test(title) || REALISTIC_GRAD_RX.test(title);
-  if(!hasEarlySignal && s >= 8) s = 7;
+  const hasEarlySignalFlag = hasEntrySignal(title) && !isSeniorTitle(title);
+  if(!hasEarlySignalFlag && s >= 8) s = 7;
 
   return s;
 }
@@ -1127,7 +1148,8 @@ function whyThisJob(j, kw, loc){
   const title = j.title || '';
   const blob = (title + ' ' + (j.location||'') + ' ' + (j.company||'')).toLowerCase();
   if(kw && expandedKeywordMatches(blob, kw)) reasons.push(`Keyword match: ${kw}`);
-  if(INTERN_RX.test(title)) reasons.push('Internship signal');
+  if(isSeniorTitle(title)) reasons.push('Experienced title');
+  else if(INTERN_RX.test(title)) reasons.push('Internship signal');
   else if(NEWGRAD_RX.test(title)) reasons.push('New-grad signal');
   else if(ENTRYLVL_RX.test(title) || REALISTIC_GRAD_RX.test(title) || ANY_EARLY_RX.test(title)) reasons.push('Early-career title');
   if(loc && locationMatches(j.location, loc)) reasons.push(`Location match: ${loc}`);
@@ -1139,6 +1161,8 @@ function whyThisJob(j, kw, loc){
 }
 function renderJob(j, kw, loc){
   const sponsor = sponsorshipLabel(j);
+  const experienced = isSeniorTitle(j.title || '');
+  const early = hasEntrySignal(j.title || '') && !experienced;
   const why = whyThisJob(j, kw, loc).map(r=>`<span>✓ ${esc(r)}</span>`).join('');
   return `
         <a class="job" href="${j.url}" target="_blank" rel="noopener">
@@ -1147,10 +1171,11 @@ function renderJob(j, kw, loc){
           </div>
           <div class="loc">${esc(j.company)} · ${esc(j.location)}${j.sector ? ` · ${esc(j.sector)}` : ''}</div>
           <div class="job-meta-row">
-            ${ANY_EARLY_RX.test(j.title) || REALISTIC_GRAD_RX.test(j.title) ? '<span class="tag">entry / grad</span>' : ''}
+            ${early ? '<span class="tag">entry / grad</span>' : ''}
+            ${experienced ? '<span class="tag warn">experienced role</span>' : ''}
             <span class="tag blue">${esc(freshnessText(j.posted))}</span>
             <span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>
-            ${(j.score || 0) >= 8 ? '<span class="tag strong">high-priority lead</span>' : ''}
+            ${(!experienced && (j.score || 0) >= 8) ? '<span class="tag strong">high-priority lead</span>' : ''}
             ${j.expFlag ? '<span class="tag warn">may require experience</span>' : ''}
             ${j.source === 'adzuna' ? '<span class="tag gray">Adzuna</span>' : ''}
             ${j.source === 'ashby' ? '<span class="tag gray">Ashby</span>' : ''}
@@ -1268,6 +1293,7 @@ async function search(){
   const hideClear = document.getElementById('noclear').checked;
   const usOnly = document.getElementById('usonly').checked;
   const degreeOnly = document.getElementById('degreeonly').checked;
+  const showExperienced = document.getElementById('showexperienced') ? document.getElementById('showexperienced').checked : false;
   const showSuggest = document.getElementById('showsuggest') ? document.getElementById('showsuggest').checked : false;
 
   goBtn.disabled = true;
@@ -1352,8 +1378,12 @@ async function search(){
       const locText = (j.location || '').toLowerCase();
       const blob = (t + ' ' + locText + ' ' + (j.company || '')).toLowerCase();
 
+      // Experienced-role gate: default off, even if Level is set to "All levels".
+      // This keeps senior/lead/director/manager/level II+ roles from being labeled
+      // as entry/grad just because they match the keyword.
+      if(!showExperienced && isSeniorTitle(t)) return false;
+
       if(level !== 'all'){
-        if(isSeniorTitle(t)) return false;
         if(level === 'intern' && !INTERN_RX.test(t)) return false;
         if(level === 'newgrad' && !NEWGRAD_RX.test(t)) return false;
         if(level === 'entrylevel' && !ENTRYLVL_RX.test(t)) return false;
@@ -1578,6 +1608,7 @@ function currentSearchState(){
     sort:document.getElementById('sort').value,
     usonly:document.getElementById('usonly').checked,
     degreeonly:document.getElementById('degreeonly').checked,
+    showexperienced:document.getElementById('showexperienced') ? document.getElementById('showexperienced').checked : false,
     noclear:document.getElementById('noclear').checked,
     showsuggest:document.getElementById('showsuggest').checked
   };
@@ -1658,6 +1689,7 @@ document.getElementById('reset').addEventListener('click', ()=>{
   document.getElementById('sort').value = 'best';
   document.getElementById('usonly').checked = true;
   document.getElementById('degreeonly').checked = true;
+  if(document.getElementById('showexperienced')) document.getElementById('showexperienced').checked = false;
   document.getElementById('noclear').checked = false;
   document.getElementById('showsuggest').checked = false;
   results.innerHTML = '';
