@@ -499,9 +499,9 @@
               <span id="sponsorFilterWrap" class="sponsor-filter" style="display:none;">
                 <label for="sponsorFilter" class="inline">Show:</label>
                 <select id="sponsorFilter">
-                  <option value="available" selected>🟢 Sponsorship available only</option>
-                  <option value="unknown">🟡 Unknown only</option>
-                  <option value="all">All (available + unknown)</option>
+                  <option value="all" selected>All (available + not specified)</option>
+                  <option value="available">🟢 Sponsorship available only</option>
+                  <option value="unknown">🟡 Not specified only</option>
                 </select>
               </span>
             </span>
@@ -1169,7 +1169,7 @@ function sponsorshipLabel(j){
   // If we did a real description-based scan (work-auth box on), use that result.
   if(j.sponsorScan === 'available') return {text:'🟢 Sponsorship available', cls:'sp-yes'};
   if(j.sponsorScan === 'none')      return {text:'🔴 No sponsorship', cls:'sp-no'};
-  if(j.sponsorScan === 'unknown')   return {text:'🟡 Sponsorship unknown', cls:'sp-unk'};
+  if(j.sponsorScan === 'unknown')   return {text:'🟡 Sponsorship not specified', cls:'sp-unk'};
   // Otherwise fall back to the light title/location guess.
   const blob = ((j.title||'') + ' ' + (j.location||'') + ' ' + (j.company||'')).toLowerCase();
   if(NO_SPONSOR_RX.test(blob) || CLEAR_RX.test(blob)) return {text:'No sponsorship / citizenship risk', cls:'risk'};
@@ -1544,7 +1544,7 @@ async function search(){
             window._spAvailable = jobs.filter(j => j.sponsorScan === 'available').length;
             window._spUnknown = jobs.filter(j => j.sponsorScan === 'unknown').length;
             // Then apply the user's dropdown choice.
-            const mode = (document.getElementById('sponsorFilter') || {}).value || 'available';
+            const mode = (document.getElementById('sponsorFilter') || {}).value || 'all';
             if(mode === 'available'){
               jobs = jobs.filter(j => j.sponsorScan === 'available');
             } else if(mode === 'unknown'){
@@ -1566,7 +1566,7 @@ async function search(){
 
     // Helpful note for international students when "available only" yields few.
     if(hideClear){
-      const mode = (document.getElementById('sponsorFilter') || {}).value || 'available';
+      const mode = (document.getElementById('sponsorFilter') || {}).value || 'all';
       const avail = window._spAvailable || 0;
       const unk = window._spUnknown || 0;
       if(mode === 'available' && (avail <= 3) && unk > 0){
