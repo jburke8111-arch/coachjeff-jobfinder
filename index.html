@@ -172,6 +172,12 @@
   .tag.sp-yes{background:rgba(31,122,77,.14);color:#1f7a4d;font-weight:700}
   .tag.sp-no{background:rgba(185,45,45,.12);color:#a12b2b;font-weight:700}
   .tag.sp-unk{background:#f4f1ea;color:#8a7d5f;font-weight:600}
+  .sponsor-filter{display:block;margin-top:8px}
+  .sponsor-filter label{font-size:12px;color:var(--mute);margin-right:6px}
+  .sponsor-filter select{font-size:12.5px;padding:4px 8px;border:1px solid var(--line-strong);
+    border-radius:6px;background:#fff;color:var(--navy)}
+  .sponsor-note{margin-top:6px;font-size:12.5px;font-weight:400;color:var(--mute);
+    background:#f4f1ea;padding:8px 12px;border-radius:8px;line-height:1.5}
   .job.direct{background:#fff;border:1px solid var(--line);padding-left:14px;padding-right:14px;margin-top:10px}
   .direct-heading{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:24px 0 4px}
 
@@ -490,6 +496,14 @@
             <span class="chk-text">
               <label for="noclear" class="inline">Work Authorization Requirements</label>
               <span class="hint">Reads each role's full description for visa/sponsorship language, badges every result 🟢/🔴/🟡, and hides roles that explicitly won't sponsor. Slower, but thorough — best for international students.</span>
+              <span id="sponsorFilterWrap" class="sponsor-filter" style="display:none;">
+                <label for="sponsorFilter" class="inline">Show:</label>
+                <select id="sponsorFilter">
+                  <option value="available" selected>🟢 Sponsorship available only</option>
+                  <option value="unknown">🟡 Unknown only</option>
+                  <option value="all">All (available + unknown)</option>
+                </select>
+              </span>
             </span>
           </span>
           <span class="chk">
@@ -1523,9 +1537,19 @@ async function search(){
 
           if(hideClear){
             // Attach real (description-based) sponsorship status to each job.
-            jobs.forEach(j => { if(sponsorship[j.id]) j.sponsorScan = sponsorship[j.id]; });
-            // Filter OUT jobs whose description explicitly says no sponsorship.
+            jobs.forEach(j => { j.sponsorScan = sponsorship[j.id] || 'unknown'; });
+            // Always hide the explicit "no sponsorship" roles.
             jobs = jobs.filter(j => j.sponsorScan !== 'none');
+            // Remember the pools for the helpful note.
+            window._spAvailable = jobs.filter(j => j.sponsorScan === 'available').length;
+            window._spUnknown = jobs.filter(j => j.sponsorScan === 'unknown').length;
+            // Then apply the user's dropdown choice.
+            const mode = (document.getElementById('sponsorFilter') || {}).value || 'available';
+            if(mode === 'available'){
+              jobs = jobs.filter(j => j.sponsorScan === 'available');
+            } else if(mode === 'unknown'){
+              jobs = jobs.filter(j => j.sponsorScan === 'unknown');
+            } // 'all' keeps both available + unknown
           }
         }
       }
@@ -1539,6 +1563,20 @@ async function search(){
     statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>`;
 
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
+
+    // Helpful note for international students when "available only" yields few.
+    if(hideClear){
+      const mode = (document.getElementById('sponsorFilter') || {}).value || 'available';
+      const avail = window._spAvailable || 0;
+      const unk = window._spUnknown || 0;
+      if(mode === 'available' && (avail <= 3) && unk > 0){
+        const note = document.createElement('div');
+        note.className = 'sponsor-note';
+        note.innerHTML = `Only <strong>${avail}</strong> role${avail===1?'':'s'} explicitly confirm sponsorship. ` +
+          `<strong>${unk}</strong> more didn't specify either way — switch “Show” to <strong>All</strong> or <strong>Unknown</strong> to see them.`;
+        countEl.appendChild(note);
+      }
+    }
 
     let html = '';
 
@@ -1740,6 +1778,19 @@ renderSavedSearches();
 
 document.getElementById('lvl').addEventListener('change', syncExperienceControls);
 syncExperienceControls();
+
+// Show the sponsorship filter dropdown only when "Work Authorization" is checked.
+function syncSponsorFilter(){
+  const on = document.getElementById('noclear').checked;
+  const wrap = document.getElementById('sponsorFilterWrap');
+  if(wrap) wrap.style.display = on ? 'block' : 'none';
+}
+document.getElementById('noclear').addEventListener('change', syncSponsorFilter);
+syncSponsorFilter();
+// Re-run the search when the sponsorship filter changes (only meaningful with box on).
+document.getElementById('sponsorFilter').addEventListener('change', ()=>{
+  if(document.getElementById('noclear').checked) search();
+});
 
 document.getElementById('reset').addEventListener('click', ()=>{
   document.getElementById('kw').value = '';
