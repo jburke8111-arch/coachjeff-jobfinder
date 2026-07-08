@@ -73,12 +73,15 @@ export default async (request) => {
           allJobs.push({
             title,
             company: source.company,
+            board: source.board,
             sector: source.sector,
             location: loc,
             url: j.absolute_url || `https://boards.greenhouse.io/${source.board}/jobs/${j.id}`,
             posted: j.updated_at ? Date.parse(j.updated_at) : null,
             salary: "",
-            source: "greenhouse"
+            source: "greenhouse",
+            id: j.id,
+            ats: "gh"
           });
         }
       } catch (_) {}

@@ -110,8 +110,9 @@ async function fetchDescription(job){
 
     // Greenhouse individual job JSON: boards-api.greenhouse.io/v1/boards/{co}/jobs/{id}
     // The job.url is usually the public apply URL; we derive the API URL when possible.
-    if(job.ats === 'gh' && job.company && job.id){
-      const api = `https://boards-api.greenhouse.io/v1/boards/${job.company}/jobs/${job.id}`;
+    if(job.ats === 'gh' && (job.board || job.company) && job.id){
+      const slug = job.board || job.company;
+      const api = `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs/${job.id}`;
       const r = await withTimeout(fetch(api), 7000);
       if(r.ok){
         const d = await r.json();
