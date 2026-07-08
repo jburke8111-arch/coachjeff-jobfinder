@@ -1228,6 +1228,7 @@ function scoreJob(j, kw, loc){
   }
 
   // 5) Penalties — soft signals the role may not fit a new grad
+  if(j.aggregator) s -= 3;                                            // (2) aggregator wall (signup gate) ranks below real employer/ATS links
   if(isSeniorTitle(title)) s -= experiencedPenalty(title);             // experienced roles should rank far below true early-career roles
   if(CLEAR_RX.test(title + ' ' + locText)) s -= 1;                  // clearance/sponsorship friction
   if(/\b([2-9]|1[0-9])\s*\+?\s*years?\b/i.test(title)) s -= 5;       // explicit experience requirement in title
@@ -1315,6 +1316,8 @@ function renderJob(j, kw, loc){
             ${(!experienced && (j.score || 0) >= 8) ? '<span class="tag strong">high-priority lead</span>' : ''}
             ${j.expFlag ? '<span class="tag warn">may require experience</span>' : ''}
             ${j.source === 'adzuna' ? '<span class="tag gray">Adzuna</span>' : ''}
+            ${j.aggregator ? `<span class="tag warn">via ${esc(j.aggregatorName || 'aggregator')} — signup may be required</span>` : ''}
+            ${j.resolvedDirect ? '<span class="tag strong">direct employer link found</span>' : ''}
             ${j.source === 'ashby' ? '<span class="tag gray">Ashby</span>' : ''}
             ${j.source === 'greenhouse' ? '<span class="tag gray">Greenhouse</span>' : ''}
             ${j.source === 'usajobs' ? '<span class="tag gray">USAJOBS</span>' : ''}
@@ -1503,6 +1506,36 @@ async function search(){
       sourceStats.greenhouse = greenhouseJobs.length;
       if(greenhouseJobs.length){ jobs = jobs.concat(greenhouseJobs); }
     } catch(e){ /* ignore Greenhouse errors, keep other results */ }
+
+    // (3) Company-direct resolution: some Adzuna results link to aggregator walls
+    // (ZipRecruiter etc.) that gate the job behind a signup. When the Adzuna job's
+    // company matches one of our curated ATS boards, swap the wall link for the
+    // real board so the click lands on a page the user can actually use.
+    try {
+      const boardBySlug = new Map();
+      for(const c of COMPANIES){
+        // Normalize the board token the same way adzuna.js normalizes company names.
+        const key = String(c.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if(key && !boardBySlug.has(key)) boardBySlug.set(key, c);
+      }
+      const boardUrl = (c) => c.ats === 'lever'
+        ? `https://jobs.lever.co/${c.slug}`
+        : `https://boards.greenhouse.io/${c.slug}`;
+
+      let resolved = 0;
+      for(const j of jobs){
+        if(j.source !== 'adzuna' || !j.aggregator || !j.companySlug) continue;
+        const match = boardBySlug.get(j.companySlug);
+        if(match){
+          j.url = boardUrl(match);
+          j.aggregator = false;
+          j.aggregatorName = '';
+          j.resolvedDirect = true;   // for the "direct link found" badge
+          resolved++;
+        }
+      }
+      if(resolved) sourceStats.adzunaResolved = resolved;
+    } catch(e){ /* resolution is best-effort; never break the merge */ }
 
     // Deduplicate after all sources are merged.
     const seenJobKeys = new Set();
