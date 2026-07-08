@@ -78,9 +78,22 @@ export default async (request, context) => {
     }
 
     const data = await apiResp.json();
-    const items = (data &&
+    let items = (data &&
       data.SearchResult &&
       data.SearchResult.SearchResultItems) || [];
+
+    // Drop jobs a new grad CANNOT apply to. USAJOBS marks eligibility with a
+    // HiringPath array. We keep only roles open to the general public (or the
+    // student / recent-graduate Pathways paths) and drop internal-only,
+    // competitive-service-only, land-management, and senior-executive postings.
+    // If HiringPath is missing, we keep the job (fail-open, don't hide good ones).
+    const OK_PATHS = ["public", "student", "recent-graduate"];
+    items = items.filter((item) => {
+      const d = (item && item.MatchedObjectDescriptor) || {};
+      const paths = (d.UserArea && d.UserArea.Details && d.UserArea.Details.HiringPath) || d.HiringPath;
+      if (!Array.isArray(paths) || paths.length === 0) return true; // unknown -> keep
+      return paths.some((p) => OK_PATHS.includes(String(p).toLowerCase()));
+    });
 
     // Normalize into the same simple shape the rest of the site uses,
     // so USAJOBS results slot in alongside Greenhouse/Lever results.
