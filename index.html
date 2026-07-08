@@ -1507,7 +1507,7 @@ async function search(){
         statusEl.innerHTML = hideClear
           ? `<span class="loading">Checking ${checkable.length} roles for work-authorization &amp; sponsorship…</span>`
           : `<span class="loading">Verifying ${checkable.length} role${checkable.length===1?'':'s'} against their descriptions…</span>`;
-        const payload = checkable.map(j => ({ id:j.id, url:j.url, ats:j.ats, company:j.company }));
+        const payload = checkable.map(j => ({ id:j.id, url:j.url, ats:j.ats, company:j.company, board:j.board }));
         const resp = await fetch('/.netlify/functions/checkjobs', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
