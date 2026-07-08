@@ -181,8 +181,6 @@
   .job.direct{background:#fff;border:1px solid var(--line);padding-left:14px;padding-right:14px;margin-top:10px}
   .direct-heading{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:24px 0 4px}
 
-
-
   .searchlinks{margin-top:28px;border-top:1px solid var(--line);padding-top:20px}
   .searchlink-note{font-size:13.5px;color:var(--mute);max-width:76ch;margin:0 0 12px}
   .searchlink-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -215,8 +213,6 @@
     color:var(--mute);list-style:none;user-select:none}
     color:var(--mute);line-height:1.7;word-break:break-word}
 @media(max-width:560px){.job-top{flex-direction:column;gap:2px}.co{white-space:normal}}
-
-
 
   /* V7 polish: match mockup spacing and font hierarchy */
   .wrap details.advancedbar,
@@ -371,6 +367,22 @@
   .loosen-btn{width:auto;height:auto;padding:8px 12px;border:1px solid var(--line-strong);border-radius:999px;background:#fff;color:var(--navy);font-size:13px;font-weight:600}
   .loosen-btn:hover{border-color:var(--amber);color:var(--amber-deep);background:#fff}
 
+  /* Brand-bar coaching link */
+  .brandbar .brand-link{margin-left:14px;font-size:12px;color:var(--amber);font-weight:700;
+    text-decoration:none;letter-spacing:.02em;white-space:nowrap}
+  .brandbar .brand-link:hover{color:#fff;text-decoration:underline}
+  @media(max-width:620px){.brandbar .tagline{display:none} .brandbar .brand-link{margin-left:auto}}
+
+  /* Slim coaching prompt below results */
+  .coaching-prompt{display:flex;align-items:center;gap:18px;justify-content:space-between;
+    background:var(--navy-bar);color:#fff;border-radius:12px;padding:18px 24px;margin:24px 0 8px;
+    text-decoration:none;transition:all .12s;flex-wrap:wrap}
+  .coaching-prompt:hover{background:var(--navy-deep)}
+  .coaching-prompt .cp-text{font-size:14px;line-height:1.55;color:#dbe3ef;max-width:70ch}
+  .coaching-prompt .cp-text strong{color:#fff}
+  .coaching-prompt .cp-go{flex:none;font-size:13.5px;font-weight:700;color:#1a1a1a;
+    background:var(--amber);padding:9px 18px;border-radius:8px;white-space:nowrap}
+  .coaching-prompt:hover .cp-go{background:#e89a3c}
 </style>
 
 <script data-goatcounter="https://coachjeff-jobfinder.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
@@ -381,6 +393,7 @@
     <span class="dot"></span>
     <span class="name">Coach Jeff&apos;s Job Finder</span>
     <span class="tagline">Free Early-Career Search Tool</span>
+    <a class="brand-link" href="/coaching.html">Free Coaching ↗</a>
   </div>
 </div>
 <div class="wrap">
@@ -540,6 +553,10 @@
 
   <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, and Greenhouse. Roles link directly to the application page.</p>
 
+  <a class="coaching-prompt" href="/coaching.html">
+    <span class="cp-text"><strong>Want a second set of eyes on your search?</strong> Coach Jeff offers free 1-on-1 coaching for new grads — resume, LinkedIn, job search &amp; interviews.</span>
+    <span class="cp-go">Free Coaching →</span>
+  </a>
 
 </div>
 
@@ -1146,8 +1163,6 @@ function scoreJob(j, kw, loc){
   return s;
 }
 
-
-
 function matchPercent(rawScore){
   const n = Math.round(55 + Math.max(0, Math.min(12, rawScore || 0)) * 3.6);
   return Math.max(45, Math.min(98, n));
@@ -1689,8 +1704,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const s = document.getElementById('status');
   if (s && (s.textContent.includes('Ready') || s.textContent.includes('script loaded'))) s.textContent = '';
 });
-
-
 
 function currentSearchState(){
   return {

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free Career Coaching — Coach Jeff | Experience Career System</title>
+<meta name="description" content="Free career coaching for college students and recent graduates from Coach Jeff — a retired federal economist. Four free 1-hour sessions: resume, LinkedIn, job search, and interview prep.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Free Career Coaching — Coach Jeff">
+<meta property="og:description" content="Four free 1-hour coaching sessions for new grads: resume, LinkedIn, job search, and interview prep. From Experience Career System.">
+<meta property="og:site_name" content="Experience Career System">
+<meta property="og:url" content="https://coachjeff-jobfinder.netlify.app/coaching.html">
+<style>
+  :root{
+    --navy:#12203a;
+    --navy-bar:#1c3257;
+    --navy-deep:#0d1830;
+    --paper:#fbfaf7;
+    --card:#ffffff;
+    --amber:#d98a2b;
+    --amber-deep:#b6701c;
+    --line:#e4e1d9;
+    --line-strong:#cfd3da;
+    --mute:#5d6470;
+    --faint:#8a8f99;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--navy);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:var(--amber-deep)}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 24px}
+
+  /* Brand bar (matches job finder) */
+  .brandbar{background:var(--navy-bar);color:#fff}
+  .brandbar .row{display:flex;align-items:center;gap:10px;padding:13px 24px;max-width:1000px;margin:0 auto}
+  .brandbar .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);flex:none}
+  .brandbar .name{font-size:13.5px;font-weight:700;letter-spacing:.01em}
+  .brandbar .back{margin-left:auto;font-size:13px;font-weight:600;color:#cfd8e6;
+    text-decoration:none;white-space:nowrap}
+  .brandbar .back:hover{color:#fff;text-decoration:underline}
+
+  /* Hero */
+  .hero{background:var(--navy-bar);color:#fff;padding:40px 0 48px}
+  .hero .eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--amber);margin-bottom:12px}
+  .hero h1{font-size:34px;line-height:1.15;margin:0 0 14px;font-weight:800}
+  .hero h1 .hl{color:var(--amber)}
+  .hero p{font-size:15.5px;line-height:1.6;color:#d3dcea;max-width:60ch;margin:0}
+
+  /* Sections */
+  section{padding:40px 0}
+  section h2{font-size:21px;font-weight:800;margin:0 0 8px}
+  section .lead{font-size:14.5px;color:var(--mute);max-width:64ch;margin:0 0 24px;line-height:1.65}
+
+  .about-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 28px;
+    margin-top:8px}
+  .about-card p{font-size:15px;line-height:1.7;margin:0 0 18px;color:#2c3648}
+  .about-actions{display:flex;flex-wrap:wrap;gap:12px}
+  .btn{display:inline-block;font-size:14px;font-weight:700;padding:11px 20px;border-radius:9px;
+    text-decoration:none;transition:all .12s;border:1px solid var(--line-strong);color:var(--navy);background:#fff}
+  .btn:hover{border-color:var(--amber);background:#fffaf2}
+  .btn.primary{background:var(--amber);border-color:var(--amber);color:#1a1a1a}
+  .btn.primary:hover{background:var(--amber-deep);border-color:var(--amber-deep);color:#fff}
+
+  /* Coaching sessions */
+  .intro-cta{display:inline-flex;align-items:center;gap:8px;background:rgba(217,138,43,.1);
+    border:1px solid rgba(217,138,43,.3);border-radius:10px;padding:14px 20px;
+    font-size:15px;font-weight:700;color:var(--amber-deep);text-decoration:none;margin-bottom:26px}
+  .intro-cta:hover{background:rgba(217,138,43,.16)}
+  .sessions{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .session{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;
+    text-decoration:none;color:inherit;display:flex;flex-direction:column;transition:all .12s}
+  .session:hover{border-color:var(--amber);box-shadow:0 4px 16px rgba(18,32,58,.06);transform:translateY(-1px)}
+  .session .num{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber-deep);margin-bottom:8px}
+  .session h3{font-size:16.5px;font-weight:700;margin:0 0 8px;color:var(--navy)}
+  .session p{font-size:13.5px;line-height:1.6;color:var(--mute);margin:0 0 16px;flex:1}
+  .session .go{font-size:13px;font-weight:700;color:var(--amber-deep)}
+
+  /* Tools + contact */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+  .mini-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px 26px}
+  .mini-card h2{font-size:17px;margin-bottom:14px}
+  .link-row{display:block;font-size:14.5px;font-weight:600;color:var(--navy);text-decoration:none;
+    padding:11px 0;border-bottom:1px solid var(--line)}
+  .link-row:last-child{border-bottom:none}
+  .link-row:hover{color:var(--amber-deep)}
+  .contact-line{font-size:14.5px;margin:0 0 12px;color:#2c3648}
+  .contact-line strong{color:var(--navy)}
+
+  footer{background:var(--navy-bar);color:#9fb0c9;text-align:center;font-size:12.5px;
+    padding:22px 24px;margin-top:40px}
+  footer a{color:#cfd8e6}
+
+  @media(max-width:760px){
+    .sessions{grid-template-columns:1fr}
+    .cols{grid-template-columns:1fr}
+    .hero h1{font-size:27px}
+  }
+</style>
+</head>
+<body>
+
+<div class="brandbar">
+  <div class="row">
+    <span class="dot"></span>
+    <span class="name">Coach Jeff&apos;s Job Finder</span>
+    <a class="back" href="/">← Back to Job Finder</a>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Experience Career System</div>
+    <h1>Free career coaching <span class="hl">for new graduates.</span></h1>
+    <p>The job finder helps you find roles. I help you land them — with free one-on-one coaching built specifically for college students and recent grads.</p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section>
+    <h2>About Coach Jeff</h2>
+    <div class="about-card">
+      <p>After more than 33 years with the Federal Government, I retired and now volunteer my time helping college students and recent graduates start successful careers. Everything I build — from coaching sessions to career tools — is designed to help early-career job seekers compete more effectively.</p>
+      <div class="about-actions">
+        <a class="btn primary" href="https://www.linkedin.com/in/jeff-burke-87595621/" target="_blank" rel="noopener">Connect on LinkedIn</a>
+        <a class="btn" href="mailto:jburke8111@gmail.com">Email Coach Jeff</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Free Career Coaching Sessions</h2>
+    <p class="lead">Four free one-hour sessions, each focused on a different part of your search. Book any that help — or start with a quick intro call to figure out where to begin.</p>
+    <a class="intro-cta" href="https://cal.com/careercoachjeff/30min" target="_blank" rel="noopener">📞 Book a free 30-minute intro call →</a>
+    <div class="sessions">
+      <a class="session" href="https://cal.com/careercoachjeff/free-career-coaching-session-1-resume-1-hour" target="_blank" rel="noopener">
+        <span class="num">Session 1</span>
+        <h3>Resume Strategy</h3>
+        <p>ATS optimization, resume review, accomplishments, skills, and projects.</p>
+        <span class="go">Book this session →</span>
+      </a>
+      <a class="session" href="https://cal.com/careercoachjeff/free-career-coaching-session-2-resume-1-hour" target="_blank" rel="noopener">
+        <span class="num">Session 2</span>
+        <h3>LinkedIn &amp; Personal Branding</h3>
+        <p>Headline, About section, keywords, and networking strategy.</p>
+        <span class="go">Book this session →</span>
+      </a>
+      <a class="session" href="https://cal.com/careercoachjeff/free-career-coaching-session-3-networking-applications-1-hour" target="_blank" rel="noopener">
+        <span class="num">Session 3</span>
+        <h3>Job Search Strategy</h3>
+        <p>Job search plan, networking, applications, the hidden job market, and recruiters.</p>
+        <span class="go">Book this session →</span>
+      </a>
+      <a class="session" href="https://cal.com/careercoachjeff/free-career-coaching-session-4-interviewing-next-steps-1-hour" target="_blank" rel="noopener">
+        <span class="num">Session 4</span>
+        <h3>Interview Preparation</h3>
+        <p>Behavioral interviews, STAR stories, technical interviews, and salary discussions.</p>
+        <span class="go">Book this session →</span>
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <div class="cols">
+      <div class="mini-card">
+        <h2>Other Free Tools</h2>
+        <a class="link-row" href="https://coachjeff-resume-optimizer.netlify.app/" target="_blank" rel="noopener">ATS Resume Builder →</a>
+        <a class="link-row" href="https://coachjeff-coverletter.netlify.app/" target="_blank" rel="noopener">Cover Letter Builder →</a>
+        <a class="link-row" href="/">Coach Jeff&apos;s Job Finder →</a>
+      </div>
+      <div class="mini-card">
+        <h2>Get in Touch</h2>
+        <p class="contact-line"><strong>LinkedIn:</strong> <a href="https://www.linkedin.com/in/jeff-burke-87595621/" target="_blank" rel="noopener">jeff-burke</a></p>
+        <p class="contact-line"><strong>Email:</strong> <a href="mailto:jburke8111@gmail.com">jburke8111@gmail.com</a></p>
+        <p class="contact-line" style="color:var(--mute);font-size:13px;margin-top:16px;">All coaching is free. I do this to help new grads compete — no catch.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  Built by Jeff Burke · Experience Career System · Free for all early-career job seekers · <a href="/">Back to Job Finder</a>
+</footer>
+
+</body>
+</html>
