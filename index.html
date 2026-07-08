@@ -383,6 +383,20 @@
   .coaching-prompt .cp-go{flex:none;font-size:13.5px;font-weight:700;color:#1a1a1a;
     background:var(--amber);padding:9px 18px;border-radius:8px;white-space:nowrap}
   .coaching-prompt:hover .cp-go{background:#e89a3c}
+
+
+  /* V20 major-based search guide — compact 2-step flow */
+  .majorbar{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+  .majorbar-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+  .major-help{font-size:12.5px;color:var(--faint);line-height:1.4;margin:0 0 12px}
+  .major-steps{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;align-items:end}
+  .major-step-label{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-deep);margin-bottom:2px}
+  .majorbar select{height:42px;font-size:14.5px;background-color:#fff}
+  .title-select-wrap{position:relative}
+  .title-select-wrap select{padding-right:46px}
+  .title-select-wrap .search-glyph{position:absolute;right:30px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px;opacity:.65}
+  @media(max-width:760px){.major-steps{grid-template-columns:1fr}}
+
 </style>
 
 <script data-goatcounter="https://coachjeff-jobfinder.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
@@ -411,6 +425,26 @@
 
 
   <div class="hero-search">
+    <div class="majorbar" aria-label="Find jobs by major">
+      <div class="majorbar-title">🎓 What&rsquo;s your major?</div>
+      <p class="major-help">Select your major, then choose a recommended job title. The title fills the Keyword box — add a location if you want, then click Search.</p>
+      <div class="major-steps">
+        <div class="field">
+          <div class="major-step-label">Step 1</div>
+          <label for="majorSelect">Major</label>
+          <select id="majorSelect"></select>
+        </div>
+        <div class="field">
+          <div class="major-step-label">Step 2</div>
+          <label for="majorTitleSelect">Recommended job title</label>
+          <div class="title-select-wrap">
+            <select id="majorTitleSelect"></select>
+            <span class="search-glyph" aria-hidden="true">🔍</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="hero-grid">
       <div class="field">
         <label for="kw">Keyword</label>
@@ -424,18 +458,6 @@
         <button id="go">Search</button>
         <button id="saveSearch" class="secondary" type="button">Save Search</button>
         <button id="reset" class="secondary" type="button">Reset</button>
-      </div>
-    </div>
-
-    <div class="quickbar">
-      <div class="quickbar-title">Popular Early-Career Roles</div>
-      <div class="quickchips">
-        <button class="chip quick" data-kw="data analyst">Data Analyst</button>
-        <button class="chip quick" data-kw="business analyst">Business Analyst</button>
-        <button class="chip quick" data-kw="marketing coordinator">Marketing</button>
-        <button class="chip quick" data-kw="sales development">Sales / BDR</button>
-        <button class="chip quick" data-kw="it support">IT Support</button>
-      <button class="chip quick" data-kw="project coordinator">Project Coordinator</button>
       </div>
     </div>
   </div>
@@ -608,6 +630,62 @@
 -->
 
 <script>
+
+// V18: Major-to-job-title search map. Ordered roughly by broad U.S. undergraduate popularity
+// and usefulness for early-career job seekers. Each title becomes a one-click keyword search.
+const MAJOR_TITLE_MAP = {
+  "Business Administration": ["Business Analyst", "Operations Analyst", "Project Coordinator", "Management Trainee", "Client Success Associate"],
+  "Computer Science": ["Software Engineer", "Software Developer", "Full Stack Developer", "QA Engineer", "Technical Support Engineer"],
+  "Psychology": ["Case Manager", "Behavioral Health Technician", "HR Coordinator", "Research Assistant", "Client Services Coordinator"],
+  "Nursing": ["Registered Nurse", "New Grad RN", "Nurse Residency", "Clinical Nurse", "Public Health Nurse"],
+  "Biology": ["Research Assistant", "Laboratory Technician", "Clinical Research Coordinator", "Quality Assurance Analyst", "Environmental Scientist"],
+  "Accounting": ["Staff Accountant", "Audit Associate", "Tax Associate", "Accounting Analyst", "Accounts Payable Specialist"],
+  "Finance": ["Financial Analyst", "Credit Analyst", "Investment Analyst", "Risk Analyst", "Client Service Associate"],
+  "Marketing": ["Marketing Coordinator", "Digital Marketing Specialist", "Marketing Analyst", "Social Media Coordinator", "Content Marketing Specialist"],
+  "Communications": ["Communications Coordinator", "Public Relations Assistant", "Marketing Coordinator", "Social Media Coordinator", "Content Specialist"],
+  "Criminal Justice": ["Investigator", "Compliance Analyst", "Probation Officer", "Case Manager", "Security Analyst"],
+  "Mechanical Engineering": ["Mechanical Engineer", "Manufacturing Engineer", "Quality Engineer", "Process Engineer", "Project Engineer"],
+  "Information Systems": ["Business Systems Analyst", "IT Analyst", "Systems Analyst", "Application Support Analyst", "Data Analyst"],
+  "Economics": ["Research Analyst", "Data Analyst", "Financial Analyst", "Pricing Analyst", "Policy Analyst"],
+  "Political Science": ["Policy Analyst", "Legislative Assistant", "Program Coordinator", "Research Assistant", "Government Affairs Associate"],
+  "Elementary Education": ["Elementary Teacher", "Instructional Assistant", "Education Coordinator", "Tutor", "Youth Program Coordinator"],
+  "Kinesiology / Exercise Science": ["Exercise Specialist", "Wellness Coordinator", "Rehabilitation Aide", "Fitness Specialist", "Health Coach"],
+  "Computer Engineering": ["Software Engineer", "Embedded Software Engineer", "Hardware Engineer", "Systems Engineer", "Test Engineer"],
+  "Electrical Engineering": ["Electrical Engineer", "Controls Engineer", "Test Engineer", "Power Engineer", "Field Engineer"],
+  "Health Sciences": ["Clinical Coordinator", "Patient Care Coordinator", "Public Health Analyst", "Health Program Coordinator", "Healthcare Analyst"],
+  "Public Health": ["Public Health Analyst", "Health Program Coordinator", "Epidemiology Assistant", "Community Health Coordinator", "Research Assistant"],
+  "Sociology": ["Case Manager", "Program Coordinator", "Research Assistant", "Community Outreach Coordinator", "Social Services Coordinator"],
+  "English": ["Content Writer", "Editor", "Communications Coordinator", "Technical Writer", "Marketing Coordinator"],
+  "History": ["Research Assistant", "Archivist Assistant", "Museum Coordinator", "Policy Assistant", "Communications Coordinator"],
+  "Human Resources": ["HR Coordinator", "Talent Acquisition Coordinator", "Recruiting Coordinator", "HR Generalist", "People Operations Associate"],
+  "Supply Chain Management": ["Supply Chain Analyst", "Logistics Coordinator", "Procurement Analyst", "Operations Analyst", "Inventory Analyst"],
+  "Business Analytics": ["Data Analyst", "Business Analyst", "Operations Analyst", "Reporting Analyst", "Business Intelligence Analyst"],
+  "Data Analytics": ["Data Analyst", "Reporting Analyst", "Business Intelligence Analyst", "Operations Analyst", "Research Analyst"],
+  "Cybersecurity": ["Security Analyst", "SOC Analyst", "Information Security Analyst", "Cybersecurity Analyst", "IT Risk Analyst"],
+  "Information Technology": ["IT Support Specialist", "Help Desk Analyst", "Systems Administrator", "Network Technician", "Application Support Analyst"],
+  "Graphic Design": ["Graphic Designer", "Visual Designer", "Production Designer", "Marketing Designer", "UX Designer"],
+  "Journalism": ["Reporter", "Editorial Assistant", "Content Writer", "Communications Coordinator", "Social Media Coordinator"],
+  "Public Relations": ["Public Relations Assistant", "Communications Coordinator", "Media Relations Coordinator", "Account Coordinator", "Social Media Coordinator"],
+  "Management": ["Management Trainee", "Operations Coordinator", "Business Analyst", "Project Coordinator", "Client Success Associate"],
+  "Entrepreneurship": ["Business Development Representative", "Sales Development Representative", "Operations Coordinator", "Marketing Coordinator", "Account Coordinator"],
+  "International Business": ["Business Analyst", "Import Export Coordinator", "Supply Chain Analyst", "Account Coordinator", "Operations Analyst"],
+  "Hospitality Management": ["Event Coordinator", "Revenue Analyst", "Hotel Operations Coordinator", "Guest Services Manager Trainee", "Sales Coordinator"],
+  "Sports Management": ["Athletic Operations Coordinator", "Event Coordinator", "Ticket Sales Representative", "Marketing Coordinator", "Partnerships Coordinator"],
+  "Environmental Science": ["Environmental Scientist", "Sustainability Analyst", "Environmental Coordinator", "EHS Specialist", "Research Technician"],
+  "Civil Engineering": ["Civil Engineer", "Project Engineer", "Construction Coordinator", "Transportation Engineer", "Field Engineer"],
+  "Chemical Engineering": ["Process Engineer", "Chemical Engineer", "Quality Engineer", "Manufacturing Engineer", "Validation Engineer"],
+  "Industrial Engineering": ["Industrial Engineer", "Process Improvement Analyst", "Operations Analyst", "Manufacturing Engineer", "Supply Chain Analyst"],
+  "Biomedical Engineering": ["Biomedical Engineer", "Quality Engineer", "Clinical Research Coordinator", "Validation Engineer", "Product Development Engineer"],
+  "Mathematics": ["Data Analyst", "Actuarial Analyst", "Quantitative Analyst", "Research Analyst", "Operations Analyst"],
+  "Statistics": ["Data Analyst", "Statistical Analyst", "Research Analyst", "Business Intelligence Analyst", "Actuarial Analyst"],
+  "Physics": ["Research Assistant", "Data Analyst", "Test Engineer", "Laboratory Technician", "Systems Engineer"],
+  "Chemistry": ["Chemist", "Laboratory Technician", "Quality Control Analyst", "Research Associate", "Environmental Analyst"],
+  "Social Work": ["Case Manager", "Social Services Coordinator", "Community Outreach Coordinator", "Family Support Specialist", "Program Coordinator"],
+  "Public Administration": ["Program Analyst", "Policy Analyst", "Administrative Analyst", "Government Affairs Associate", "Program Coordinator"],
+  "Healthcare Administration": ["Healthcare Analyst", "Administrative Fellow", "Practice Coordinator", "Patient Services Coordinator", "Operations Analyst"],
+  "Advertising": ["Account Coordinator", "Media Planner", "Marketing Coordinator", "Social Media Coordinator", "Brand Coordinator"]
+};
+
 // Curated grad-friendly employers across sectors. {slug, ats, sector}. Edit freely.
 // Some slugs will 404 over time as companies rename or switch ATS — the tool
 // reports "boards live vs unreachable" so you can prune dead ones.
@@ -1773,12 +1851,48 @@ function renderSavedSearches(){
     renderSavedSearches();
   });
 }
-document.querySelectorAll('.quick').forEach(btn=>btn.addEventListener('click',()=>{
-  document.getElementById('kw').value = btn.dataset.kw || '';
+
+function titleCaseMajorSearch(term){
+  return (term || '').toString().trim();
+}
+function fillKeywordFromSuggestion(term){
+  const clean = titleCaseMajorSearch(term);
+  if(!clean) return;
+  document.getElementById('kw').value = clean;
   document.getElementById('lvl').value = 'early';
   syncExperienceControls();
+}
+function runKeywordSearch(term){
+  fillKeywordFromSuggestion(term);
   search();
+}
+function initMajorSearch(){
+  const majorSelect = document.getElementById('majorSelect');
+  const titleSelect = document.getElementById('majorTitleSelect');
+  if(!majorSelect || !titleSelect || typeof MAJOR_TITLE_MAP === 'undefined') return;
+
+  majorSelect.innerHTML = Object.keys(MAJOR_TITLE_MAP).map((major, idx)=>
+    `<option value="${esc(major)}"${idx === 0 ? ' selected' : ''}>${esc(major)}</option>`
+  ).join('');
+
+  function renderTitleOptions(){
+    const titles = MAJOR_TITLE_MAP[majorSelect.value] || [];
+    titleSelect.innerHTML = `<option value="">Choose one to fill Keyword…</option>` +
+      titles.map((title, idx)=>`<option value="${esc(title)}">${idx + 1}. ${esc(title)}</option>`).join('');
+    titleSelect.value = '';
+  }
+
+  majorSelect.addEventListener('change', renderTitleOptions);
+  titleSelect.addEventListener('change', ()=>{
+    if(titleSelect.value) fillKeywordFromSuggestion(titleSelect.value);
+  });
+  renderTitleOptions();
+}
+
+document.querySelectorAll('.quick').forEach(btn=>btn.addEventListener('click',()=>{
+  runKeywordSearch(btn.dataset.kw || '');
 }));
+initMajorSearch();
 document.getElementById('saveSearch').addEventListener('click',()=>{
   const st = currentSearchState();
   const name = [st.loc, st.kw || 'All early-career', st.work !== 'any' ? st.work : ''].filter(Boolean).join(' · ');
@@ -1822,6 +1936,11 @@ document.getElementById('reset').addEventListener('click', ()=>{
   results.innerHTML = '';
   countEl.textContent = '';
   statusEl.textContent = '';
+  if(document.getElementById('majorSelect') && document.getElementById('majorTitleSelect')){
+    document.getElementById('majorSelect').selectedIndex = 0;
+    const evt = new Event('change');
+    document.getElementById('majorSelect').dispatchEvent(evt);
+  }
   document.getElementById('kw').focus();
 });
 
