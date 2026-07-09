@@ -172,6 +172,77 @@
   .tag.sp-yes{background:rgba(31,122,77,.14);color:#1f7a4d;font-weight:700}
   .tag.sp-no{background:rgba(185,45,45,.12);color:#a12b2b;font-weight:700}
   .tag.sp-unk{background:#f4f1ea;color:#8a7d5f;font-weight:600}
+
+  /* --- Saved-job / applied controls on each result card --- */
+  .job-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+  .jbtn{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;
+    padding:5px 11px;border-radius:999px;border:1px solid var(--line-strong);
+    background:#fff;color:var(--navy);cursor:pointer;transition:all .12s;line-height:1.2;
+    width:auto;flex:0 0 auto;white-space:nowrap}
+  .jbtn:hover{border-color:var(--amber);color:var(--amber-deep)}
+  .jbtn .ic{font-size:13px;line-height:1}
+  .jbtn.save.on{background:rgba(217,138,43,.13);border-color:var(--amber);color:var(--amber-deep)}
+  .jbtn.applied.on{background:rgba(31,122,77,.13);border-color:#1f7a4d;color:#1f7a4d}
+  .jbtn.applied.on:hover{border-color:#1f7a4d;color:#1f7a4d}
+
+  /* --- My saved jobs panel --- */
+  .savedjobs-bar{margin:14px 0 4px}
+  .savedjobs-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    flex-wrap:wrap;margin-bottom:10px}
+  .savedjobs-title{font-size:14px;font-weight:700;color:var(--navy);letter-spacing:.01em}
+  .savedjobs-title .cnt{color:var(--mute);font-weight:600}
+  .savedjobs-hint{font-size:12px;color:var(--mute);margin:-4px 0 10px;line-height:1.45}
+  .savedjobs-hint strong{color:var(--navy);font-weight:700}
+
+  /* --- On-screen source-health panel (dev instrument) --- */
+  .health-panel{position:fixed;inset:0;z-index:1000;background:rgba(20,28,40,.45);
+    display:flex;align-items:center;justify-content:center;padding:18px}
+  .health-card{background:#fff;border-radius:14px;max-width:440px;width:100%;
+    max-height:82vh;overflow:auto;box-shadow:0 18px 50px rgba(0,0,0,.28);
+    padding:18px 20px 20px}
+  .health-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .health-title{font-size:15px;font-weight:800;color:var(--navy);letter-spacing:.01em}
+  .health-close{border:none;background:transparent;font-size:24px;line-height:1;
+    color:var(--faint);cursor:pointer;padding:0 4px}
+  .health-close:hover{color:var(--navy)}
+  .hp-sub{font-size:12px;color:var(--mute);margin:0 0 10px;font-weight:600}
+  .hp-empty{font-size:13px;color:var(--mute);margin:8px 0}
+  .hp-table{width:100%;border-collapse:collapse;font-size:13px}
+  .hp-table th{text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--mute);font-weight:700;padding:4px 6px;border-bottom:1px solid var(--line)}
+  .hp-table th:first-child{text-align:left}
+  .hp-table td{padding:7px 6px;border-bottom:1px solid var(--line)}
+  .hp-src{font-weight:600;color:var(--navy)}
+  .hp-num{text-align:right;color:var(--navy);font-variant-numeric:tabular-nums}
+  .hp-rate{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px}
+  .hp-note{font-size:12px;color:var(--mute);line-height:1.5;margin:12px 0 4px}
+  .hp-note strong{color:var(--navy)}
+  .hp-actions{display:flex;gap:8px;margin-top:12px}
+  .savedjobs-tools{display:flex;gap:8px;flex-wrap:wrap}
+  .savedjobs-list{display:flex;flex-direction:column;gap:2px}
+  .sj-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+    padding:12px 4px;border-bottom:1px solid var(--line)}
+  .sj-main{min-width:0}
+  .sj-title{font-size:15px;font-weight:600;color:var(--navy);text-decoration:none;letter-spacing:-.01em}
+  .sj-title:hover{color:var(--amber-deep)}
+  .sj-meta{font-size:12.5px;color:var(--mute);margin-top:3px}
+  .sj-tags{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
+  .sj-controls{display:flex;gap:6px;align-items:center;flex-shrink:0}
+  .sj-del{border:none;background:transparent;color:var(--faint);font-size:17px;line-height:1;
+    cursor:pointer;padding:2px 4px}
+  .sj-del:hover{color:#c0392b}
+  .savedjobs-empty{font-size:13px;color:var(--mute);padding:6px 4px}
+
+  /* --- Always-visible saved-jobs cue near the top --- */
+  .savedjobs-cue-wrap{margin:2px 0 4px}
+  .savedjobs-cue{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;
+    padding:6px 13px;border-radius:999px;border:1px solid var(--line-strong);background:#fff;
+    color:var(--navy);cursor:pointer;transition:all .12s;line-height:1.2}
+  .savedjobs-cue:hover{border-color:var(--amber);color:var(--amber-deep)}
+  .savedjobs-cue .sjc-star{color:var(--amber-deep);font-size:14px;line-height:1}
+  .savedjobs-cue .sjc-count{color:var(--mute);font-weight:700}
+  .savedjobs-cue.has-saved{border-color:var(--amber);background:rgba(217,138,43,.08)}
+  .savedjobs-cue.has-saved .sjc-count{color:var(--amber-deep)}
   .sponsor-filter{display:block;margin-top:8px}
   .sponsor-filter label{font-size:12px;color:var(--mute);margin-right:6px}
   .sponsor-filter select{font-size:12.5px;padding:4px 8px;border:1px solid var(--line-strong);
@@ -467,6 +538,12 @@
     <div id="savedSearches" class="savedchips"></div>
   </div>
 
+  <div class="savedjobs-cue-wrap">
+    <button class="savedjobs-cue" id="savedJobsCue" type="button" title="Jump to your saved jobs">
+      <span class="sjc-star">★</span> Saved jobs <span class="sjc-count" id="savedJobsCueCount">(0)</span>
+    </button>
+  </div>
+
   <details class="advancedbar">
     <summary>Advanced Filters</summary>
     <div class="advanced-body">
@@ -571,6 +648,18 @@
     <span class="count" id="count"></span>
   </div>
 
+  <div class="savedjobs-bar" id="savedJobsBar" style="display:none;">
+    <div class="savedjobs-head">
+      <div class="savedjobs-title">★ My saved jobs <span class="cnt" id="savedJobsCount"></span></div>
+      <div class="savedjobs-tools">
+        <button class="jbtn" id="exportSavedJobs" title="Download your saved jobs as a CSV spreadsheet"><span class="ic">⬇</span> Export CSV</button>
+        <button class="jbtn" id="clearSavedJobs" title="Remove all saved jobs">Clear all</button>
+      </div>
+    </div>
+    <p class="savedjobs-hint">Saved on this device and browser only — they won't appear on your phone or another computer. Use <strong>Export CSV</strong> to keep a copy.</p>
+    <div class="savedjobs-list" id="savedJobsList"></div>
+  </div>
+
   <div class="results" id="results"></div>
 
   <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, and Greenhouse. Roles link directly to the application page.</p>
@@ -579,6 +668,16 @@
     <span class="cp-text"><strong>Want a second set of eyes on your search?</strong> Coach Jeff offers free 1-on-1 coaching for new grads — resume, LinkedIn, job search &amp; interviews.</span>
     <span class="cp-go">Free Coaching →</span>
   </a>
+
+  <div class="health-panel" id="healthPanel" role="dialog" aria-label="Source health" style="display:none;">
+    <div class="health-card">
+      <div class="health-head">
+        <span class="health-title">★ Source health</span>
+        <button class="health-close" id="healthClose" aria-label="Close">×</button>
+      </div>
+      <div id="healthPanelBody"></div>
+    </div>
+  </div>
 
 </div>
 
@@ -1302,10 +1401,13 @@ function renderJob(j, kw, loc){
   const experienced = isSeniorTitle(j.title || '');
   const early = hasEntrySignal(j.title || '') && !experienced;
   const why = whyThisJob(j, kw, loc).map(r=>`<span>✓ ${esc(r)}</span>`).join('');
+  const id = jobId(j);
+  const saved = isJobSaved(id);
+  const applied = isJobApplied(id);
   return `
-        <a class="job" href="${j.url}" target="_blank" rel="noopener">
+        <div class="job" data-jobid="${esc(id)}">
           <div class="job-top">
-            <span class="title">${esc(j.title)}</span>
+            <a class="title" href="${j.url}" target="_blank" rel="noopener">${esc(j.title)}</a>
           </div>
           <div class="loc">${esc(j.company)} · ${esc(j.location)}${j.sector ? ` · ${esc(j.sector)}` : ''}</div>
           <div class="job-meta-row">
@@ -1324,7 +1426,15 @@ function renderJob(j, kw, loc){
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
           <div class="why"><strong>Why this job?</strong><div class="why-list">${why}</div></div>
-        </a>`;
+          <div class="job-actions">
+            <button class="jbtn save${saved?' on':''}" data-act="save" data-jobid="${esc(id)}" aria-pressed="${saved}">
+              <span class="ic">${saved?'★':'☆'}</span><span class="lbl">${saved?'Saved':'Save'}</span>
+            </button>
+            <button class="jbtn applied${applied?' on':''}" data-act="applied" data-jobid="${esc(id)}" aria-pressed="${applied}">
+              <span class="ic">${applied?'✓':'○'}</span><span class="lbl">${applied?'Applied':'Mark applied'}</span>
+            </button>
+          </div>
+        </div>`;
 }
 function coachPickCompanies(kw){
   const q = (kw || '').toLowerCase();
@@ -1686,6 +1796,20 @@ async function search(){
     const evalLine = `${totalFetched.toLocaleString()} job${totalFetched===1?'':'s'} evaluated · ${jobs.length.toLocaleString()} matched filters · ${hiddenByFilters.toLocaleString()} filtered out`;
     const sourceBreakdown = `Source results: employer boards ${sourceStats.direct.toLocaleString()}, USAJobs ${sourceStats.usajobs.toLocaleString()}, Adzuna ${sourceStats.adzuna.toLocaleString()}, Ashby ${sourceStats.ashby.toLocaleString()}, Greenhouse ${sourceStats.greenhouse.toLocaleString()}`;
 
+    // --- Source-health logging (developer instrument, local only) ---
+    // Records what each source returned per search so Jeff can confirm
+    // fixes (e.g. Greenhouse id/ats) actually produce results in the wild
+    // on his own device. Nothing leaves the browser. See coachJeffHealth().
+    logSourceHealth({
+      kw: kw || '', loc: loc || '',
+      direct: sourceStats.direct, usajobs: sourceStats.usajobs,
+      adzuna: sourceStats.adzuna, ashby: sourceStats.ashby,
+      greenhouse: sourceStats.greenhouse,
+      adzunaResolved: sourceStats.adzunaResolved || 0,
+      boardsOk: okCos, boardsFail: failCos,
+      totalFetched, matched: jobs.length
+    });
+
     statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>`;
 
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
@@ -1705,6 +1829,9 @@ async function search(){
     }
 
     let html = '';
+
+    // Register this result set so Save buttons can persist full job data by ID.
+    registerJobsForSaving(jobs);
 
     if(jobs.length){
       html += jobs.map(j => renderJob(j, kw, loc)).join('');
@@ -1797,6 +1924,211 @@ async function search(){
 function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 
+/* ============================================================
+   SOURCE-HEALTH LOG  (developer instrument — local only)
+   Every search appends one row to localStorage.coachJeffSourceHealth
+   (capped at the last 100). Nothing is sent anywhere.
+
+   From the browser console, Jeff can run:
+     coachJeffHealth()        -> summary table + zero-return rates
+     coachJeffHealth(20)      -> also show the last 20 raw searches
+     coachJeffHealthClear()   -> wipe the log
+   The point: after the Greenhouse id/ats fix, run a handful of
+   searches, then coachJeffHealth() — if Greenhouse still shows a
+   high "zero-return rate", the fix didn't take.
+   ============================================================ */
+const HEALTH_KEY = 'coachJeffSourceHealth';
+const HEALTH_MAX = 100;
+
+function readHealthLog(){
+  try { return JSON.parse(localStorage.getItem(HEALTH_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+function logSourceHealth(rec){
+  try {
+    const log = readHealthLog();
+    log.unshift(Object.assign({ t: new Date().toISOString() }, rec));
+    if(log.length > HEALTH_MAX) log.length = HEALTH_MAX;
+    localStorage.setItem(HEALTH_KEY, JSON.stringify(log));
+    // Live one-liner in dev console for the search that just ran.
+    if(window.console && console.debug){
+      console.debug(
+        `[jobfinder] "${rec.kw||'(all)'}"${rec.loc?(' @ '+rec.loc):''} — ` +
+        `boards ${rec.direct} (ok ${rec.boardsOk}/fail ${rec.boardsFail}), ` +
+        `USAJobs ${rec.usajobs}, Adzuna ${rec.adzuna}, Ashby ${rec.ashby}, ` +
+        `Greenhouse ${rec.greenhouse} → ${rec.matched} matched`
+      );
+    }
+  } catch(e){ /* storage full or blocked — ignore, never break search */ }
+}
+
+// Console summary: per-source totals, average per search, and the
+// key signal — how often each source returned ZERO results.
+// Shared computation used by both the console report and the on-screen
+// panel, so the two can never disagree.
+function computeHealthSummary(){
+  const log = readHealthLog();
+  const n = log.length;
+  const sources = [
+    ['Employer boards','direct'],
+    ['USAJobs','usajobs'],
+    ['Adzuna','adzuna'],
+    ['Ashby','ashby'],
+    ['Greenhouse','greenhouse']
+  ];
+  const rows = sources.map(([label,key])=>{
+    const vals = log.map(r => Number(r[key])||0);
+    const total = vals.reduce((a,b)=>a+b,0);
+    const zeros = n ? vals.filter(v => v===0).length : 0;
+    return {
+      label, key, total,
+      avg: n ? +(total/n).toFixed(1) : 0,
+      zeros, zeroRate: n ? Math.round(100*zeros/n) : 0
+    };
+  });
+  const boardOk   = log.map(r=>Number(r.boardsOk)||0).reduce((a,b)=>a+b,0);
+  const boardFail = log.map(r=>Number(r.boardsFail)||0).reduce((a,b)=>a+b,0);
+  return { n, rows, boardOk, boardFail, log };
+}
+
+function coachJeffHealth(showRecent){
+  const { n, rows, boardOk, boardFail, log } = computeHealthSummary();
+  if(!n){ console.log('No searches logged yet on this browser. Run a search first.'); return; }
+  const summary = rows.map(r=>({
+    Source: r.label, 'Total roles': r.total, 'Avg / search': r.avg,
+    'Zero-return searches': `${r.zeros}/${n}`, 'Zero-return rate': `${r.zeroRate}%`
+  }));
+  console.log(`%cSource health — last ${n} search${n===1?'':'es'} on this browser`,
+    'font-weight:bold;font-size:13px');
+  (console.table ? console.table : console.log)(summary);
+  console.log(`Employer-board reachability across all searches: ${boardOk} ok, ${boardFail} unreachable.`);
+  console.log('Tip: a high Zero-return rate for one source means it is silently failing or matching nothing. Greenhouse is the one to watch after the id/ats fix.');
+
+  if(showRecent){
+    const k = Math.min(Number(showRecent)||10, log.length);
+    const recent = log.slice(0,k).map(r=>({
+      when: (r.t||'').replace('T',' ').slice(0,16),
+      keyword: r.kw||'(all)', location: r.loc||'',
+      boards: r.direct, USAJobs: r.usajobs, Adzuna: r.adzuna,
+      Ashby: r.ashby, Greenhouse: r.greenhouse, matched: r.matched
+    }));
+    console.log(`%cLast ${k} searches`, 'font-weight:bold');
+    (console.table ? console.table : console.log)(recent);
+  }
+  return `Logged searches: ${n}. Run coachJeffHealth(20) for recent rows, coachJeffHealthClear() to reset.`;
+}
+function coachJeffHealthClear(){
+  localStorage.removeItem(HEALTH_KEY);
+  const p = document.getElementById('healthPanelBody');
+  if(p) renderHealthPanel();
+  return 'Source-health log cleared.';
+}
+
+/* ---- On-screen health panel (works on mobile — no console needed) ----
+   Trigger it two ways:
+     • Desktop: Ctrl+Shift+H
+     • Mobile:  tap the small "Listings come from…" footer line 5×
+                quickly (within ~3s)
+   It's invisible to students unless they know the gesture. */
+function healthColorFor(rate){
+  // Higher zero-return rate = worse. Green < 25%, amber < 60%, red otherwise.
+  if(rate < 25) return {bg:'rgba(31,122,77,.12)', fg:'#1f7a4d'};
+  if(rate < 60) return {bg:'rgba(217,138,43,.15)', fg:'#b6701c'};
+  return {bg:'rgba(185,45,45,.12)', fg:'#a12b2b'};
+}
+function renderHealthPanel(){
+  const body = document.getElementById('healthPanelBody');
+  if(!body) return;
+  const { n, rows, boardOk, boardFail } = computeHealthSummary();
+  if(!n){
+    body.innerHTML = `<p class="hp-empty">No searches logged yet on this browser. Run a search, then reopen this panel.</p>`;
+    return;
+  }
+  const rowHtml = rows.map(r=>{
+    const c = healthColorFor(r.zeroRate);
+    return `<tr>
+      <td class="hp-src">${esc(r.label)}</td>
+      <td class="hp-num">${r.total}</td>
+      <td class="hp-num">${r.avg}</td>
+      <td class="hp-num"><span class="hp-rate" style="background:${c.bg};color:${c.fg}">${r.zeroRate}%</span></td>
+    </tr>`;
+  }).join('');
+  body.innerHTML = `
+    <p class="hp-sub">Last ${n} search${n===1?'':'es'} on this browser</p>
+    <table class="hp-table">
+      <thead><tr><th>Source</th><th>Roles</th><th>Avg</th><th>Empty&nbsp;%</th></tr></thead>
+      <tbody>${rowHtml}</tbody>
+    </table>
+    <p class="hp-note">Employer boards: ${boardOk} reachable, ${boardFail} unreachable across all searches. A high <strong>Empty %</strong> for one source means it's returning nothing — watch Greenhouse after the id/ats fix.</p>
+    <div class="hp-actions">
+      <button class="jbtn" id="healthCopy">Copy as text</button>
+      <button class="jbtn" id="healthReset">Clear log</button>
+    </div>`;
+
+  const copyBtn = document.getElementById('healthCopy');
+  if(copyBtn) copyBtn.addEventListener('click', ()=>{
+    const txt = rows.map(r=>`${r.label}: ${r.total} roles, avg ${r.avg}/search, empty ${r.zeroRate}%`).join('\n')
+      + `\nBoards: ${boardOk} ok / ${boardFail} unreachable · ${n} searches`;
+    if(navigator.clipboard) navigator.clipboard.writeText(txt).then(
+      ()=>{ copyBtn.textContent='Copied ✓'; setTimeout(()=>copyBtn.textContent='Copy as text',1400); },
+      ()=>{ copyBtn.textContent='Copy failed'; setTimeout(()=>copyBtn.textContent='Copy as text',1400); }
+    );
+  });
+  const resetBtn = document.getElementById('healthReset');
+  if(resetBtn) resetBtn.addEventListener('click', ()=>{
+    if(confirm('Clear the source-health log on this browser?')){ coachJeffHealthClear(); }
+  });
+}
+function openHealthPanel(){
+  const p = document.getElementById('healthPanel');
+  if(!p) return;
+  renderHealthPanel();
+  p.style.display = 'flex';
+}
+function closeHealthPanel(){
+  const p = document.getElementById('healthPanel');
+  if(p) p.style.display = 'none';
+}
+
+// Desktop shortcut: Ctrl+Shift+H
+document.addEventListener('keydown', (e)=>{
+  if((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'H' || e.key === 'h')){
+    e.preventDefault();
+    const p = document.getElementById('healthPanel');
+    if(p && p.style.display === 'flex') closeHealthPanel(); else openHealthPanel();
+  }
+  if(e.key === 'Escape') closeHealthPanel();
+});
+
+// Mobile gesture: 5 quick taps on the footer note line.
+(function wireHealthTapGesture(){
+  const note = document.querySelector('.note');
+  if(!note) return;
+  let taps = 0, timer = null;
+  const bump = ()=>{
+    taps++;
+    clearTimeout(timer);
+    timer = setTimeout(()=>{ taps = 0; }, 3000);
+    if(taps >= 5){ taps = 0; clearTimeout(timer); openHealthPanel(); }
+  };
+  note.addEventListener('click', bump);
+})();
+
+// Expose on window so they're callable from the console reliably.
+window.coachJeffHealth = coachJeffHealth;
+window.coachJeffHealthClear = coachJeffHealthClear;
+window.coachJeffHealthPanel = openHealthPanel;
+
+// Close controls for the on-screen panel.
+(function wireHealthClose(){
+  const x = document.getElementById('healthClose');
+  if(x) x.addEventListener('click', closeHealthPanel);
+  const overlay = document.getElementById('healthPanel');
+  if(overlay) overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeHealthPanel(); });
+})();
+
+
+
 window.addEventListener('error', (event) => {
   const s = document.getElementById('status');
   const r = document.getElementById('results');
@@ -1884,6 +2216,237 @@ function renderSavedSearches(){
     renderSavedSearches();
   });
 }
+
+/* ============================================================
+   SAVED JOBS + APPLIED STATUS
+   Stored in localStorage under coachJeffSavedJobs as an array of
+   { id, title, company, location, url, sector, source, sponsor,
+     applied (bool), savedAt (ISO) }.
+   A stable id is derived from url (or title+company) so the same
+   role saved twice never duplicates.
+   ============================================================ */
+
+// Live lookup of the most recent result set, keyed by job id, so a
+// Save click can persist the full record without re-deriving it.
+let _jobsById = {};
+function registerJobsForSaving(jobs){
+  _jobsById = {};
+  (jobs || []).forEach(j => { _jobsById[jobId(j)] = j; });
+}
+
+// Stable, collision-resistant id. Prefer the apply URL; fall back to
+// title+company. Hash to keep it short and localStorage-key friendly.
+function jobId(j){
+  const basis = (j && (j.url || '') ) || ((j && j.title || '') + '|' + (j && j.company || ''));
+  let h = 0;
+  const s = basis.toLowerCase().trim();
+  for(let i=0;i<s.length;i++){ h = ((h<<5)-h + s.charCodeAt(i))|0; }
+  return 'j' + (h>>>0).toString(36);
+}
+
+function savedJobs(){
+  try { return JSON.parse(localStorage.getItem('coachJeffSavedJobs') || '[]'); }
+  catch(e){ return []; }
+}
+function writeSavedJobs(list){
+  localStorage.setItem('coachJeffSavedJobs', JSON.stringify(list));
+}
+function isJobSaved(id){ return savedJobs().some(x => x.id === id); }
+function isJobApplied(id){ const r = savedJobs().find(x => x.id === id); return !!(r && r.applied); }
+
+// Toggle save. When saving, snapshot the full job record from the
+// current result set. When un-saving, drop it entirely.
+function toggleSaveJob(id){
+  const list = savedJobs();
+  const idx = list.findIndex(x => x.id === id);
+  if(idx >= 0){
+    list.splice(idx,1);
+  } else {
+    const j = _jobsById[id] || {};
+    const sp = sponsorshipLabel(j);
+    list.unshift({
+      id,
+      title: j.title || 'Saved role',
+      company: j.company || '',
+      location: j.location || '',
+      url: j.url || '',
+      sector: j.sector || '',
+      source: j.source || '',
+      sponsor: (sp && sp.text) || '',
+      applied: false,
+      savedAt: new Date().toISOString()
+    });
+  }
+  writeSavedJobs(list);
+  renderSavedJobs();
+}
+
+// Toggle applied. If the job isn't saved yet, saving+applying in one
+// click is the natural behavior, so we save it first.
+function toggleAppliedJob(id){
+  let list = savedJobs();
+  let rec = list.find(x => x.id === id);
+  if(!rec){
+    toggleSaveJob(id);           // saves it
+    list = savedJobs();
+    rec = list.find(x => x.id === id);
+    if(rec){ rec.applied = true; }
+  } else {
+    rec.applied = !rec.applied;
+  }
+  writeSavedJobs(list);
+  renderSavedJobs();
+}
+
+// Repaint the Save/Applied buttons on any visible result card for this id.
+function refreshCardButtons(id){
+  const saved = isJobSaved(id);
+  const applied = isJobApplied(id);
+  document.querySelectorAll(`.job[data-jobid="${cssEscId(id)}"]`).forEach(card=>{
+    const sBtn = card.querySelector('.jbtn.save');
+    const aBtn = card.querySelector('.jbtn.applied');
+    if(sBtn){
+      sBtn.classList.toggle('on', saved);
+      sBtn.setAttribute('aria-pressed', saved);
+      sBtn.querySelector('.ic').textContent = saved ? '★' : '☆';
+      sBtn.querySelector('.lbl').textContent = saved ? 'Saved' : 'Save';
+    }
+    if(aBtn){
+      aBtn.classList.toggle('on', applied);
+      aBtn.setAttribute('aria-pressed', applied);
+      aBtn.querySelector('.ic').textContent = applied ? '✓' : '○';
+      aBtn.querySelector('.lbl').textContent = applied ? 'Applied' : 'Mark applied';
+    }
+  });
+}
+// Ids are [a-z0-9] only, so this is just a safety guard for the selector.
+function cssEscId(id){ return (id||'').replace(/[^a-z0-9]/gi,''); }
+
+function renderSavedJobs(){
+  const bar  = document.getElementById('savedJobsBar');
+  const list = document.getElementById('savedJobsList');
+  const cnt  = document.getElementById('savedJobsCount');
+  if(!bar || !list) return;
+  const jobs = savedJobs();
+
+  // Keep the always-visible top cue in sync (shows even at 0).
+  const cue = document.getElementById('savedJobsCue');
+  const cueCnt = document.getElementById('savedJobsCueCount');
+  if(cueCnt) cueCnt.textContent = `(${jobs.length})`;
+  if(cue) cue.classList.toggle('has-saved', jobs.length > 0);
+
+  if(!jobs.length){
+    bar.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+  bar.style.display = '';
+  const appliedCount = jobs.filter(j => j.applied).length;
+  if(cnt) cnt.textContent = `(${jobs.length} saved · ${appliedCount} applied)`;
+
+  list.innerHTML = jobs.map(j => `
+    <div class="sj-row" data-jobid="${esc(j.id)}">
+      <div class="sj-main">
+        ${j.url
+          ? `<a class="sj-title" href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.title)}</a>`
+          : `<span class="sj-title">${esc(j.title)}</span>`}
+        <div class="sj-meta">${esc(j.company)}${j.location ? ' · ' + esc(j.location) : ''}${j.source ? ' · ' + esc(j.source) : ''}</div>
+        <div class="sj-tags">
+          ${j.applied ? '<span class="tag strong">✓ applied</span>' : '<span class="tag warn">not yet applied</span>'}
+          ${j.sponsor ? `<span class="tag gray">${esc(j.sponsor)}</span>` : ''}
+        </div>
+      </div>
+      <div class="sj-controls">
+        <button class="jbtn applied${j.applied?' on':''}" data-sjact="applied" data-jobid="${esc(j.id)}">
+          <span class="ic">${j.applied?'✓':'○'}</span>${j.applied?'Applied':'Mark applied'}
+        </button>
+        <button class="sj-del" data-sjact="del" data-jobid="${esc(j.id)}" title="Remove from saved jobs" aria-label="Remove saved job">×</button>
+      </div>
+    </div>`).join('');
+}
+
+// CSV export of the saved list — the tracker international students want.
+function exportSavedJobsCsv(){
+  const jobs = savedJobs();
+  if(!jobs.length) return;
+  const cols = ['Title','Company','Location','Sector','Sponsorship','Applied','Source','Saved','URL'];
+  const cell = v => {
+    const s = (v==null?'':String(v)).replace(/"/g,'""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  const rows = jobs.map(j => [
+    j.title, j.company, j.location, j.sector, j.sponsor,
+    j.applied ? 'Yes' : 'No', j.source,
+    (j.savedAt || '').slice(0,10), j.url
+  ].map(cell).join(','));
+  const csv = cols.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'coach-jeff-saved-jobs.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+// Delegated clicks on result cards (Save / Mark applied buttons).
+document.getElementById('results').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.jbtn[data-act]');
+  if(!btn) return;
+  const id = btn.dataset.jobid;
+  if(!id) return;
+  if(btn.dataset.act === 'save') toggleSaveJob(id);
+  else if(btn.dataset.act === 'applied') toggleAppliedJob(id);
+  refreshCardButtons(id);
+});
+
+// Delegated clicks inside the My Saved Jobs panel (applied toggle / delete).
+document.getElementById('savedJobsList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-sjact]');
+  if(!btn) return;
+  const id = btn.dataset.jobid;
+  if(!id) return;
+  if(btn.dataset.sjact === 'applied'){
+    toggleAppliedJob(id);
+  } else if(btn.dataset.sjact === 'del'){
+    writeSavedJobs(savedJobs().filter(x => x.id !== id));
+    renderSavedJobs();
+  }
+  refreshCardButtons(id);
+});
+
+document.getElementById('exportSavedJobs').addEventListener('click', exportSavedJobsCsv);
+document.getElementById('clearSavedJobs').addEventListener('click', ()=>{
+  if(!savedJobs().length) return;
+  if(confirm('Remove all saved jobs? This cannot be undone.')){
+    localStorage.removeItem('coachJeffSavedJobs');
+    renderSavedJobs();
+    // Reset any Save buttons currently on screen.
+    document.querySelectorAll('.job[data-jobid]').forEach(card=>{
+      refreshCardButtons(card.dataset.jobid);
+    });
+  }
+});
+
+// Top cue: scroll to the saved-jobs panel; nudge if nothing saved yet.
+document.getElementById('savedJobsCue').addEventListener('click', ()=>{
+  const bar = document.getElementById('savedJobsBar');
+  if(savedJobs().length && bar){
+    bar.scrollIntoView({behavior:'smooth', block:'start'});
+  } else {
+    const cue = document.getElementById('savedJobsCue');
+    if(cue){
+      const cc = cue.querySelector('.sjc-count');
+      const prev = cc.textContent;
+      cc.textContent = '— none yet';
+      setTimeout(()=>{ cc.textContent = prev; }, 1600);
+    }
+  }
+});
+
+renderSavedJobs();
 
 function titleCaseMajorSearch(term){
   return (term || '').toString().trim();
