@@ -173,6 +173,17 @@
   .tag.sp-no{background:rgba(185,45,45,.12);color:#a12b2b;font-weight:700}
   .tag.sp-unk{background:#f4f1ea;color:#8a7d5f;font-weight:600}
 
+  /* --- Employer H-1B sponsorship-history note (on 🟡 unknown jobs) --- */
+  .sponsor-history{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:9px 12px;
+    border-radius:8px;font-size:12.5px;line-height:1.5;border:1px solid var(--line-strong);
+    background:#faf7f0;color:var(--navy)}
+  .sponsor-history.sh-strong{border-color:rgba(31,122,77,.35);background:rgba(31,122,77,.06)}
+  .sponsor-history.sh-moderate{border-color:rgba(217,138,43,.35);background:rgba(217,138,43,.07)}
+  .sponsor-history .sh-ic{flex-shrink:0;font-size:13px;line-height:1.4}
+  .sponsor-history .sh-text strong{font-weight:700}
+  .sponsor-history a{color:var(--amber-deep);font-weight:600;white-space:nowrap;text-decoration:none}
+  .sponsor-history a:hover{text-decoration:underline}
+
   /* --- Saved-job / applied controls on each result card --- */
   .job-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
   .jbtn{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;
@@ -1007,6 +1018,71 @@ function hasEntrySignal(title){
   return INTERN_RX.test(t) || NEWGRAD_RX.test(t) || ENTRYLVL_RX.test(t) || REALISTIC_GRAD_RX.test(t) || ANY_EARLY_RX.test(t);
 }
 
+/* ============================================================
+   CURATED H-1B SPONSOR HISTORY  (student-facing hint)
+   Shown ONLY on 🟡 "sponsorship not specified" jobs, to help an
+   international student tell "big sponsor that just didn't mention
+   it on this posting" from "employer with no known sponsorship record."
+
+   Tiers:
+     'strong'   = high, consistent recent H-1B filing volume
+     'moderate' = files regularly but at lower volume
+   Employers not listed here get NO flag (safe: no false reassurance).
+
+   SOURCE: USCIS H-1B Employer Data Hub + DOL LCA disclosure data,
+   cross-checked against multiple 2025-2026 sponsor summaries.
+   ------------------------------------------------------------
+   >>> LAST REVIEWED: 2026-07-09  (review ~twice a year) <<<
+   Next review target: ~Nov 2026 (after DOL annual data) and ~Apr 2027.
+   To update: change a tier, add/remove a name (lowercase key), and
+   bump the LAST REVIEWED date above.
+
+   NOTE ON 2026 RULES: The H-1B lottery became wage-weighted for the
+   FY2027 cap season (registration opened Mar 2026); selection odds now
+   depend on the offered wage level, so "strong sponsor" no longer implies
+   good lottery odds. The on-card note reflects this and links students to
+   verify current status themselves.
+   ============================================================ */
+const SPONSOR_HISTORY_REVIEWED = '2026-07-09';
+const SPONSOR_HISTORY = {
+  // strong — large, consistent recent sponsors
+  'spacex':'strong', 'space exploration technologies':'strong',
+  'stripe':'strong', 'databricks':'strong', 'airbnb':'strong',
+  'palantir':'strong', 'snowflake':'strong', 'coinbase':'strong',
+  'pinterest':'strong', 'lyft':'strong', 'datadog':'strong',
+  'mongodb':'strong', 'twilio':'strong', 'reddit':'strong',
+  'spotify':'strong', 'roblox':'strong', 'affirm':'strong',
+  'instacart':'strong', 'robinhood':'strong', 'cloudflare':'strong',
+  'gitlab':'strong', 'dropbox':'strong', 'discord':'strong',
+  // moderate — files regularly, lower volume
+  'figma':'moderate', 'asana':'moderate', 'samsara':'moderate',
+  'duolingo':'moderate', 'chime':'moderate', 'gusto':'moderate',
+  'airtable':'moderate', 'webflow':'moderate', 'vercel':'moderate',
+  'sofi':'moderate', 'betterment':'moderate', 'marqeta':'moderate',
+  'flexport':'moderate', 'verkada':'moderate', 'faire':'moderate',
+  'peloton':'moderate', 'twitch':'moderate', 'relativity':'moderate',
+  'oscar':'moderate', 'point72':'moderate'
+};
+
+// Normalize an employer name and return its tier, or null if not listed.
+function sponsorHistoryTier(company){
+  if(!company) return null;
+  let c = company.toLowerCase().trim();
+  // strip common suffixes / punctuation so "Stripe, Inc." matches "stripe"
+  c = c.replace(/[.,]/g,' ')
+       .replace(/\b(inc|llc|corp|corporation|co|ltd|the|group|technologies|technology|labs)\b/g,' ')
+       .replace(/\s+/g,' ')
+       .trim();
+  if(SPONSOR_HISTORY[c]) return SPONSOR_HISTORY[c];
+  // also try the raw lowercased name and a first-token match for safety
+  const raw = company.toLowerCase().trim();
+  if(SPONSOR_HISTORY[raw]) return SPONSOR_HISTORY[raw];
+  const first = c.split(' ')[0];
+  if(first && SPONSOR_HISTORY[first]) return SPONSOR_HISTORY[first];
+  return null;
+}
+
+
 // Roles whose titles strongly signal non-degree / hourly / trade work.
 const NONDEGREE_RX = /\b(warehouse|fulfillment|picker|packer|forklift|driver|delivery|courier|dispatch(er)?|barista|cook|chef|line cook|kitchen|server|waiter|waitress|bartender|busser|dishwasher|cashier|retail associate|sales associate|store associate|stocker|merchandiser|janitor|custodian|housekeep(er|ing)|cleaner|maintenance tech|hvac|plumber|electrician|welder|machinist|mechanic|technician|installer|laborer|landscaper|security guard|caregiver|home health aide|cna|receptionist|front desk|valet|usher|groundskeeper|assembler|line worker|production (associate|worker|operator)|loader|crew member|team member)\b/i;
 
@@ -1097,7 +1173,16 @@ async function withTimeout(promise, ms){
 
 // Legacy direct Greenhouse board fetch disabled.
 // Greenhouse results now come through /.netlify/functions/greenhouse.
+// NOTE: Greenhouse is NOT fetched per-company here. All Greenhouse roles
+// come from the serverless /greenhouse function via fetchGreenhouseAPI(),
+// which is faster (one server call vs. ~50 browser requests) and returns
+// clean records with id/url/ats. The board loop in search() only processes
+// ats:'lever' companies, so this function is never reached in normal use.
+// It is kept only so fetchBoardResilient's branch stays valid. If a future
+// change ever routes a gh company here, we warn loudly instead of silently
+// returning nothing (which would look like a healthy empty board).
 async function fetchGreenhouse(c){
+  console.warn('[jobfinder] fetchGreenhouse(c) called for "'+(c&&c.slug)+'" — Greenhouse should go through fetchGreenhouseAPI(), not the per-company board loop. Returning [].');
   return [];
 }
 async function fetchLever(c){
@@ -1170,6 +1255,9 @@ async function fetchAshby(keyword, location){
 
 // Fetch Greenhouse-hosted roles through our Netlify function.
 // Keeps Greenhouse calls server-side and avoids dozens of browser requests.
+// The serverless function returns clean records today; the mapping below is
+// defensive so that if any future record arrives missing a field, it can't
+// render a broken/dead-link card. Records with no usable apply URL are dropped.
 async function fetchGreenhouseAPI(keyword, location){
   try {
     const params = new URLSearchParams();
@@ -1178,7 +1266,22 @@ async function fetchGreenhouseAPI(keyword, location){
     const resp = await fetch('/.netlify/functions/greenhouse?' + params.toString());
     if(!resp.ok) return [];
     const data = await resp.json();
-    return (data && data.ok && Array.isArray(data.jobs)) ? data.jobs : [];
+    if(!(data && data.ok && Array.isArray(data.jobs))) return [];
+    return data.jobs
+      .filter(j => j && j.url)                       // no apply link => unusable, skip
+      .map(j => ({
+        title: j.title || 'Untitled role',
+        company: j.company || j.board || 'Employer',
+        board: j.board || '',
+        sector: j.sector || '',
+        location: j.location || '—',
+        url: j.url,
+        posted: j.posted || null,
+        salary: j.salary || '',
+        source: 'greenhouse',
+        id: (j.id != null ? j.id : ('gh-' + (j.board||'') + '-' + (j.url||''))),
+        ats: 'gh'
+      }));
   } catch(e){
     return [];
   }
@@ -1359,14 +1462,15 @@ function freshnessText(posted){
   return 'Posted 30+ days ago';
 }
 function sponsorshipLabel(j){
-  // If we did a real description-based scan (work-auth box on), use that result.
+  // Only show a sponsorship badge when a real description-based scan has run
+  // (i.e. the student ticked "Work Authorization Requirements"). Without a scan
+  // we haven't actually examined sponsorship, so we show NO badge rather than a
+  // misleading "unknown" on every result.
   if(j.sponsorScan === 'available') return {text:'🟢 Sponsorship available', cls:'sp-yes'};
   if(j.sponsorScan === 'none')      return {text:'🔴 No sponsorship', cls:'sp-no'};
   if(j.sponsorScan === 'unknown')   return {text:'🟡 Sponsorship not specified', cls:'sp-unk'};
-  // Otherwise fall back to the light title/location guess.
-  const blob = ((j.title||'') + ' ' + (j.location||'') + ' ' + (j.company||'')).toLowerCase();
-  if(NO_SPONSOR_RX.test(blob) || CLEAR_RX.test(blob)) return {text:'No sponsorship / citizenship risk', cls:'risk'};
-  return {text:'Sponsorship unknown', cls:'gray'};
+  // No scan run for this job → no badge.
+  return null;
 }
 function salaryEstimate(j){
   const t = (j.title||'').toLowerCase();
@@ -1414,7 +1518,7 @@ function renderJob(j, kw, loc){
             ${early ? '<span class="tag">entry / grad</span>' : ''}
             ${experienced ? '<span class="tag warn">experienced role</span>' : ''}
             <span class="tag blue">${esc(freshnessText(j.posted))}</span>
-            <span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>
+            ${sponsor ? `<span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>` : ''}
             ${(!experienced && (j.score || 0) >= 8) ? '<span class="tag strong">high-priority lead</span>' : ''}
             ${j.expFlag ? '<span class="tag warn">may require experience</span>' : ''}
             ${j.source === 'adzuna' ? '<span class="tag gray">Adzuna</span>' : ''}
@@ -1426,6 +1530,22 @@ function renderJob(j, kw, loc){
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
           <div class="why"><strong>Why this job?</strong><div class="why-list">${why}</div></div>
+          ${(()=>{
+            // Only add the employer-history hint when THIS posting didn't state
+            // sponsorship (🟡 unknown) AND the employer is in our curated list.
+            if(!sponsor || sponsor.cls !== 'sp-unk') return '';
+            const tier = sponsorHistoryTier(j.company);
+            if(!tier) return '';
+            const label = tier === 'strong'
+              ? 'has a <strong>strong recent H-1B sponsorship history</strong>'
+              : 'has a <strong>moderate recent H-1B sponsorship history</strong>';
+            return `<div class="sponsor-history sh-${tier}">
+              <span class="sh-ic">ℹ️</span>
+              <span class="sh-text">This posting doesn't mention sponsorship, but <strong>${esc(j.company)}</strong> ${label}.
+              Note: 2026 H-1B lottery rules are now wage-weighted, so a sponsorship record no longer guarantees selection odds.
+              <a href="https://www.uscis.gov/tools/reports-and-studies/h-1b-employer-data-hub" target="_blank" rel="noopener">Verify current status →</a></span>
+            </div>`;
+          })()}
           <div class="job-actions">
             <button class="jbtn save${saved?' on':''}" data-act="save" data-jobid="${esc(id)}" aria-pressed="${saved}">
               <span class="ic">${saved?'★':'☆'}</span><span class="lbl">${saved?'Saved':'Save'}</span>
@@ -1746,7 +1866,13 @@ async function search(){
     try {
       const SUSPICIOUS_RX = /\b(operations|fulfillment|warehouse|logistics|hub|depot|fleet|store|retail|field|floor|shift|crew|team member|associate|coordinator|specialist|representative|assistant|agent|clerk)\b/i;
       // Which jobs can have their description fetched (Greenhouse/Lever with an id).
-      const fetchable = jobs.filter(j => j && j.id != null && (j.ats === 'gh' || j.ats === 'lever'));
+      // Which jobs can have their description fetched (Greenhouse/Lever with a
+      // server-resolvable id). GH jobs given a synthetic string id (a rare
+      // fallback for malformed records) are excluded, since checkjobs needs the
+      // real Greenhouse numeric id to fetch the description.
+      const fetchable = jobs.filter(j => j && j.id != null
+        && (j.ats === 'gh' || j.ats === 'lever')
+        && !(j.ats === 'gh' && typeof j.id === 'string' && j.id.startsWith('gh-')));
 
       // When the user ticks "Work Authorization Requirements", do a THOROUGH scan:
       // fetch descriptions for ALL fetchable jobs (for real sponsorship detection),
