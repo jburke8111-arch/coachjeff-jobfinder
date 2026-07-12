@@ -509,7 +509,7 @@
   <div class="hero-search">
     <div class="majorbar" aria-label="Find jobs by major">
       <div class="majorbar-title">🎓 What&rsquo;s your major?</div>
-      <p class="major-help">Select your major, then choose a recommended job title. The title fills the Keyword box — add a location if you want, then click Search.</p>
+      <p class="major-help">Choose your major, then pick one recommended job title. Broader entry-level roles appear first to improve your chances of finding matches; emerging AI and data roles are listed separately when relevant. The title fills the Keyword box — add a location if you want, then click Search.</p>
       <div class="major-steps">
         <div class="field">
           <div class="major-step-label">Step 1</div>
@@ -518,7 +518,7 @@
         </div>
         <div class="field">
           <div class="major-step-label">Step 2</div>
-          <label for="majorTitleSelect">Recommended job title</label>
+          <label for="majorTitleSelect">Recommended Job Titles (Pick One)</label>
           <div class="title-select-wrap">
             <select id="majorTitleSelect"></select>
             <span class="search-glyph" aria-hidden="true">🔍</span>
@@ -744,57 +744,64 @@
 // V18: Major-to-job-title search map. Ordered roughly by broad U.S. undergraduate popularity
 // and usefulness for early-career job seekers. Each title becomes a one-click keyword search.
 const MAJOR_TITLE_MAP = {
-  "Business Administration": ["Business Analyst", "Operations Analyst", "Project Coordinator", "Management Trainee", "Client Success Associate"],
-  "Computer Science": ["Software Engineer", "Software Developer", "Full Stack Developer", "QA Engineer", "Technical Support Engineer"],
-  "Psychology": ["Case Manager", "Behavioral Health Technician", "HR Coordinator", "Research Assistant", "Client Services Coordinator"],
-  "Nursing": ["Registered Nurse", "New Grad RN", "Nurse Residency", "Clinical Nurse", "Public Health Nurse"],
-  "Biology": ["Research Assistant", "Laboratory Technician", "Clinical Research Coordinator", "Quality Assurance Analyst", "Environmental Scientist"],
-  "Accounting": ["Staff Accountant", "Audit Associate", "Tax Associate", "Accounting Analyst", "Accounts Payable Specialist"],
-  "Finance": ["Financial Analyst", "Credit Analyst", "Investment Analyst", "Risk Analyst", "Client Service Associate"],
-  "Marketing": ["Marketing Coordinator", "Digital Marketing Specialist", "Marketing Analyst", "Social Media Coordinator", "Content Marketing Specialist"],
-  "Communications": ["Communications Coordinator", "Public Relations Assistant", "Marketing Coordinator", "Social Media Coordinator", "Content Specialist"],
-  "Criminal Justice": ["Investigator", "Compliance Analyst", "Probation Officer", "Case Manager", "Security Analyst"],
-  "Mechanical Engineering": ["Mechanical Engineer", "Manufacturing Engineer", "Quality Engineer", "Process Engineer", "Project Engineer"],
-  "Information Systems": ["Business Systems Analyst", "IT Analyst", "Systems Analyst", "Application Support Analyst", "Data Analyst"],
-  "Economics": ["Research Analyst", "Data Analyst", "Financial Analyst", "Pricing Analyst", "Policy Analyst"],
-  "Political Science": ["Policy Analyst", "Legislative Assistant", "Program Coordinator", "Research Assistant", "Government Affairs Associate"],
-  "Elementary Education": ["Elementary Teacher", "Instructional Assistant", "Education Coordinator", "Tutor", "Youth Program Coordinator"],
-  "Kinesiology / Exercise Science": ["Exercise Specialist", "Wellness Coordinator", "Rehabilitation Aide", "Fitness Specialist", "Health Coach"],
-  "Computer Engineering": ["Software Engineer", "Embedded Software Engineer", "Hardware Engineer", "Systems Engineer", "Test Engineer"],
-  "Electrical Engineering": ["Electrical Engineer", "Controls Engineer", "Test Engineer", "Power Engineer", "Field Engineer"],
-  "Health Sciences": ["Clinical Coordinator", "Patient Care Coordinator", "Public Health Analyst", "Health Program Coordinator", "Healthcare Analyst"],
-  "Public Health": ["Public Health Analyst", "Health Program Coordinator", "Epidemiology Assistant", "Community Health Coordinator", "Research Assistant"],
-  "Sociology": ["Case Manager", "Program Coordinator", "Research Assistant", "Community Outreach Coordinator", "Social Services Coordinator"],
-  "English": ["Content Writer", "Editor", "Communications Coordinator", "Technical Writer", "Marketing Coordinator"],
-  "History": ["Research Assistant", "Archivist Assistant", "Museum Coordinator", "Policy Assistant", "Communications Coordinator"],
-  "Human Resources": ["HR Coordinator", "Talent Acquisition Coordinator", "Recruiting Coordinator", "HR Generalist", "People Operations Associate"],
-  "Supply Chain Management": ["Supply Chain Analyst", "Logistics Coordinator", "Procurement Analyst", "Operations Analyst", "Inventory Analyst"],
-  "Business Analytics": ["Data Analyst", "Business Analyst", "Operations Analyst", "Reporting Analyst", "Business Intelligence Analyst"],
-  "Data Analytics": ["Data Analyst", "Reporting Analyst", "Business Intelligence Analyst", "Operations Analyst", "Research Analyst"],
-  "Cybersecurity": ["Security Analyst", "SOC Analyst", "Information Security Analyst", "Cybersecurity Analyst", "IT Risk Analyst"],
-  "Information Technology": ["IT Support Specialist", "Help Desk Analyst", "Systems Administrator", "Network Technician", "Application Support Analyst"],
-  "Graphic Design": ["Graphic Designer", "Visual Designer", "Production Designer", "Marketing Designer", "UX Designer"],
-  "Journalism": ["Reporter", "Editorial Assistant", "Content Writer", "Communications Coordinator", "Social Media Coordinator"],
-  "Public Relations": ["Public Relations Assistant", "Communications Coordinator", "Media Relations Coordinator", "Account Coordinator", "Social Media Coordinator"],
-  "Management": ["Management Trainee", "Operations Coordinator", "Business Analyst", "Project Coordinator", "Client Success Associate"],
-  "Entrepreneurship": ["Business Development Representative", "Sales Development Representative", "Operations Coordinator", "Marketing Coordinator", "Account Coordinator"],
-  "International Business": ["Business Analyst", "Import Export Coordinator", "Supply Chain Analyst", "Account Coordinator", "Operations Analyst"],
-  "Hospitality Management": ["Event Coordinator", "Revenue Analyst", "Hotel Operations Coordinator", "Guest Services Manager Trainee", "Sales Coordinator"],
-  "Sports Management": ["Athletic Operations Coordinator", "Event Coordinator", "Ticket Sales Representative", "Marketing Coordinator", "Partnerships Coordinator"],
-  "Environmental Science": ["Environmental Scientist", "Sustainability Analyst", "Environmental Coordinator", "EHS Specialist", "Research Technician"],
-  "Civil Engineering": ["Civil Engineer", "Project Engineer", "Construction Coordinator", "Transportation Engineer", "Field Engineer"],
-  "Chemical Engineering": ["Process Engineer", "Chemical Engineer", "Quality Engineer", "Manufacturing Engineer", "Validation Engineer"],
-  "Industrial Engineering": ["Industrial Engineer", "Process Improvement Analyst", "Operations Analyst", "Manufacturing Engineer", "Supply Chain Analyst"],
-  "Biomedical Engineering": ["Biomedical Engineer", "Quality Engineer", "Clinical Research Coordinator", "Validation Engineer", "Product Development Engineer"],
-  "Mathematics": ["Data Analyst", "Actuarial Analyst", "Quantitative Analyst", "Research Analyst", "Operations Analyst"],
-  "Statistics": ["Data Analyst", "Statistical Analyst", "Research Analyst", "Business Intelligence Analyst", "Actuarial Analyst"],
-  "Physics": ["Research Assistant", "Data Analyst", "Test Engineer", "Laboratory Technician", "Systems Engineer"],
-  "Chemistry": ["Chemist", "Laboratory Technician", "Quality Control Analyst", "Research Associate", "Environmental Analyst"],
-  "Social Work": ["Case Manager", "Social Services Coordinator", "Community Outreach Coordinator", "Family Support Specialist", "Program Coordinator"],
-  "Public Administration": ["Program Analyst", "Policy Analyst", "Administrative Analyst", "Government Affairs Associate", "Program Coordinator"],
-  "Healthcare Administration": ["Healthcare Analyst", "Administrative Fellow", "Practice Coordinator", "Patient Services Coordinator", "Operations Analyst"],
-  "Advertising": ["Account Coordinator", "Media Planner", "Marketing Coordinator", "Social Media Coordinator", "Brand Coordinator"]
+  "Accounting": {popular:["Staff Accountant", "Audit Associate", "Tax Associate", "Accounting Analyst", "Accounts Payable Specialist"]},
+  "Advertising": {popular:["Account Coordinator", "Media Planner", "Marketing Coordinator", "Social Media Coordinator", "Brand Coordinator"]},
+  "Biology": {popular:["Research Assistant", "Laboratory Technician", "Clinical Research Coordinator", "Quality Assurance Analyst", "Environmental Scientist"]},
+  "Biomedical Engineering": {popular:["Biomedical Engineer", "Quality Engineer", "Clinical Research Coordinator", "Validation Engineer", "Product Development Engineer"]},
+  "Business Administration": {popular:["Business Analyst", "Operations Analyst", "Project Coordinator", "Management Trainee", "Client Success Associate", "Account Coordinator", "Business Development Representative", "Program Coordinator"]},
+  "Business Analytics": {popular:["Data Analyst", "Business Analyst", "Business Intelligence Analyst", "Operations Analyst", "Reporting Analyst", "Product Analyst"], emerging:["Analytics Engineer", "Data Engineer", "AI Analyst", "Machine Learning Analyst"]},
+  "Chemical Engineering": {popular:["Process Engineer", "Chemical Engineer", "Quality Engineer", "Manufacturing Engineer", "Validation Engineer"]},
+  "Chemistry": {popular:["Chemist", "Laboratory Technician", "Quality Control Analyst", "Research Associate", "Environmental Analyst"]},
+  "Civil Engineering": {popular:["Civil Engineer", "Project Engineer", "Construction Coordinator", "Transportation Engineer", "Field Engineer"]},
+  "Communications": {popular:["Communications Coordinator", "Public Relations Assistant", "Marketing Coordinator", "Social Media Coordinator", "Content Specialist"]},
+  "Computer Engineering": {popular:["Software Engineer", "Embedded Software Engineer", "Hardware Engineer", "Systems Engineer", "Test Engineer", "Firmware Engineer"], emerging:["AI Engineer", "Machine Learning Engineer", "Robotics Engineer"]},
+  "Computer Science": {popular:["Software Engineer", "Software Developer", "Full Stack Developer", "Backend Engineer", "Frontend Engineer", "QA Engineer", "Technical Support Engineer"], emerging:["Data Engineer", "AI Engineer", "Machine Learning Engineer"]},
+  "Criminal Justice": {popular:["Investigator", "Compliance Analyst", "Probation Officer", "Case Manager", "Security Analyst"]},
+  "Cybersecurity": {popular:["Security Analyst", "SOC Analyst", "Information Security Analyst", "Cybersecurity Analyst", "IT Risk Analyst", "GRC Analyst"], emerging:["Cloud Security Analyst", "Security Automation Engineer"]},
+  "Data Analytics": {popular:["Data Analyst", "Reporting Analyst", "Business Intelligence Analyst", "Operations Analyst", "Research Analyst", "Product Analyst"], emerging:["Analytics Engineer", "Data Engineer", "Machine Learning Analyst", "AI Analyst"]},
+  "Economics": {popular:["Research Analyst", "Data Analyst", "Financial Analyst", "Pricing Analyst", "Policy Analyst"]},
+  "Electrical Engineering": {popular:["Electrical Engineer", "Controls Engineer", "Test Engineer", "Power Engineer", "Field Engineer"]},
+  "Elementary Education": {popular:["Elementary Teacher", "Instructional Assistant", "Education Coordinator", "Tutor", "Youth Program Coordinator"]},
+  "English": {popular:["Content Writer", "Editor", "Communications Coordinator", "Technical Writer", "Marketing Coordinator"]},
+  "Entrepreneurship": {popular:["Business Development Representative", "Sales Development Representative", "Operations Coordinator", "Marketing Coordinator", "Account Coordinator"]},
+  "Environmental Science": {popular:["Environmental Scientist", "Sustainability Analyst", "Environmental Coordinator", "EHS Specialist", "Research Technician"]},
+  "Finance": {popular:["Financial Analyst", "Credit Analyst", "Investment Analyst", "Risk Analyst", "Client Service Associate"]},
+  "Graphic Design": {popular:["Graphic Designer", "Visual Designer", "Production Designer", "Marketing Designer", "UX Designer"]},
+  "Health Sciences": {popular:["Clinical Coordinator", "Patient Care Coordinator", "Public Health Analyst", "Health Program Coordinator", "Healthcare Analyst"]},
+  "Healthcare Administration": {popular:["Healthcare Analyst", "Administrative Fellow", "Practice Coordinator", "Patient Services Coordinator", "Operations Analyst"]},
+  "History": {popular:["Research Assistant", "Archivist Assistant", "Museum Coordinator", "Policy Assistant", "Communications Coordinator"]},
+  "Hospitality Management": {popular:["Event Coordinator", "Revenue Analyst", "Hotel Operations Coordinator", "Guest Services Manager Trainee", "Sales Coordinator"]},
+  "Human Resources": {popular:["HR Coordinator", "Talent Acquisition Coordinator", "Recruiting Coordinator", "HR Generalist", "People Operations Associate"]},
+  "Industrial Engineering": {popular:["Industrial Engineer", "Process Improvement Analyst", "Operations Analyst", "Manufacturing Engineer", "Supply Chain Analyst"]},
+  "Information Systems": {popular:["Business Systems Analyst", "IT Analyst", "Systems Analyst", "Application Support Analyst", "Data Analyst", "Business Intelligence Analyst"], emerging:["Data Engineer", "AI Business Analyst"]},
+  "Information Technology": {popular:["IT Support Specialist", "Help Desk Analyst", "Systems Administrator", "Network Technician", "Application Support Analyst", "Cloud Support Associate"], emerging:["Cloud Engineer", "DevOps Engineer"]},
+  "International Business": {popular:["Business Analyst", "Import Export Coordinator", "Supply Chain Analyst", "Account Coordinator", "Operations Analyst"]},
+  "Journalism": {popular:["Reporter", "Editorial Assistant", "Content Writer", "Communications Coordinator", "Social Media Coordinator"]},
+  "Kinesiology / Exercise Science": {popular:["Exercise Specialist", "Wellness Coordinator", "Rehabilitation Aide", "Fitness Specialist", "Health Coach"]},
+  "Management": {popular:["Management Trainee", "Operations Coordinator", "Business Analyst", "Project Coordinator", "Client Success Associate"]},
+  "Marketing": {popular:["Marketing Coordinator", "Digital Marketing Specialist", "Marketing Analyst", "Social Media Coordinator", "Content Marketing Specialist"]},
+  "Mathematics": {popular:["Data Analyst", "Actuarial Analyst", "Quantitative Analyst", "Research Analyst", "Operations Research Analyst", "Business Intelligence Analyst"], emerging:["Data Engineer", "AI Engineer", "Machine Learning Engineer"]},
+  "Mechanical Engineering": {popular:["Mechanical Engineer", "Manufacturing Engineer", "Quality Engineer", "Process Engineer", "Project Engineer"]},
+  "Nursing": {popular:["Registered Nurse", "New Grad RN", "Nurse Residency", "Clinical Nurse", "Public Health Nurse"]},
+  "Physics": {popular:["Research Assistant", "Data Analyst", "Test Engineer", "Laboratory Technician", "Systems Engineer"]},
+  "Political Science": {popular:["Policy Analyst", "Legislative Assistant", "Program Coordinator", "Research Assistant", "Government Affairs Associate"]},
+  "Psychology": {popular:["Case Manager", "Behavioral Health Technician", "HR Coordinator", "Research Assistant", "Client Services Coordinator"]},
+  "Public Administration": {popular:["Program Analyst", "Policy Analyst", "Administrative Analyst", "Government Affairs Associate", "Program Coordinator"]},
+  "Public Health": {popular:["Public Health Analyst", "Health Program Coordinator", "Epidemiology Assistant", "Community Health Coordinator", "Research Assistant"]},
+  "Public Relations": {popular:["Public Relations Assistant", "Communications Coordinator", "Media Relations Coordinator", "Account Coordinator", "Social Media Coordinator"]},
+  "Social Work": {popular:["Case Manager", "Social Services Coordinator", "Community Outreach Coordinator", "Family Support Specialist", "Program Coordinator"]},
+  "Sociology": {popular:["Case Manager", "Program Coordinator", "Research Assistant", "Community Outreach Coordinator", "Social Services Coordinator"]},
+  "Sports Management": {popular:["Athletic Operations Coordinator", "Event Coordinator", "Ticket Sales Representative", "Marketing Coordinator", "Partnerships Coordinator"]},
+  "Statistics": {popular:["Data Analyst", "Statistical Analyst", "Research Analyst", "Business Intelligence Analyst", "Actuarial Analyst", "Quantitative Analyst"], emerging:["Data Engineer", "AI Engineer", "Machine Learning Engineer"]},
+  "Supply Chain Management": {popular:["Supply Chain Analyst", "Logistics Coordinator", "Procurement Analyst", "Operations Analyst", "Inventory Analyst"]}
 };
+
+// V20.1 beta update:
+// • Majors are alphabetized automatically.
+// • Recommended titles are curated by likely entry-level search volume, not alphabetized.
+// • AI/data specialties are separated so users can choose them without hiding broader options.
+// Regression-test these keywords after deployment: AI Engineer, Machine Learning Engineer,
+// ML Engineer, Data Engineer, Analytics Engineer, Applied Scientist, Research Engineer, LLM Engineer.
 
 // Curated grad-friendly employers across sectors. {slug, ats, sector}. Edit freely.
 // Some slugs will 404 over time as companies rename or switch ATS — the tool
@@ -2593,14 +2600,20 @@ function initMajorSearch(){
   const titleSelect = document.getElementById('majorTitleSelect');
   if(!majorSelect || !titleSelect || typeof MAJOR_TITLE_MAP === 'undefined') return;
 
-  majorSelect.innerHTML = Object.keys(MAJOR_TITLE_MAP).map((major, idx)=>
+  const majors = Object.keys(MAJOR_TITLE_MAP).sort((a,b)=>a.localeCompare(b));
+  majorSelect.innerHTML = majors.map((major, idx)=>
     `<option value="${esc(major)}"${idx === 0 ? ' selected' : ''}>${esc(major)}</option>`
   ).join('');
 
   function renderTitleOptions(){
-    const titles = MAJOR_TITLE_MAP[majorSelect.value] || [];
+    const groups = MAJOR_TITLE_MAP[majorSelect.value] || {popular:[]};
+    const popular = groups.popular || [];
+    const emerging = groups.emerging || [];
+    const popularOptions = popular.map(title=>`<option value="${esc(title)}">${esc(title)}</option>`).join('');
+    const emergingOptions = emerging.map(title=>`<option value="${esc(title)}">${esc(title)}</option>`).join('');
     titleSelect.innerHTML = `<option value="">Choose one to fill Keyword…</option>` +
-      titles.map((title, idx)=>`<option value="${esc(title)}">${idx + 1}. ${esc(title)}</option>`).join('');
+      (popular.length ? `<optgroup label="Popular Entry-Level Roles">${popularOptions}</optgroup>` : '') +
+      (emerging.length ? `<optgroup label="Emerging AI & Data Roles">${emergingOptions}</optgroup>` : '');
     titleSelect.value = '';
   }
 
