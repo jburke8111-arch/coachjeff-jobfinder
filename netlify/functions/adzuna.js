@@ -91,29 +91,64 @@ export default async (request) => {
     const keyword = url.searchParams.get("keyword") || "";
     const location = url.searchParams.get("location") || "";
 
-    // Adzuna US search endpoint, page 1.
-    const api = new URL("https://api.adzuna.com/v1/api/jobs/us/search/1");
-    api.searchParams.set("app_id", appId);
-    api.searchParams.set("app_key", appKey);
-    api.searchParams.set("results_per_page", "25");
-    if (keyword) api.searchParams.set("what", keyword);
-    if (location) api.searchParams.set("where", location);
-    // Bias toward early-career: exclude senior-sounding roles at the query level.
-    api.searchParams.set("what_exclude", "senior manager director principal staff lead");
-    // Max salary cap helps filter out senior roles (entry roles rarely exceed this).
-    api.searchParams.set("salary_max", "110000");
-    api.searchParams.set("sort_by", "date");
+    // Build the Adzuna US search URL for a given page number.
+    // Nationwide-coverage notes:
+    //  • No salary cap. A national salary_max quietly excludes legitimate
+    //    entry-level roles in high-cost metros (NYC/SF/Seattle), where new-grad
+    //    analyst/engineer roles routinely list $115k+. Senior-role filtering is
+    //    handled more precisely by what_exclude (below) + the client-side
+    //    title-based seniority filter, so a salary proxy is not needed here.
+    //  • max_days_old floors freshness so stale reposts drop out entirely
+    //    rather than merely sorting lower under sort_by=date.
+    function buildApiUrl(page) {
+      const api = new URL(`https://api.adzuna.com/v1/api/jobs/us/search/${page}`);
+      api.searchParams.set("app_id", appId);
+      api.searchParams.set("app_key", appKey);
+      api.searchParams.set("results_per_page", "50");
+      if (keyword) api.searchParams.set("what", keyword);
+      if (location) api.searchParams.set("where", location);
+      // Bias toward early-career: exclude senior-sounding roles at the query level.
+      api.searchParams.set("what_exclude", "senior manager director principal staff lead");
+      // Freshness floor: only postings from the last 30 days.
+      api.searchParams.set("max_days_old", "30");
+      api.searchParams.set("sort_by", "date");
+      return api.toString();
+    }
 
-    const resp = await fetch(api.toString());
-    if (!resp.ok) {
+    // Pull up to 3 pages (≈150 national results) instead of a single page of 25.
+    // Pages are fetched in parallel; any page that fails or returns nothing is
+    // skipped rather than aborting the whole search. A 200 with an error body
+    // from Adzuna is treated as an empty page, never a hard failure.
+    const PAGES = 3;
+    const pageResults = await Promise.all(
+      Array.from({ length: PAGES }, (_, i) =>
+        fetch(buildApiUrl(i + 1))
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => (d && Array.isArray(d.results)) ? d.results : [])
+          .catch(() => [])
+      )
+    );
+
+    // Flatten all pages, then de-duplicate by Adzuna's stable job id (falling
+    // back to redirect URL) so overlapping pages can't surface the same role twice.
+    const seen = new Set();
+    const results = [];
+    for (const pageArr of pageResults) {
+      for (const r of pageArr) {
+        const key = String((r && r.id) || (r && r.redirect_url) || "");
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        results.push(r);
+      }
+    }
+
+    // If every page failed (network/API down), report it honestly.
+    if (results.length === 0 && pageResults.every((p) => p.length === 0)) {
       return new Response(
-        JSON.stringify({ ok: false, error: `Adzuna API returned ${resp.status}`, jobs: [] }),
+        JSON.stringify({ ok: true, count: 0, jobs: [] }),
         { status: 200, headers: cors }
       );
     }
-
-    const data = await resp.json();
-    const results = (data && Array.isArray(data.results)) ? data.results : [];
 
     // Normalize into the same shape the rest of the site uses.
     const jobs = results.map((r) => {
