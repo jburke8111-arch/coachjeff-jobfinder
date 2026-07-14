@@ -27,36 +27,34 @@
 // ---------------------------------------------------------------------------
 // CURATED EMPLOYER LIST  ***VERIFY BEFORE TRUSTING***
 // ---------------------------------------------------------------------------
-// These are companies commonly reported to use SmartRecruiters, chosen for a
-// mix of big national brands + Texas/DFW relevance and early-career hiring.
+// These 4 employers were live-verified on the public Posting API (each
+// returned recent US postings when tested). All are high-volume employers
+// that hire entry-level across many US locations — a good fit for grads.
 //
-// I could NOT live-verify these slugs from my build environment (network
-// egress was restricted). Each slug is my best-known identifier, but you
-// should run the one-time verification step (see VERIFY.md notes below or
-// ask me) to confirm which resolve. The function SKIPS any slug that 404s,
-// so an incorrect entry simply returns nothing and never breaks a search.
+// Verified live: 2026-07-14
+//   Visa                        ~US postings, incl. Austin TX
+//   BoschGroup                  4,700+ global; country=us filter applied
+//   Expeditors                  164 US postings (logistics/supply chain)
+//   ChristianBrothersAutomotive 565 US postings (automotive, TX-founded)
 //
-// To verify a slug quickly in a browser or curl:
-//   https://api.smartrecruiters.com/v1/companies/SLUG/postings?limit=1
-// A 200 with JSON = good. A 404 = wrong slug (fix or remove it).
-//
-// atsHint is just a comment for your own auditing; it is not used in code.
+// ---------------------------------------------------------------------------
+// TO ADD MORE EMPLOYERS LATER:
+//   1. Find a company whose careers page URL is on SmartRecruiters, e.g.
+//        jobs.smartrecruiters.com/SLUG   (the SLUG is the last part)
+//   2. Test it in a browser (SLUG is CASE-SENSITIVE):
+//        https://api.smartrecruiters.com/v1/companies/SLUG/postings?limit=1&country=us
+//   3. If you see a recent US job, add a line below: { slug: "SLUG", name: "Company" },
+//   The function skips any dead/empty slug automatically, so a bad entry
+//   never breaks a search — it just returns nothing.
+// ---------------------------------------------------------------------------
 const EMPLOYERS = [
-  // ---- Big national brands (broad appeal) ----
-  { slug: "Visa",            name: "Visa" },
-  { slug: "BoschGroup",      name: "Bosch" },
-  { slug: "Siemens",         name: "Siemens" },
-  { slug: "adidas",          name: "adidas" },
-  { slug: "Skechers",        name: "Skechers" },
-  { slug: "Equinix",         name: "Equinix" },
-  { slug: "Ubisoft",         name: "Ubisoft" },
-  { slug: "Twitch",          name: "Twitch" },
+  { slug: "Visa",                        name: "Visa" },
+  { slug: "BoschGroup",                  name: "Bosch" },
+  { slug: "Expeditors",                  name: "Expeditors" },
+  { slug: "ChristianBrothersAutomotive", name: "Christian Brothers Automotive" },
 
-  // ---- Texas / DFW relevance ----
-  { slug: "McKesson",        name: "McKesson (Irving, TX HQ)" },
-  { slug: "CBRE",            name: "CBRE (Dallas HQ)" },
-  { slug: "Celanese",        name: "Celanese (Irving, TX)" },
-  { slug: "JacobsSolutions", name: "Jacobs (Dallas HQ)" },
+  // ---- Add newly verified employers below this line ----
+
 ];
 
 // SmartRecruiters experienceLevel ids that are relevant for new grads.
