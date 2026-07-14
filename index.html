@@ -687,7 +687,7 @@
 
   <div class="results" id="results"></div>
 
-  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, and Greenhouse. Roles link directly to the application page.</p>
+  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, and SmartRecruiters. Roles link directly to the application page.</p>
 
   <a class="coaching-prompt" href="/coaching.html">
     <span class="cp-text"><strong>Want a second set of eyes on your search?</strong> Coach Jeff offers free 1-on-1 coaching for new grads — resume, LinkedIn, job search &amp; interviews.</span>
@@ -1274,6 +1274,23 @@ async function fetchAshby(keyword, location){
   }
 }
 
+// Fetch SmartRecruiters-hosted roles through our Netlify function.
+// No API key is needed; the function queries public SmartRecruiters endpoints.
+// Returns [] on any failure so SmartRecruiters never breaks the rest of the search.
+async function fetchSmartRecruiters(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('keyword', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/smartrecruiters?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    return (data && data.ok && Array.isArray(data.jobs)) ? data.jobs : [];
+  } catch(e){
+    return [];
+  }
+}
+
 // Fetch Greenhouse-hosted roles through our Netlify function.
 // Keeps Greenhouse calls server-side and avoids dozens of browser requests.
 // The serverless function returns clean records today; the mapping below is
@@ -1803,6 +1820,14 @@ async function search(){
       sourceStats.greenhouse = greenhouseJobs.length;
       if(greenhouseJobs.length){ jobs = jobs.concat(greenhouseJobs); }
     } catch(e){ /* ignore Greenhouse errors, keep other results */ }
+
+    // Also pull SmartRecruiters-hosted roles through our Netlify function and merge them in.
+    try {
+      statusEl.innerHTML = `<span class="loading">Adding SmartRecruiters roles…</span>`;
+      const srJobs = await fetchSmartRecruiters(kw, loc);
+      sourceStats.smartrecruiters = srJobs.length;
+      if(srJobs.length){ jobs = jobs.concat(srJobs); }
+    } catch(e){ /* ignore SmartRecruiters errors, keep other results */ }
 
     // (3) Company-direct resolution: some Adzuna results link to aggregator walls
     // (ZipRecruiter etc.) that gate the job behind a signup. When the Adzuna job's
