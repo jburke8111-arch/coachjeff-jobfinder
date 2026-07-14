@@ -110,6 +110,17 @@
   .chip.clear-all{cursor:pointer;color:var(--faint);border-style:dashed}
   .chip.clear-all:hover{color:#c0392b;border-color:#c0392b}
   .chip:hover{border-color:var(--amber);background:#fff;color:var(--amber-deep)}
+  .role-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;min-height:20px;align-items:center}
+  .role-chips-hint{font-size:12px;color:var(--faint)}
+  .role-chip{display:inline-flex;align-items:center;gap:4px;padding:0;overflow:hidden;
+    min-height:34px;border-radius:999px;background:var(--navy);color:#fff;border:1px solid var(--navy);
+    font-size:13px;font-weight:600;white-space:nowrap}
+  .role-chip .role-chip-label{padding:7px 2px 7px 14px;white-space:nowrap}
+  .role-chip .role-chip-del{border:none;background:transparent;color:rgba(255,255,255,.75);
+    font-size:16px;line-height:1;padding:7px 12px 7px 4px;cursor:pointer}
+  .role-chip .role-chip-del:hover{color:#fff}
+  .role-chips-cap{font-size:12px;font-weight:700;color:var(--amber-deep);margin-left:2px;white-space:nowrap}
+  .label-optional{font-weight:400;color:var(--faint);font-size:12px;text-transform:none;letter-spacing:0}
   .profile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
   .profile-grid .field{gap:4px}
   @media(max-width:760px){.profile-grid{grid-template-columns:repeat(2,1fr)}}
@@ -471,7 +482,7 @@
   .majorbar{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--line)}
   .majorbar-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
   .major-help{font-size:12.5px;color:var(--faint);line-height:1.4;margin:0 0 12px}
-  .major-steps{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;align-items:end}
+  .major-steps{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;align-items:start}
   .major-step-label{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-deep);margin-bottom:2px}
   .majorbar select{height:42px;font-size:14.5px;background-color:#fff}
   .title-select-wrap{position:relative}
@@ -509,7 +520,7 @@
   <div class="hero-search">
     <div class="majorbar" aria-label="Find jobs by major">
       <div class="majorbar-title">🎓 What&rsquo;s your major?</div>
-      <p class="major-help">Choose your major, then pick one recommended job title. Broader entry-level roles appear first to improve your chances of finding matches; emerging AI and data roles are listed separately when relevant. The title fills the Keyword box — add a location if you want, then click Search.</p>
+      <p class="major-help">Choose your major, then pick up to 3 recommended roles to compare — results match any of them. The Keyword box is optional if you've picked roles.</p>
       <div class="major-steps">
         <div class="field">
           <div class="major-step-label">Step 1</div>
@@ -518,10 +529,13 @@
         </div>
         <div class="field">
           <div class="major-step-label">Step 2</div>
-          <label for="majorTitleSelect">Recommended Job Titles (Pick One)</label>
+          <label for="majorTitleSelect">Recommended Job Titles (Pick up to 3 to compare)</label>
           <div class="title-select-wrap">
             <select id="majorTitleSelect"></select>
             <span class="search-glyph" aria-hidden="true">🔍</span>
+          </div>
+          <div id="roleChips" class="role-chips" aria-live="polite">
+            <span class="role-chips-hint">Results match any role you add.</span>
           </div>
         </div>
       </div>
@@ -529,8 +543,8 @@
 
     <div class="hero-grid">
       <div class="field">
-        <label for="kw">Keyword</label>
-        <input id="kw" type="text" placeholder="Data analyst, marketing, IT support…" value="">
+        <label for="kw">Keyword <span class="label-optional">(optional if you picked roles)</span></label>
+        <input id="kw" type="text" placeholder="Or type your own: data analyst, marketing…" value="">
       </div>
       <div class="field">
         <label for="loc">Location</label>
@@ -1404,6 +1418,45 @@ function expandedKeywordMatches(blob, kw){
   return q.split(' ').filter(Boolean).every(t => b.includes(t));
 }
 
+// ---- Multi-role (pick up to 3) support -------------------------------------
+// selectedRoles holds up to 3 chosen job titles. Matching is OR across the
+// typed keyword AND each selected role, with each role run through the SAME
+// expandedKeywordMatches above — so per-role expansion and the strict
+// data-analyst precision are preserved per title, never flattened together.
+const MAX_ROLES = 3;
+let selectedRoles = [];
+
+// Return the list of active query terms: the typed keyword (if any) plus every
+// selected role, de-duplicated. This is the OR set.
+function activeQueryTerms(kw){
+  const terms = [];
+  const seen = new Set();
+  const push = (t) => {
+    const v = (t || '').trim();
+    const key = normalizeForSearch(v);
+    if(v && key && !seen.has(key)){ seen.add(key); terms.push(v); }
+  };
+  push(kw);
+  selectedRoles.forEach(push);
+  return terms;
+}
+
+// OR-aware wrapper around expandedKeywordMatches. A job matches if it matches
+// ANY active term. With no terms, everything passes (same as empty keyword).
+function keywordMatchesAny(blob, kw){
+  const terms = activeQueryTerms(kw);
+  if(terms.length === 0) return true;
+  return terms.some(t => expandedKeywordMatches(blob, t));
+}
+
+// Which active term actually matched this blob (for "why this job" tagging).
+// Returns the first matching term, or '' if none.
+function matchedTerm(blob, kw){
+  const terms = activeQueryTerms(kw);
+  for(const t of terms){ if(expandedKeywordMatches(blob, t)) return t; }
+  return '';
+}
+
 function scoreJob(j, kw, loc){
   const title = (j.title || '');
   const tl = title.toLowerCase();
@@ -1416,9 +1469,10 @@ function scoreJob(j, kw, loc){
   else if(REALISTIC_GRAD_RX.test(title)) s += 2;                     // realistic grad titles w/o the wording
   else if(ANY_EARLY_RX.test(title)) s += 1;                          // weak early signal
 
-  // 2) Keyword relevance — title match worth more than anywhere-match
-  if(kw){
-    if(expandedKeywordMatches(title, kw)) s += 3;                                      // keyword right in the title
+  // 2) Keyword relevance — title match worth more than anywhere-match.
+  //    OR-aware: counts a title hit for the typed keyword OR any selected role.
+  if(kw || selectedRoles.length){
+    if(keywordMatchesAny(title, kw)) s += 3;                         // a query term is right in the title
     else s += 1;                                                     // matched elsewhere (already filtered in)
   }
 
@@ -1495,7 +1549,10 @@ function whyThisJob(j, kw, loc){
   const reasons = [];
   const title = j.title || '';
   const blob = (title + ' ' + (j.location||'') + ' ' + (j.company||'')).toLowerCase();
-  if(kw && expandedKeywordMatches(blob, kw)) reasons.push(`Keyword match: ${kw}`);
+  if(kw || selectedRoles.length){
+    const hit = matchedTerm(blob, kw);
+    if(hit) reasons.push(`Matches: ${hit}`);
+  }
   if(isSeniorTitle(title)) reasons.push('Experienced title');
   else if(INTERN_RX.test(title)) reasons.push('Internship signal');
   else if(NEWGRAD_RX.test(title)) reasons.push('New-grad signal');
@@ -1660,6 +1717,9 @@ function isStateSearch(input){
 }
 
 async function search(){
+  // Any real search cancels a pending debounced role-search, so clicking Search
+  // (or pressing Enter) right after picking a role can't cause a double search.
+  if(_roleSearchTimer){ clearTimeout(_roleSearchTimer); _roleSearchTimer = null; }
   syncExperienceControls();
   const kw = document.getElementById('kw').value.trim().toLowerCase();
   const loc = document.getElementById('loc').value.trim().toLowerCase();
@@ -1809,7 +1869,7 @@ async function search(){
       }
       afterLevel++;
 
-      if(kw && !expandedKeywordMatches(blob, kw)) return false;
+      if((kw || selectedRoles.length) && !keywordMatchesAny(blob, kw)) return false;
       afterKeyword++;
 
       if(loc && !locationMatches(j.location, loc)) return false;
@@ -2294,17 +2354,22 @@ function currentSearchState(){
     degreeonly:document.getElementById('degreeonly').checked,
     showexperienced:document.getElementById('showexperienced') ? document.getElementById('showexperienced').checked : false,
     noclear:document.getElementById('noclear').checked,
-    showsuggest:document.getElementById('showsuggest').checked
+    showsuggest:document.getElementById('showsuggest').checked,
+    roles: selectedRoles.slice()
   };
 }
 function applySearchState(st){
   if(!st) return;
   for(const [k,v] of Object.entries(st)){
+    if(k === 'roles') continue; // handled explicitly below (no matching element)
     const el = document.getElementById(k);
     if(!el) continue;
     if(el.type === 'checkbox') el.checked = !!v;
     else el.value = v;
   }
+  // Restore picked roles (cap at MAX_ROLES defensively) and redraw chips.
+  selectedRoles = Array.isArray(st.roles) ? st.roles.slice(0, MAX_ROLES) : [];
+  if(typeof window.renderRoleChips === 'function') window.renderRoleChips();
   syncExperienceControls();
 }
 function savedSearches(){
@@ -2595,6 +2660,15 @@ function runKeywordSearch(term){
   fillKeywordFromSuggestion(term);
   search();
 }
+// Debounced search for the role picker: rapid consecutive picks/removals
+// collapse into a single search fired ~600ms after the last change, so adding
+// three roles triggers one search instead of three (and one set of API calls).
+let _roleSearchTimer = null;
+function debouncedRoleSearch(){
+  if(_roleSearchTimer) clearTimeout(_roleSearchTimer);
+  _roleSearchTimer = setTimeout(()=>{ _roleSearchTimer = null; search(); }, 600);
+}
+
 function initMajorSearch(){
   const majorSelect = document.getElementById('majorSelect');
   const titleSelect = document.getElementById('majorTitleSelect');
@@ -2605,23 +2679,61 @@ function initMajorSearch(){
     `<option value="${esc(major)}"${idx === 0 ? ' selected' : ''}>${esc(major)}</option>`
   ).join('');
 
+  const atCap = () => selectedRoles.length >= MAX_ROLES;
+
   function renderTitleOptions(){
     const groups = MAJOR_TITLE_MAP[majorSelect.value] || {popular:[]};
     const popular = groups.popular || [];
     const emerging = groups.emerging || [];
     const popularOptions = popular.map(title=>`<option value="${esc(title)}">${esc(title)}</option>`).join('');
     const emergingOptions = emerging.map(title=>`<option value="${esc(title)}">${esc(title)}</option>`).join('');
-    titleSelect.innerHTML = `<option value="">Choose one to fill Keyword…</option>` +
+    const lead = atCap()
+      ? '3 of 3 selected — remove one to change'
+      : (selectedRoles.length ? 'Add another role…' : 'Add a role…');
+    titleSelect.innerHTML = `<option value="">${esc(lead)}</option>` +
       (popular.length ? `<optgroup label="Popular Entry-Level Roles">${popularOptions}</optgroup>` : '') +
       (emerging.length ? `<optgroup label="Emerging AI & Data Roles">${emergingOptions}</optgroup>` : '');
     titleSelect.value = '';
+    titleSelect.disabled = atCap();
+  }
+
+  // Draw the selected-role chips (or the hint when empty), plus a cap note.
+  window.renderRoleChips = function renderRoleChips(){
+    const box = document.getElementById('roleChips');
+    if(!box) return;
+    if(selectedRoles.length === 0){
+      box.innerHTML = '<span class="role-chips-hint">Results match any role you add.</span>';
+    } else {
+      box.innerHTML = selectedRoles.map((r,i)=>
+        `<span class="role-chip"><span class="role-chip-label">${esc(r)}</span>`+
+        `<button type="button" class="role-chip-del" data-i="${i}" aria-label="Remove ${esc(r)}">×</button></span>`
+      ).join('');
+    }
+    box.querySelectorAll('.role-chip-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const i = parseInt(btn.dataset.i, 10);
+        if(!isNaN(i)){ selectedRoles.splice(i,1); renderRoleChips(); renderTitleOptions(); debouncedRoleSearch(); }
+      });
+    });
+  };
+
+  function addRole(title){
+    const t = (title || '').trim();
+    if(!t || atCap()) return;
+    // De-dupe case-insensitively against existing picks.
+    if(selectedRoles.some(r => normalizeForSearch(r) === normalizeForSearch(t))) return;
+    selectedRoles.push(t);
+    renderRoleChips();
+    renderTitleOptions();
+    debouncedRoleSearch();
   }
 
   majorSelect.addEventListener('change', renderTitleOptions);
   titleSelect.addEventListener('change', ()=>{
-    if(titleSelect.value) fillKeywordFromSuggestion(titleSelect.value);
+    if(titleSelect.value) addRole(titleSelect.value);
   });
   renderTitleOptions();
+  window.renderRoleChips();
 }
 
 document.querySelectorAll('.quick').forEach(btn=>btn.addEventListener('click',()=>{
@@ -2630,7 +2742,9 @@ document.querySelectorAll('.quick').forEach(btn=>btn.addEventListener('click',()
 initMajorSearch();
 document.getElementById('saveSearch').addEventListener('click',()=>{
   const st = currentSearchState();
-  const name = [st.loc, st.kw || 'All early-career', st.work !== 'any' ? st.work : ''].filter(Boolean).join(' · ');
+  const roleLabel = (st.roles && st.roles.length) ? st.roles.join(' / ') : '';
+  const kwLabel = [st.kw, roleLabel].filter(Boolean).join(' / ') || 'All early-career';
+  const name = [st.loc, kwLabel, st.work !== 'any' ? st.work : ''].filter(Boolean).join(' · ');
   const saves = savedSearches().filter(s => s.name !== name).slice(0,7);
   saves.unshift({name, state:st});
   localStorage.setItem('coachJeffSavedSearches', JSON.stringify(saves));
@@ -2668,6 +2782,8 @@ document.getElementById('reset').addEventListener('click', ()=>{
   document.getElementById('noclear').checked = false;
   document.getElementById('showsuggest').checked = false;
   syncExperienceControls();
+  selectedRoles = [];
+  if(typeof window.renderRoleChips === 'function') window.renderRoleChips();
   results.innerHTML = '';
   countEl.textContent = '';
   statusEl.textContent = '';
