@@ -75,12 +75,14 @@ const EMPLOYERS = [
   // which is what resolveApplyUrl()'s third fallback builds.
   { slug: "linkedin3",                        name: "LinkedIn",                     sector: "tech" },
 
-  // NOTE: Walmart30 is run through Cielo (their RPO) and skews heavily toward
-  // hourly store/pharmacy roles rather than corporate or new-grad programs.
-  // Sector tagged 'retail-hourly' so grads can filter it out if they want.
-  // Postings here carry no applyUrl — the real link lives in an "ATS Link"
-  // custom field, which resolveApplyUrl() below handles.
-  { slug: "Walmart30",                        name: "Walmart",                      sector: "retail-hourly" },
+  // NOTE: Walmart30 is run through Cielo (their RPO). Volume skews toward
+  // hourly store/pharmacy roles, but it does carry genuine early-career
+  // professional postings too (e.g. Graduate Public Policy Research
+  // Associate, Washington DC), so the sector stays plain 'retail'.
+  // Postings here carry no applyUrl and their "ATS Link" field is unreliable
+  // (see resolveApplyUrl notes) — they fall back to the SmartRecruiters
+  // posting page.
+  { slug: "Walmart30",                        name: "Walmart",                      sector: "retail" },
 ];
 
 const API_BASE = "https://api.smartrecruiters.com/v1/companies";
@@ -103,24 +105,22 @@ function withTimeout(url, ms){
 // `.filter(j => j.url)` guard never caught it.
 //
 // Correct order of preference:
-//   1. p.applyUrl            — present on most tenants, the canonical link
-//   2. "ATS Link" customField — some tenants (e.g. Walmart30/Cielo) put the
-//                               real careers-site link here instead
-//   3. jobs.smartrecruiters.com/{slug}/{id} — the public posting page; this
-//      is a valid, working URL pattern for ANY SmartRecruiters tenant, so it
-//      is a safe universal fallback
+//   1. p.applyUrl — present on most tenants, the canonical link
+//   2. jobs.smartrecruiters.com/{slug}/{id} — the public posting page; a
+//      valid, working URL pattern for ANY SmartRecruiters tenant, so it is a
+//      safe universal fallback (verified live on linkedin3)
 // p.ref is never used as a user-facing link.
+//
+// WHY NOT THE "ATS Link" customField:
+//   Some tenants (Walmart30/Cielo) expose an "ATS Link" pointing at their own
+//   careers site, e.g. careers.walmart.com/us/en/jobs/R-2532817. Tested
+//   2026-07-15: that URL is real, but Walmart redirects it to their Workday
+//   instance and the deep link does NOT survive the hop — the user lands on a
+//   generic search page with ~2,000 unrelated jobs and no way back to the
+//   role. It fails silently (no 404), which is worse than a broken link.
+//   The SmartRecruiters posting page below is reliable, so we skip ATS Link.
 function resolveApplyUrl(posting, slug){
   if (posting.applyUrl) return posting.applyUrl;
-
-  const fields = Array.isArray(posting.customField) ? posting.customField : [];
-  const atsLink = fields.find(f =>
-    f && typeof f.fieldLabel === "string" &&
-    f.fieldLabel.trim().toLowerCase() === "ats link"
-  );
-  if (atsLink && atsLink.valueLabel && /^https?:\/\//i.test(atsLink.valueLabel)) {
-    return atsLink.valueLabel;
-  }
 
   if (posting.id) {
     return `https://jobs.smartrecruiters.com/${encodeURIComponent(slug)}/${encodeURIComponent(posting.id)}`;
