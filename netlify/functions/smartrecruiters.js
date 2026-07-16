@@ -39,11 +39,14 @@
 //      If it 404s or totalFound is 0, skip it.
 //   Dead/empty slugs are skipped automatically and never break a search.
 //
-// A FASTER WAY TO CHECK MANY AT ONCE:
-//   Paste candidate slugs in below, deploy, then open:
-//        /.netlify/functions/smartrecruiters?diag=1
-//   It returns a live/empty/dead status + posting count per employer, so you
-//   can prune the list in one pass instead of testing URLs one by one.
+// A FASTER WAY TO CHECK MANY AT ONCE (use this for batches):
+//   1. Collect slugs from careers.smartrecruiters.com/SLUG URLs. Don't test
+//      them individually.
+//   2. Paste them all into EMPLOYERS below, deploy.
+//   3. Open /.netlify/functions/smartrecruiters?diag=1 — returns a
+//      live/empty/dead status + US posting count for every employer at once.
+//   4. Delete the dead/empty rows, deploy again.
+//   Two deploys for any batch size, instead of one URL check per employer.
 const EMPLOYERS = [
   { slug: "Visa",                        name: "Visa",                          sector: "fintech" },
   { slug: "BoschGroup",                  name: "Bosch",                         sector: "manufacturing" },
@@ -83,12 +86,43 @@ const EMPLOYERS = [
   // (see resolveApplyUrl notes) — they fall back to the SmartRecruiters
   // posting page.
   { slug: "Walmart30",                        name: "Walmart",                      sector: "retail" },
+
+  // ---- Added 2026-07-15: CANDIDATES, NOT YET API-VERIFIED ----
+  // Slugs taken from live careers.smartrecruiters.com pages. A live careers
+  // page does NOT prove the public Posting API is open for that tenant, so
+  // these have not been confirmed. Run ?diag=1 after deploying and delete any
+  // row that comes back "dead" or "empty". Dead slugs fail soft in the
+  // meantime — they cost one wasted fetch and never break a search.
+  { slug: "aubergecollection",                name: "Auberge Resorts Collection",   sector: "hospitality" },
+  { slug: "Winsupply1",                       name: "Winsupply",                    sector: "distribution" },
+  { slug: "msxinternational",                 name: "MSX International",            sector: "automotive" },
+  { slug: "signode",                          name: "Signode",                      sector: "manufacturing" },
+  { slug: "mcwaneinc",                        name: "McWane",                       sector: "manufacturing" },
+  { slug: "AWPSafety",                        name: "AWP Safety",                   sector: "infrastructure" },
+  { slug: "ProgressRail",                     name: "Progress Rail (Caterpillar)",  sector: "manufacturing" },
+  { slug: "californiaclosets",                name: "California Closets",           sector: "retail" },
+  { slug: "eversana1",                        name: "EVERSANA",                     sector: "life-sciences" },
+  { slug: "Dungarvin",                        name: "Dungarvin",                    sector: "healthcare" },
+  { slug: "thewonderfulcompany",              name: "The Wonderful Company",        sector: "consumer-goods" },
+  { slug: "Eataly",                           name: "Eataly",                       sector: "hospitality" },
+  { slug: "LLNL",                             name: "Lawrence Livermore National Laboratory", sector: "research" },
+  { slug: "NorthwesternMutual",               name: "Northwestern Mutual",          sector: "finance" },
+  { slug: "IHeartMedia",                      name: "iHeartMedia",                  sector: "media" },
+  { slug: "fanniemae",                        name: "Fannie Mae",                   sector: "finance" },
 ];
 
 const API_BASE = "https://api.smartrecruiters.com/v1/companies";
 const PER_COMPANY_LIMIT = 50;   // postings pulled per employer per query
-const CONCURRENCY = 6;          // stay under the 8-concurrent ceiling
+const CONCURRENCY = 6;          // stay under SmartRecruiters' 8-concurrent ceiling
 const FETCH_TIMEOUT_MS = 12000;
+
+// NOTE ON SCALING: with ~30 employers at CONCURRENCY 6 and a 12s per-request
+// timeout, a worst case where many employers are slow could approach
+// Netlify's 10s synchronous function limit. In practice responses are fast
+// (~200-400ms) so 30 employers finish in roughly 5 rounds well under 2s. If
+// the list grows much beyond ~40, or if you start seeing 502s from Netlify,
+// the fix is to lower FETCH_TIMEOUT_MS (a slow employer is not worth stalling
+// the whole search for) rather than to raise CONCURRENCY past 8.
 
 function withTimeout(url, ms){
   const controller = new AbortController();
