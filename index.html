@@ -543,7 +543,7 @@
 
     <div class="hero-grid">
       <div class="field">
-        <label for="kw">Keyword <span class="label-optional">(optional if you picked roles)</span></label>
+        <label for="kw">Keyword <span class="label-optional">(job title or company)</span></label>
         <input id="kw" type="text" placeholder="Or type your own: data analyst, marketing…" value="">
       </div>
       <div class="field">
@@ -1535,7 +1535,7 @@ function freshnessText(posted){
   if(days === 0) return 'Posted today';
   if(days === 1) return 'Posted yesterday';
   if(days <= 6) return `Posted ${days} days ago`;
-  if(days <= 13) return 'Posted this week';
+  if(days <= 13) return 'Posted last week';
   if(days <= 30) return `Posted ${Math.ceil(days/7)} weeks ago`;
   return 'Posted 30+ days ago';
 }
@@ -1562,6 +1562,20 @@ function salaryEstimate(j){
   if(/coordinator|assistant|program|project/.test(t)) return prefix + ': $42K\u2013$65K';
   return ''; // no field match -> show nothing rather than a guess
 }
+// Age in days for a posting, or null if we can't determine it.
+function postedAgeDays(posted){
+  if(!posted) return null;
+  const ts = typeof posted === 'number' ? posted : Date.parse(posted);
+  if(!ts || Number.isNaN(ts)) return null;
+  return Math.max(0, Math.floor((Date.now() - ts) / 86400000));
+}
+
+// "WHY THIS JOB?" lists reasons FOR the job. Every line here is rendered with
+// a ✓, so only genuinely positive signals belong. Things that argue AGAINST a
+// job (a stale posting, a senior title, an unknown date) must not appear —
+// a ✓ next to "Posted 30+ days ago" tells the student the opposite of the
+// truth. Those signals still show in the tag row via freshnessText(), which
+// is neutral reporting rather than a checkmarked endorsement.
 function whyThisJob(j, kw, loc){
   const reasons = [];
   const title = j.title || '';
@@ -1570,14 +1584,19 @@ function whyThisJob(j, kw, loc){
     const hit = matchedTerm(blob, kw);
     if(hit) reasons.push(`Matches: ${hit}`);
   }
-  if(isSeniorTitle(title)) reasons.push('Experienced title');
+  // A senior title is a strike against an entry-level search, not a reason for
+  // it, so it is deliberately absent here. The other branches stay.
+  if(isSeniorTitle(title)) { /* no positive reason to add */ }
   else if(INTERN_RX.test(title)) reasons.push('Internship signal');
   else if(NEWGRAD_RX.test(title)) reasons.push('New-grad signal');
   else if(ENTRYLVL_RX.test(title) || REALISTIC_GRAD_RX.test(title) || ANY_EARLY_RX.test(title)) reasons.push('Early-career title');
   if(loc && locationMatches(j.location, loc)) reasons.push(`Location match: ${loc}`);
   if(isUSLocation(j.location)) reasons.push('US location');
   if(j.sector) reasons.push(`${j.sector} sector`);
-  if(j.posted) reasons.push(freshnessText(j.posted));
+  // Freshness is only a selling point while the posting is actually fresh.
+  // Older than 30 days (or undated) => say nothing rather than claim a ✓.
+  const age = postedAgeDays(j.posted);
+  if(age !== null && age <= 30) reasons.push(freshnessText(j.posted));
   if(reasons.length < 3) reasons.push('Direct employer career page');
   return reasons.slice(0,5);
 }
