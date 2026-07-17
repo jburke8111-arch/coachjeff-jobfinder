@@ -9,9 +9,18 @@
 //
 // Endpoint per company:
 //   https://api.ashbyhq.com/posting-api/job-board/{board}?includeCompensation=true
+//
+// TO ADD MORE BOARDS (mirrors the smartrecruiters.js workflow):
+//   1. Collect candidate board names from jobs.ashbyhq.com/SLUG careers URLs.
+//      Don't test them one at a time.
+//   2. Paste them all into ASHBY_BOARDS below, deploy.
+//   3. Open /.netlify/functions/ashby?diag=1 — returns a live/empty/dead
+//      status + listed-posting count for every board at once.
+//   4. Delete the dead/empty rows, deploy again.
+//   Two deploys for any batch size, instead of one URL check per company.
 
 const ASHBY_BOARDS = [
-  // Verify these are live by hitting the function with an empty keyword.
+  // Verify these are live by hitting the function with ?diag=1.
   // Names that aren't real Ashby boards are harmlessly skipped.
   { board: "ramp", company: "Ramp" },
   { board: "notion", company: "Notion" },
@@ -33,6 +42,12 @@ const ASHBY_BOARDS = [
   { board: "clipboardhealth", company: "Clipboard Health" },
   { board: "benchling", company: "Benchling" },
   { board: "moderntreasury", company: "Modern Treasury" },
+
+  // ---- Added 2026-07-16 (API-verified: 9 listed US postings) ----
+  // Scrunch is a Sitecore company (AI search visibility for marketing teams).
+  // Board carries early-career-relevant roles beyond engineering: AI Search
+  // Analyst, Solutions Engineer, several Customer Success posts.
+  { board: "scrunch", company: "Scrunch" },
 ];
 
 async function withTimeout(promise, ms){
@@ -40,6 +55,61 @@ async function withTimeout(promise, ms){
   const timeout = new Promise((_, rej) => { t = setTimeout(() => rej(new Error("timeout")), ms); });
   try { return await Promise.race([promise, timeout]); }
   finally { clearTimeout(t); }
+}
+
+// ---------------------------------------------------------------------------
+// DIAGNOSTIC MODE:  /.netlify/functions/ashby?diag=1
+// ---------------------------------------------------------------------------
+// Returns one row per board with its live status and listed-posting count,
+// instead of returning jobs. Use this after pasting in a batch of candidate
+// board names: anything marked "dead" or "empty" can be deleted from
+// ASHBY_BOARDS. Does not affect the normal search path in any way.
+//
+// Mirrors the ?diag=1 contract in smartrecruiters.js. Ashby differs in shape:
+// there is no totalFound field and no server-side country filter, so the count
+// is derived by counting jobs where isListed !== false.
+async function runDiagnostics(){
+  const rows = await Promise.all(ASHBY_BOARDS.map(async (source) => {
+    const apiUrl = `https://api.ashbyhq.com/posting-api/job-board/${source.board}`;
+    try {
+      const resp = await withTimeout(fetch(apiUrl), 7000);
+      if (!resp.ok) {
+        return { board: source.board, company: source.company, status: "dead",
+                 httpStatus: resp.status, listedPostings: 0 };
+      }
+      const data = await resp.json();
+      const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+      const listed = jobs.filter(j => j.isListed !== false);
+      const sample = listed[0] || null;
+      return {
+        board: source.board,
+        company: source.company,
+        status: listed.length > 0 ? "live" : "empty",
+        listedPostings: listed.length,
+        sampleTitle: sample ? sample.title : null,
+        sampleHasApplyUrl: sample ? Boolean(sample.applyUrl) : null
+      };
+    } catch (e) {
+      return { board: source.board, company: source.company, status: "error",
+               listedPostings: 0, error: String((e && e.message) || e).slice(0, 80) };
+    }
+  }));
+
+  const live  = rows.filter(r => r.status === "live");
+  const total = live.reduce((sum, r) => sum + r.listedPostings, 0);
+
+  return {
+    ok: true,
+    checkedAt: new Date().toISOString(),
+    summary: {
+      boards: rows.length,
+      live: live.length,
+      empty: rows.filter(r => r.status === "empty").length,
+      dead:  rows.filter(r => r.status === "dead" || r.status === "error").length,
+      totalListedPostings: total
+    },
+    diag: rows.sort((a, b) => b.listedPostings - a.listedPostings)
+  };
 }
 
 export default async (request) => {
@@ -55,6 +125,17 @@ export default async (request) => {
 
   try {
     const url = new URL(request.url);
+
+    // Diagnostic mode — board health check, no jobs returned.
+    const diag = url.searchParams.get("diag");
+    if (diag === "1" || diag === "true") {
+      const out = await runDiagnostics();
+      return new Response(JSON.stringify(out, null, 2), {
+        status: 200,
+        headers: { ...cors, "Cache-Control": "no-store" },
+      });
+    }
+
     const keyword = (url.searchParams.get("keyword") || "").toLowerCase().trim();
     const location = (url.searchParams.get("location") || "").toLowerCase().trim();
 
@@ -77,8 +158,15 @@ export default async (request) => {
             (Array.isArray(j.secondaryLocations) && j.secondaryLocations[0] && j.secondaryLocations[0].location) ||
             (j.isRemote ? "Remote" : "—");
 
+          // Token-AND match: every word in the keyword must appear somewhere in
+          // the searchable text, in any order. A plain substring match required
+          // the user's words to be contiguous and in the same order as the
+          // title, so "analyst ai search" or "scrunch analyst" found nothing.
           const text = `${title} ${loc} ${source.company}`.toLowerCase();
-          if (keyword && !text.includes(keyword)) continue;
+          if (keyword) {
+            const terms = keyword.split(/\s+/).filter(Boolean);
+            if (!terms.every(t => text.includes(t))) continue;
+          }
           if (location && location !== "remote" && !text.includes(location)) continue;
 
           let salary = "";
