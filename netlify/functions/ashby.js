@@ -50,6 +50,42 @@ const ASHBY_BOARDS = [
   { board: "scrunch", company: "Scrunch" },
 ];
 
+// ---------------------------------------------------------------------------
+// EXPERIENCE GATE
+// ---------------------------------------------------------------------------
+// Implements the server-side experience scan described in the index.html
+// known-issues block. Title regexes cannot tell a new-grad "Analyst" from a
+// 4-year "Analyst" — only the requirements text can. Ashby hands us
+// descriptionPlain in the SAME board response, so this costs no extra fetch
+// (unlike the Greenhouse/Lever path, which needs a per-job call).
+//
+// Returns the minimum years of experience demanded, or 0 if none stated.
+// Deliberately conservative: it reads the LOW end of a range ("2-4 years" -> 2)
+// and ignores unrelated numbers by requiring the word "year(s)" adjacent.
+function minYearsRequired(text){
+  if(!text) return 0;
+  let t = String(text).toLowerCase();
+  let max = 0;
+
+  // Ranges FIRST: "2-4 years", "2 to 4 years", "2–4 years" -> the low end (2).
+  // Each match is then blanked out of the text, because the single-value regex
+  // below would otherwise re-match the range's tail ("4 years") and report the
+  // HIGH end — overstating the requirement on every range in the posting.
+  const range = /\b(\d{1,2})\s*(?:-|–|—|to)\s*\d{1,2}\s*\+?\s*years?\b/g;
+  t = t.replace(range, (_full, low) => {
+    max = Math.max(max, parseInt(low, 10));
+    return " ";
+  });
+
+  // "3+ years", "5 years of experience", "minimum 3 years"
+  const single = /\b(?:minimum(?: of)?\s*|at least\s*)?(\d{1,2})\s*\+?\s*years?\b/g;
+  let m;
+  while((m = single.exec(t)) !== null) max = Math.max(max, parseInt(m[1], 10));
+
+  // Sanity ceiling: "401(k)" style noise and decade references shouldn't count.
+  return max > 15 ? 0 : max;
+}
+
 async function withTimeout(promise, ms){
   let t;
   const timeout = new Promise((_, rej) => { t = setTimeout(() => rej(new Error("timeout")), ms); });
@@ -174,6 +210,9 @@ export default async (request) => {
             salary = `${j.compensation.scrapeableCompensationSalarySummary} (listed)`;
           }
 
+          // Read the real requirements, not just the title.
+          const minYears = minYearsRequired(j.descriptionPlain || "");
+
           out.push({
             title,
             company: source.company,
@@ -183,6 +222,8 @@ export default async (request) => {
             posted: j.publishedAt ? Date.parse(j.publishedAt) : null,
             salary,
             source: "ashby",
+            minYears,                  // 0 = nothing stated
+            expFlag: minYears >= 2,    // matches index.html's "may require experience" tag
           });
         }
         return out;
