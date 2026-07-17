@@ -1569,10 +1569,17 @@ function scoreJob(j, kw, loc){
   let s = 0;
 
   // 1) Early-career signal in the title (the core of what this board is for)
+  //
+  // Ambiguous titles get HALF credit unless the description was actually read.
+  // "AI Security Analyst" fires ENTRYLVL_RX purely because it ends in "Analyst",
+  // and full credit there was enough to push unverified roles to a
+  // "high-priority lead" badge — asserting confidence the tool doesn't have.
+  // Intern/new-grad titles are self-evident and keep full credit unscanned.
+  const scanned = j.minYears !== undefined && j.minYears !== null;
   if(INTERN_RX.test(title) || NEWGRAD_RX.test(title)) s += 4;        // strongest: explicit grad/intern
-  else if(ENTRYLVL_RX.test(title)) s += 3;                           // entry-level / junior / associate
-  else if(REALISTIC_GRAD_RX.test(title)) s += 2;                     // realistic grad titles w/o the wording
-  else if(ANY_EARLY_RX.test(title)) s += 1;                          // weak early signal
+  else if(ENTRYLVL_RX.test(title)) s += (scanned ? 3 : 1.5);         // entry-level / junior / associate
+  else if(REALISTIC_GRAD_RX.test(title)) s += (scanned ? 2 : 1);     // realistic grad titles w/o the wording
+  else if(ANY_EARLY_RX.test(title)) s += (scanned ? 1 : 0.5);        // weak early signal
 
   // 2) Keyword relevance — title match worth more than anywhere-match.
   //    OR-aware: counts a title hit for the typed keyword OR any selected role.
@@ -1606,6 +1613,13 @@ function scoreJob(j, kw, loc){
   // (keyword + location + US). Cap it just below the badge threshold.
   const hasEarlySignalFlag = hasEntrySignal(title) && !isSeniorTitle(title);
   if(!hasEarlySignalFlag && s >= 8) s = 7;
+
+  // Same cap when the ONLY early signal is an ambiguous title we never verified.
+  // "high-priority lead" sitting next to "experience not verified" is the tool
+  // contradicting itself in the space of two chips — one says this is among your
+  // best matches, the other says we don't know if you can even apply.
+  const unambiguousEarly = INTERN_RX.test(title) || NEWGRAD_RX.test(title);
+  if(!scanned && !unambiguousEarly && s >= 8) s = 7;
 
   return s;
 }
@@ -1648,12 +1662,20 @@ function salaryEstimate(j){
   if(real) return real;
 
   // Every fallback below is explicitly an ENTRY-LEVEL range, so it must not
-  // appear on a role we've already established isn't entry-level. Showing
+  // appear on a role we've established isn't entry-level. Showing
   // "Typical entry-level range: $55K-$85K" directly beneath "Proceed with
   // caution · 6+ yrs" contradicts our own tier label, and understates the pay
   // badly enough to put a student off a role they might still want.
-  // No number beats a wrong one.
   if(Number(j.minYears || 0) >= 3) return '';
+
+  // ...and it must not appear on a role we haven't CHECKED either. An unscanned
+  // "Cyber Intelligence Analyst" carries "experience not verified" — quoting an
+  // entry-level range beside that chip quietly re-asserts the very claim the
+  // chip just disclaimed. Unambiguous titles (Intern, New Grad) are exempt:
+  // those are entry-level by definition, whatever the source.
+  const scanned = j.minYears !== undefined && j.minYears !== null;
+  const unambiguous = INTERN_RX.test(j.title || '') || NEWGRAD_RX.test(j.title || '');
+  if(!scanned && !unambiguous) return '';
 
   const t = (j.title||'').toLowerCase();
   const prefix = 'Typical entry-level range for this field';
