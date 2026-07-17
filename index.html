@@ -1151,6 +1151,26 @@ const NONDEGREE_RX = /\b(warehouse|fulfillment|picker|packer|forklift|driver|del
 // Clinical / licensed / degreed healthcare titles that should NOT be treated as
 // non-degree even if they contain a word like "technician" or "assistant".
 // These require a degree, license, or accredited certification program.
+// Placeholder "company" values that mean the poster is anonymous. Adzuna uses
+// the literal "Employer"; others use variants. A job with no identifiable
+// employer can't be researched, networked into, or addressed in a cover
+// letter — the three things this tool's coaching depends on.
+const ANON_COMPANY_RX = /^(employer|confidential|undisclosed|company confidential|private|n\/?a|unknown|recruiter|staffing|various)\.?$/i;
+
+// Crowdwork / gig platforms dressed up as analyst roles. These are piece-rate
+// data-labeling and model-evaluation tasks (Mercor, Outlier, Scale's networks),
+// not jobs: no employer, no salary floor, no career track. They flood any "AI"
+// search because the titles are engineered to match one — a search for
+// "AI analyst" returned nine of these under one listing, one per language.
+const GIGWORK_RX = /\b(train ai models?|ai training|expert network|join our (expert|talent) network|freelance|gig|piece[- ]rate|per[- ]task|contributor|crowdsourc|data (labeling|annotation)|rate (ai|model) (responses|outputs)|evaluate (ai|model) (responses|outputs))\b/i;
+
+// Roles gated behind a licence or board certification a new grad cannot hold.
+// Distinct from CLINICAL_RX: a BCBA (Board Certified Behavior Analyst) has
+// "Analyst" in the title, so every early-career title regex fires on it while
+// the actual requirement is a master's degree plus board certification and
+// supervised fieldwork hours.
+const LICENSED_RX = /\b(board certified|board[- ]eligible|licensed|registered|certified) (behavior|behaviour|nurse|nursing|midwife|dietitian|counselor|counsellor|therapist|social worker|pharmacist|physician|surgeon|anesthe)|(\bbcba\b|\bbcaba\b|\bcpa\b|\bpe\b license|\bp\.e\.\b|\brn\b|\blcsw\b|\blmft\b|\blpc\b|\bcfa\b charter)/i;
+
 const CLINICAL_RX = /\b(nurse|nursing|rn\b|lpn|lvn|np\b|nurse practitioner|physician|doctor|md\b|surgeon|surgical|sterile processing|pharmacist|pharmacy|therap(ist|y)|physical therap|occupational therap|respiratory|radiolog|imaging|sonograph|laboratory|lab (tech|scientist)|clinical|patient care|medical (assistant|technologist|laboratory)|technologist|dietitian|nutritionist|counselor|social work|psycholog|paramedic|emt\b|sterile|anesthe|cardiac|dental hygien|optometr|audiolog|speech|genetic counsel|perfusion|histolog|cytolog|phlebotom)\b/i;
 
 // Broader pattern used ONLY to decide whether a SEARCH keyword is healthcare-ish,
@@ -1176,6 +1196,18 @@ function isUSLocation(loc){
   if(US_RX.test(t)) return true;             // names a US place → keep
   if(/\bremote\b/i.test(t)) return true;     // bare "Remote" with no country → keep
   return false;                              // names some other place, not US → drop
+}
+
+// Some aggregator postings carry a US location field while the TITLE says
+// otherwise — Adzuna returned "INTL INDIA (Mumbai) - AI Analyst - UX/UI" tagged
+// as a US job. When a title explicitly names a country or an INTL marker, trust
+// the title: an employer who put it there meant it, whereas the location field
+// is often just where the aggregator's crawler indexed the posting.
+const TITLE_NONUS_RX = /\b(intl|international)\b.*\b(india|china|japan|brazil|mexico|canada|uk|emea|apac|latam)\b|\b(mumbai|bangalore|bengaluru|hyderabad|pune|delhi|chennai|manila|jakarta|sydney|melbourne|toronto|vancouver|london|berlin|paris|madrid|warsaw|krakow|lisbon|porto|dublin|amsterdam|bogot[aá]|s[aã]o paulo|buenos aires|santiago|guadalajara|monterrey|tel aviv|singapore|kuala lumpur|bangkok|seoul|tokyo|shanghai|beijing|shenzhen)\b/i;
+
+function isUSJob(j){
+  if(TITLE_NONUS_RX.test(j.title || '')) return false;
+  return isUSLocation(j.location);
 }
 
 // Populate sector + company dropdowns from the list
@@ -1599,6 +1631,14 @@ function sponsorshipLabel(j){
 function salaryEstimate(j){
   const real = String(j.salary || '').trim();
   if(real) return real;
+
+  // Every fallback below is explicitly an ENTRY-LEVEL range, so it must not
+  // appear on a role we've already established isn't entry-level. Showing
+  // "Typical entry-level range: $55K-$85K" directly beneath "Proceed with
+  // caution · 6+ yrs" contradicts our own tier label, and understates the pay
+  // badly enough to put a student off a role they might still want.
+  // No number beats a wrong one.
+  if(Number(j.minYears || 0) >= 3) return '';
 
   const t = (j.title||'').toLowerCase();
   const prefix = 'Typical entry-level range for this field';
@@ -2040,11 +2080,27 @@ async function search(){
       if(hideClear && CLEAR_RX.test(blob)) return false;
       afterClear++;
 
-      if(usOnly && !isUSLocation(j.location)) return false;
+      if(usOnly && !isUSJob(j)) return false;
       afterUS++;
 
       if(degreeOnly && NONDEGREE_RX.test(t) && !CLINICAL_RX.test(t)) return false;
       afterDegree++;
+
+      // Always drop these — none is a job a new grad can take. Gig/crowdwork
+      // listings are piece-rate tasks with no employer; licence-gated roles
+      // (BCBA, RN, CPA) need a credential that takes years beyond the degree.
+      // Both slip past every other filter because their titles read early-career
+      // ("AI Quality Analyst", "Behavior Analyst").
+      if(GIGWORK_RX.test(t)) return false;
+      if(LICENSED_RX.test(t)) return false;
+
+      // Aggregator postings with no employer name. Adzuna returns the literal
+      // string "Employer" when the poster withheld its identity — which is the
+      // signature of a repost farm or a gig network, and in any case leaves the
+      // student nothing to research, no company to look up, and no one to
+      // address a cover letter to. A search for "AI analyst" returned ten of
+      // these, nine of them the same listing repeated per language.
+      if(j.aggregator && ANON_COMPANY_RX.test(j.company || '')) return false;
       return true;
     });
 
@@ -2104,7 +2160,6 @@ async function search(){
       // hitting checkjobs' cap. That's why the response now reports `skipped`
       // and the UI says so, rather than silently truncating.
       const SUSPICIOUS_RX = /\b(operations|fulfillment|warehouse|logistics|hub|depot|fleet|store|retail|field|floor|shift|crew|team member|associate|coordinator|specialist|representative|assistant|agent|clerk|analyst|scientist|engineer|developer|consultant|manager|designer|researcher|strategist|architect|administrator|technician)\b/i;
-      // Which jobs can have their description fetched (Greenhouse/Lever with an id).
       // Which jobs can have their description fetched (Greenhouse/Lever with a
       // server-resolvable id). GH jobs given a synthetic string id (a rare
       // fallback for malformed records) are excluded, since checkjobs needs the
@@ -2118,11 +2173,26 @@ async function search(){
       // not just the suspicious titles. Otherwise, only the suspicious ones.
       const checkable = hideClear ? fetchable : fetchable.filter(j => SUSPICIOUS_RX.test(j.title || ''));
 
+      // Scan the BEST matches first, whatever the display sort is.
+      //
+      // checkjobs caps at 30 (60 with the sponsorship scan) and takes the first
+      // N of whatever we send. `jobs` is already sorted for DISPLAY by this
+      // point, so on the default "Most relevant" sort the top 30 happened to be
+      // scanned — but a student who switches to "Company A-Z" or "Newest" would
+      // silently spend the whole scan budget on alphabetically-early or
+      // recently-posted roles while their strongest matches went unverified.
+      //
+      // Sorting a copy by score decouples scan priority from display order: the
+      // cap always truncates the tail of the relevance ranking. The response is
+      // keyed by job id, so the order we send in has no effect on how results
+      // are displayed.
+      const scanOrder = checkable.slice().sort((a,b) => (b.score || 0) - (a.score || 0));
+
       if(checkable.length){
         statusEl.innerHTML = hideClear
           ? `<span class="loading">Checking ${checkable.length} roles for work-authorization &amp; sponsorship…</span>`
           : `<span class="loading">Verifying ${checkable.length} role${checkable.length===1?'':'s'} against their descriptions…</span>`;
-        const payload = checkable.map(j => ({ id:j.id, url:j.url, ats:j.ats, company:j.company, board:j.board }));
+        const payload = scanOrder.map(j => ({ id:j.id, url:j.url, ats:j.ats, company:j.company, board:j.board }));
         const resp = await fetch('/.netlify/functions/checkjobs', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
@@ -2206,12 +2276,13 @@ async function search(){
       totalFetched, matched: jobs.length
     });
 
-    // If the description scan hit its cap, say so plainly. A student comparing
-    // two cards can't otherwise tell that one was verified against its posting
-    // and the other was never read — and the unread one wears no tier, which
-    // looks identical to "no experience required".
+    // If the description scan hit its cap, say so plainly — and say WHICH ones
+    // went unverified. Now that the scan runs in score order, the skipped roles
+    // are always the lowest-ranked matches, which is a fact worth telling: it
+    // turns "16 roles not verified" (which 16?) into something the student can
+    // act on without opening 16 postings.
     const skipNote = (window._scanSkipped > 0)
-      ? `<br><span class="hint src-fail">${window._scanSkipped} role${window._scanSkipped===1?'':'s'} not verified against ${window._scanSkipped===1?'its':'their'} full description (scan limit reached) — check the posting itself before ruling one in or out.</span>`
+      ? `<br><span class="hint src-fail">${window._scanSkipped} lower-ranked role${window._scanSkipped===1?'':'s'} could not be verified against ${window._scanSkipped===1?'its':'their'} full description (scan limit reached). Your top matches were checked first — check the posting itself before ruling out anything further down.</span>`
       : '';
 
     statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>${skipNote}`;
