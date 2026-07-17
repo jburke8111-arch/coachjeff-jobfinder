@@ -48,10 +48,8 @@
 //   4. Delete the dead/empty rows, deploy again.
 //   Two deploys for any batch size, instead of one URL check per employer.
 const EMPLOYERS = [
-  { slug: "Visa",                        name: "Visa",                          sector: "fintech" },
   { slug: "BoschGroup",                  name: "Bosch",                         sector: "manufacturing" },
   { slug: "Expeditors",                  name: "Expeditors",                    sector: "logistics" },
-  { slug: "ChristianBrothersAutomotive", name: "Christian Brothers Automotive", sector: "automotive" },
 
   // ---- Added 2026-07-15 (verified: non-zero US totalFound) ----
 
@@ -65,13 +63,9 @@ const EMPLOYERS = [
 
   // NOTE: This is the federal subsidiary, not Convergint at large.
   // Federal roles often carry clearance requirements.
-  { slug: "ConvergintFederalSolutions",       name: "Convergint Federal Solutions", sector: "security" },
 
-  { slug: "cornerstonebuildingbrandscareers", name: "Cornerstone Building Brands",  sector: "manufacturing" },
-  { slug: "MATHoldings",                      name: "MAT Holdings",                 sector: "manufacturing" },
   { slug: "Microchip",                        name: "Microchip Technology",         sector: "semiconductors" },
   { slug: "RRDonnelley",                      name: "RRD",                          sector: "marketing" },
-  { slug: "seniorlifestyle1",                 name: "Senior Lifestyle",             sector: "healthcare" },
 
   // NOTE: linkedin3 postings carry no applyUrl; the public posting page at
   // jobs.smartrecruiters.com/linkedin3/{id} resolves correctly (verified),
@@ -93,22 +87,16 @@ const EMPLOYERS = [
   // these have not been confirmed. Run ?diag=1 after deploying and delete any
   // row that comes back "dead" or "empty". Dead slugs fail soft in the
   // meantime — they cost one wasted fetch and never break a search.
-  { slug: "aubergecollection",                name: "Auberge Resorts Collection",   sector: "hospitality" },
   { slug: "Winsupply1",                       name: "Winsupply",                    sector: "distribution" },
   { slug: "msxinternational",                 name: "MSX International",            sector: "automotive" },
   { slug: "signode",                          name: "Signode",                      sector: "manufacturing" },
   { slug: "mcwaneinc",                        name: "McWane",                       sector: "manufacturing" },
-  { slug: "AWPSafety",                        name: "AWP Safety",                   sector: "infrastructure" },
-  { slug: "ProgressRail",                     name: "Progress Rail (Caterpillar)",  sector: "manufacturing" },
-  { slug: "californiaclosets",                name: "California Closets",           sector: "retail" },
   { slug: "eversana1",                        name: "EVERSANA",                     sector: "life-sciences" },
   { slug: "Dungarvin",                        name: "Dungarvin",                    sector: "healthcare" },
   { slug: "thewonderfulcompany",              name: "The Wonderful Company",        sector: "consumer-goods" },
-  { slug: "Eataly",                           name: "Eataly",                       sector: "hospitality" },
   { slug: "LLNL",                             name: "Lawrence Livermore National Laboratory", sector: "research" },
   { slug: "NorthwesternMutual",               name: "Northwestern Mutual",          sector: "finance" },
   { slug: "IHeartMedia",                      name: "iHeartMedia",                  sector: "media" },
-  { slug: "fanniemae",                        name: "Fannie Mae",                   sector: "finance" },
 
   // ---- Added 2026-07-16: CANDIDATES, NOT YET API-VERIFIED ----
   // Careers pages confirmed live; Posting API access not yet confirmed.
@@ -116,7 +104,6 @@ const EMPLOYERS = [
   { slug: "MissionCriticalGroup",             name: "Mission Critical Group",       sector: "manufacturing" },
   { slug: "achieve1",                         name: "Achieve",                      sector: "fintech" },
   { slug: "AHRCNYC1",                         name: "AHRC New York City",           sector: "nonprofit" },
-  { slug: "AsburyCommunities",                name: "Asbury Communities",           sector: "healthcare" },
 
   // NOTE: careers URL has a sub-path (/charlies-main), which is a careers-site
   // section, not part of the API slug. Tenant slug is CharliesProduce1.
@@ -130,12 +117,7 @@ const EMPLOYERS = [
   // internal roles.
   { slug: "IndotronixInternationalCorp1",     name: "Indotronix International",     sector: "staffing" },
 
-  { slug: "IngramBargeCompany",               name: "Ingram Barge Company",         sector: "logistics" },
   { slug: "KPFFConsultingEngineers",          name: "KPFF Consulting Engineers",    sector: "engineering" },
-  { slug: "LEARN2",                           name: "LEARN Behavioral",             sector: "healthcare" },
-
-  // NOTE: McGee Air Services is Alaska Airlines' ground-handling subsidiary.
-  { slug: "McGeeAirServices",                 name: "McGee Air Services (Alaska Airlines)", sector: "aviation" },
 
   { slug: "SpectrumRetirementCommunities",    name: "Spectrum Retirement Communities", sector: "healthcare" },
   { slug: "Trucordia1",                       name: "Trucordia",                    sector: "insurance" },
@@ -144,29 +126,29 @@ const EMPLOYERS = [
   // employer you expect before trusting the name below.
   { slug: "wgc",                              name: "WGC",                          sector: "professional-services" },
 
-  // ---- Added 2026-07-17: CANDIDATES, NOT YET API-VERIFIED ----
-  // Source: bloomberry.com/data/smartrecruiters (ranks employers by ATS usage,
-  // NOT by new-grad hiring — so the list needed filtering before it landed here).
-  // Careers pages confirmed loading; Posting API access NOT confirmed. A careers
-  // page rendering does not mean the tenant exposes /v1/companies/{slug}/postings.
-  // Run ?diag=1 after deploy and delete any "dead"/"empty" rows.
+  // ---- Added 2026-07-17: API-VERIFIED via ?diag=1 on 2026-07-17 ----
+  // Source: bloomberry.com/data/smartrecruiters, which ranks employers by ATS
+  // usage — NOT by new-grad hiring — so the raw list needed heavy filtering.
   //
-  // Already cut from the source list as poor fits for early-career/degree roles:
-  // CircleLogistics1, AllCareTherapies, ArgusHomeHealthcare,
-  // ChristianLivingCommunities, ModernDentalLaboratories.
+  // Cut before adding (careers pages loaded, but wrong audience): CircleLogistics1,
+  // AllCareTherapies, ArgusHomeHealthcare, ChristianLivingCommunities,
+  // ModernDentalLaboratories.
+  // Cut after diag: MetasysTechnologiesInc1 (0 postings), GDKNCorp (3, hourly),
+  // WiserSolutions (1), KnobelsdorffEnterprises (56, but all O&M field work).
+  //
+  // What's left is small but on-target. Abacus and BuzzClan post 8 US roles each
+  // — low volume, but they're cyber/AI analyst roles, which is exactly the
+  // early-career technical work this tool exists to surface.
   { slug: "AbacusTechnologyCorporation",      name: "Abacus Technology",            sector: "it-services" },
   { slug: "buzzclanllc",                      name: "BuzzClan",                     sector: "it-services" },
-  { slug: "GDKNCorp",                         name: "GDKN Corporation",             sector: "it-services" },
-  { slug: "MetasysTechnologiesInc1",          name: "Metasys Technologies",         sector: "it-services" },
   { slug: "respecinc",                        name: "RESPEC",                       sector: "engineering" },
-  { slug: "WiserSolutions",                   name: "Wiser Solutions",              sector: "tech" },
   { slug: "HSMC1",                            name: "HSMC",                         sector: "professional-services" },
-  { slug: "KnobelsdorffEnterprises",          name: "Knobelsdorff Enterprises",     sector: "engineering" },
 
-  // NOTE: clinical-leaning employers. Kept because they also post corporate/IT
-  // roles, but expect most volume to be licensed/clinical and therefore filtered
-  // out client-side by NONDEGREE_RX / the degree-track filter. If diag shows high
-  // posting counts but searches surface nothing, these are the ones to cut first.
+  // NOTE: clinical-leaning employers, verified live. Kept because their volume is
+  // coordinator/admin/corporate as well as licensed-clinical (CareFlite's top
+  // posting is "Corporate Controller", not a paramedic role). Expect a large
+  // share to be filtered client-side by CLINICAL_RX. If searches surface nothing
+  // from these, they're the next to go.
   { slug: "careflite",                        name: "CareFlite",                    sector: "healthcare" },
   { slug: "integrateddermatology",            name: "Integrated Dermatology",       sector: "healthcare" },
   { slug: "LucidHearingHoldingCompanyLLC",    name: "Lucid Hearing",                sector: "healthcare" },
@@ -178,22 +160,21 @@ const PER_COMPANY_LIMIT = 50;   // postings pulled per employer per query
 const CONCURRENCY = 6;          // stay under SmartRecruiters' 8-concurrent ceiling
 const FETCH_TIMEOUT_MS = 6000;  // lowered from 12000 when the list passed 40 — see below
 
-// NOTE ON SCALING: with 56 employers at CONCURRENCY 6 there are ~10 rounds.
-// Responses are normally fast (~200-400ms), so a healthy run finishes in ~3s.
+// NOTE ON SCALING: 36 employers at CONCURRENCY 6 is 6 rounds. Responses are
+// normally fast (~200-400ms), so a healthy run finishes in ~2s.
+//
 // The risk is the tail: one stalled employer holds its round open for the full
 // timeout, and enough of those in sequence would blow Netlify's 10s synchronous
 // function limit — which fails the ENTIRE SmartRecruiters source, not just the
 // slow tenant.
 //
-// At 12s per request that was a real possibility with a list this size (a single
-// timed-out round would have consumed the whole budget), so FETCH_TIMEOUT_MS is
-// now 6s: still generous for an API that normally answers in under half a
-// second, but low enough that two bad rounds don't take the source down. This is
-// the fix this note originally called for when the list grew past ~40; raising
+// FETCH_TIMEOUT_MS is 6s (down from 12s): still ~15x the normal response time,
+// but low enough that a bad round doesn't take the source down. Raising
 // CONCURRENCY past 8 is not an option (SmartRecruiters' ceiling).
 //
-// A slow employer is not worth stalling the whole search for. Anything that
-// can't answer in 6s is treated as empty and skipped — the same as a 404.
+// The list was 56 employers on 2026-07-17 before a cull of hourly-dominant and
+// zero-posting tenants (see the EMPLOYERS notes). If it grows past ~45 again,
+// re-check the round math before adding more.
 
 function withTimeout(url, ms){
   const controller = new AbortController();
