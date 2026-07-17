@@ -1205,8 +1205,23 @@ function isUSLocation(loc){
 // is often just where the aggregator's crawler indexed the posting.
 const TITLE_NONUS_RX = /\b(intl|international)\b.*\b(india|china|japan|brazil|mexico|canada|uk|emea|apac|latam)\b|\b(mumbai|bangalore|bengaluru|hyderabad|pune|delhi|chennai|manila|jakarta|sydney|melbourne|toronto|vancouver|london|berlin|paris|madrid|warsaw|krakow|lisbon|porto|dublin|amsterdam|bogot[aá]|s[aã]o paulo|buenos aires|santiago|guadalajara|monterrey|tel aviv|singapore|kuala lumpur|bangkok|seoul|tokyo|shanghai|beijing|shenzhen)\b/i;
 
+// Non-English posting conventions. These are stronger evidence of a foreign
+// market than a city name, because no US employer writes them:
+//   "Alternance"   French work-study contract (no US equivalent)
+//   "(F/H)" "(H/F)" French Femme/Homme — the EU gender-neutrality convention
+//   "(m/w/d)" "(m/f/d)" German männlich/weiblich/divers
+//   "(all genders)" German-market English postings
+//   "Werkstudent" "Praktikum" "Ausbildung"  German student/trainee contracts
+//   "Stage" / "Stagiaire"  French internship
+//   "Alternant"    French apprentice
+// Adzuna listed a VISEO "Alternance – AI Business Analyst (F/H)" as a US job;
+// the location metadata said US, the title said France, and the title was right.
+const TITLE_FOREIGN_CONVENTION_RX = /\b(alternance|alternant(e)?|stagiaire|werkstudent|praktikum|ausbildung|apprenti(e)?)\b|\((f\/h|h\/f|m\/w\/d|m\/f\/d|w\/m\/d|all genders|m\/f\/x|f\/m\/d)\)|\b(m\/w\/d|m\/f\/d)\b/i;
+
 function isUSJob(j){
-  if(TITLE_NONUS_RX.test(j.title || '')) return false;
+  const title = j.title || '';
+  if(TITLE_NONUS_RX.test(title)) return false;
+  if(TITLE_FOREIGN_CONVENTION_RX.test(title)) return false;
   return isUSLocation(j.location);
 }
 
@@ -1720,10 +1735,14 @@ function whyThisJob(j, kw, loc){
   // A description-stated experience floor also disqualifies the early-career
   // ✓ — the title may read junior while the requirements say otherwise.
   const yearsGated = Number(j.minYears || 0) >= (j.yearsPreferred ? 3 : 2);
+  const wasScanned = j.minYears !== undefined && j.minYears !== null;
   if(isSeniorTitle(title) || yearsGated) { /* no positive reason to add */ }
   else if(INTERN_RX.test(title)) reasons.push('Internship signal');
   else if(NEWGRAD_RX.test(title)) reasons.push('New-grad signal');
-  else if(ENTRYLVL_RX.test(title) || REALISTIC_GRAD_RX.test(title) || ANY_EARLY_RX.test(title)) reasons.push('Early-career title');
+  // Same rule as the badge: only claim "early-career" off an ambiguous title
+  // when we actually read the description. Intern/new-grad titles above are
+  // self-evident; "Analyst" is not.
+  else if(wasScanned && (ENTRYLVL_RX.test(title) || REALISTIC_GRAD_RX.test(title) || ANY_EARLY_RX.test(title))) reasons.push('Early-career title');
   if(loc && locationMatches(j.location, loc)) reasons.push(`Location match: ${loc}`);
   if(isUSLocation(j.location)) reasons.push('US location');
   if(j.sector) reasons.push(`${j.sector} sector`);
@@ -1738,15 +1757,28 @@ function renderJob(j, kw, loc){
   const sponsor = sponsorshipLabel(j);
   const experienced = isSeniorTitle(j.title || '');
   // A stated experience floor of 2+ years overrides any title-based early
-  // signal. "Analyst" is in ENTRYLVL_RX, so without this a role demanding 2-4
-  // years still wore an "entry / grad" badge — the exact failure the headline
-  // promise ("no senior roles in disguise") is meant to prevent. Only sources
-  // that actually parse the description set minYears; where it's undefined we
-  // fall back to title-only behavior rather than guessing.
-  // Uses the same softening rule as experienceTier(): "2+ years preferred" is
-  // not the same wall as "2+ years required", so it shouldn't strip the badge.
+  // signal. Uses the same softening rule as experienceTier(): "2+ years
+  // preferred" is not the same wall as "2+ years required".
   const gated = Number(j.minYears || 0) >= (j.yearsPreferred ? 3 : 2);
-  const early = hasEntrySignal(j.title || '') && !experienced && !gated;
+
+  // AMBIGUOUS TITLES NEED EVIDENCE, NOT A GUESS.
+  //
+  // ENTRYLVL_RX contains `analyst( i)?\b`, so every "Analyst" title fires it —
+  // including "AI Security Analyst" and "Cyber Intelligence Analyst", which are
+  // rarely new-grad roles. Where the description was scanned, minYears settles
+  // it. Where it wasn't (SmartRecruiters, Adzuna, employer boards), the old code
+  // fell through to the title and asserted "entry / grad" anyway.
+  //
+  // That's the tool's own headline promise being broken by a guess: an unscanned
+  // "Analyst" wore the same badge as a verified new-grad posting, and the
+  // student had no way to tell them apart. An unambiguous signal (Intern, New
+  // Grad, Entry-Level, Junior) is safe to trust from the title alone — nobody
+  // titles a senior role "New Grad Engineer". A bare seniority-neutral noun
+  // like "Analyst" or "Associate" is not.
+  const scanned = j.minYears !== undefined && j.minYears !== null;
+  const unambiguous = INTERN_RX.test(j.title || '') || NEWGRAD_RX.test(j.title || '');
+  const early = hasEntrySignal(j.title || '') && !experienced && !gated
+                && (scanned || unambiguous);
   const why = whyThisJob(j, kw, loc).map(r=>`<span>✓ ${esc(r)}</span>`).join('');
   const id = jobId(j);
   const saved = isJobSaved(id);
@@ -1769,7 +1801,17 @@ function renderJob(j, kw, loc){
               // tag for sources that flag experience without a parsed number.
               const tier = experienceTier(j);
               if(tier) return `<span class="tag ${tier.cls}" title="${esc(tier.note)}">${esc(tier.label)} · ${esc(tier.yrsText)}</span>`;
-              return j.expFlag ? '<span class="tag warn">may require experience</span>' : '';
+              if(j.expFlag) return '<span class="tag warn">may require experience</span>';
+              // Not scanned and the title is seniority-ambiguous ("Analyst",
+              // "Associate", "Specialist"). Saying nothing here would let it
+              // pass for a verified entry-level role. Say we don't know.
+              const wasScanned = j.minYears !== undefined && j.minYears !== null;
+              const ambiguous = !INTERN_RX.test(j.title||'') && !NEWGRAD_RX.test(j.title||'')
+                                && hasEntrySignal(j.title||'');
+              if(!wasScanned && ambiguous){
+                return '<span class="tag gray" title="This source doesn\'t expose the job description, so we couldn\'t check the experience requirement. Titles like &quot;Analyst&quot; span new-grad to 6+ years — read the posting before ruling it in or out.">experience not verified</span>';
+              }
+              return '';
             })()}
             ${j.source === 'adzuna' ? '<span class="tag gray">Adzuna</span>' : ''}
             ${j.aggregator ? `<span class="tag warn">via ${esc(j.aggregatorName || 'aggregator')} — signup may be required</span>` : ''}
