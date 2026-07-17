@@ -109,20 +109,91 @@ const EMPLOYERS = [
   { slug: "NorthwesternMutual",               name: "Northwestern Mutual",          sector: "finance" },
   { slug: "IHeartMedia",                      name: "iHeartMedia",                  sector: "media" },
   { slug: "fanniemae",                        name: "Fannie Mae",                   sector: "finance" },
+
+  // ---- Added 2026-07-16: CANDIDATES, NOT YET API-VERIFIED ----
+  // Careers pages confirmed live; Posting API access not yet confirmed.
+  // Run ?diag=1 after deploy and delete any "dead"/"empty" rows.
+  { slug: "MissionCriticalGroup",             name: "Mission Critical Group",       sector: "manufacturing" },
+  { slug: "achieve1",                         name: "Achieve",                      sector: "fintech" },
+  { slug: "AHRCNYC1",                         name: "AHRC New York City",           sector: "nonprofit" },
+  { slug: "AsburyCommunities",                name: "Asbury Communities",           sector: "healthcare" },
+
+  // NOTE: careers URL has a sub-path (/charlies-main), which is a careers-site
+  // section, not part of the API slug. Tenant slug is CharliesProduce1.
+  { slug: "CharliesProduce1",                 name: "Charlie's Produce",            sector: "food-distribution" },
+
+  // NOTE: Equus Workforce Solutions is a workforce-services provider; some
+  // postings may be roles staffed for client programs.
+  { slug: "Equus",                            name: "Equus Workforce Solutions",    sector: "workforce-services" },
+
+  // NOTE: staffing firm — postings are largely client placements, not
+  // internal roles.
+  { slug: "IndotronixInternationalCorp1",     name: "Indotronix International",     sector: "staffing" },
+
+  { slug: "IngramBargeCompany",               name: "Ingram Barge Company",         sector: "logistics" },
+  { slug: "KPFFConsultingEngineers",          name: "KPFF Consulting Engineers",    sector: "engineering" },
+  { slug: "LEARN2",                           name: "LEARN Behavioral",             sector: "healthcare" },
+
+  // NOTE: McGee Air Services is Alaska Airlines' ground-handling subsidiary.
+  { slug: "McGeeAirServices",                 name: "McGee Air Services (Alaska Airlines)", sector: "aviation" },
+
+  { slug: "SpectrumRetirementCommunities",    name: "Spectrum Retirement Communities", sector: "healthcare" },
+  { slug: "Trucordia1",                       name: "Trucordia",                    sector: "insurance" },
+
+  // NOTE: short/generic slug — confirm the diag sampleTitle matches the
+  // employer you expect before trusting the name below.
+  { slug: "wgc",                              name: "WGC",                          sector: "professional-services" },
+
+  // ---- Added 2026-07-17: CANDIDATES, NOT YET API-VERIFIED ----
+  // Source: bloomberry.com/data/smartrecruiters (ranks employers by ATS usage,
+  // NOT by new-grad hiring — so the list needed filtering before it landed here).
+  // Careers pages confirmed loading; Posting API access NOT confirmed. A careers
+  // page rendering does not mean the tenant exposes /v1/companies/{slug}/postings.
+  // Run ?diag=1 after deploy and delete any "dead"/"empty" rows.
+  //
+  // Already cut from the source list as poor fits for early-career/degree roles:
+  // CircleLogistics1, AllCareTherapies, ArgusHomeHealthcare,
+  // ChristianLivingCommunities, ModernDentalLaboratories.
+  { slug: "AbacusTechnologyCorporation",      name: "Abacus Technology",            sector: "it-services" },
+  { slug: "buzzclanllc",                      name: "BuzzClan",                     sector: "it-services" },
+  { slug: "GDKNCorp",                         name: "GDKN Corporation",             sector: "it-services" },
+  { slug: "MetasysTechnologiesInc1",          name: "Metasys Technologies",         sector: "it-services" },
+  { slug: "respecinc",                        name: "RESPEC",                       sector: "engineering" },
+  { slug: "WiserSolutions",                   name: "Wiser Solutions",              sector: "tech" },
+  { slug: "HSMC1",                            name: "HSMC",                         sector: "professional-services" },
+  { slug: "KnobelsdorffEnterprises",          name: "Knobelsdorff Enterprises",     sector: "engineering" },
+
+  // NOTE: clinical-leaning employers. Kept because they also post corporate/IT
+  // roles, but expect most volume to be licensed/clinical and therefore filtered
+  // out client-side by NONDEGREE_RX / the degree-track filter. If diag shows high
+  // posting counts but searches surface nothing, these are the ones to cut first.
+  { slug: "careflite",                        name: "CareFlite",                    sector: "healthcare" },
+  { slug: "integrateddermatology",            name: "Integrated Dermatology",       sector: "healthcare" },
+  { slug: "LucidHearingHoldingCompanyLLC",    name: "Lucid Hearing",                sector: "healthcare" },
+  { slug: "TVG-MedullaLLC",                   name: "Medulla (Chiro One)",          sector: "healthcare" },
 ];
 
 const API_BASE = "https://api.smartrecruiters.com/v1/companies";
 const PER_COMPANY_LIMIT = 50;   // postings pulled per employer per query
 const CONCURRENCY = 6;          // stay under SmartRecruiters' 8-concurrent ceiling
-const FETCH_TIMEOUT_MS = 12000;
+const FETCH_TIMEOUT_MS = 6000;  // lowered from 12000 when the list passed 40 — see below
 
-// NOTE ON SCALING: with ~30 employers at CONCURRENCY 6 and a 12s per-request
-// timeout, a worst case where many employers are slow could approach
-// Netlify's 10s synchronous function limit. In practice responses are fast
-// (~200-400ms) so 30 employers finish in roughly 5 rounds well under 2s. If
-// the list grows much beyond ~40, or if you start seeing 502s from Netlify,
-// the fix is to lower FETCH_TIMEOUT_MS (a slow employer is not worth stalling
-// the whole search for) rather than to raise CONCURRENCY past 8.
+// NOTE ON SCALING: with 56 employers at CONCURRENCY 6 there are ~10 rounds.
+// Responses are normally fast (~200-400ms), so a healthy run finishes in ~3s.
+// The risk is the tail: one stalled employer holds its round open for the full
+// timeout, and enough of those in sequence would blow Netlify's 10s synchronous
+// function limit — which fails the ENTIRE SmartRecruiters source, not just the
+// slow tenant.
+//
+// At 12s per request that was a real possibility with a list this size (a single
+// timed-out round would have consumed the whole budget), so FETCH_TIMEOUT_MS is
+// now 6s: still generous for an API that normally answers in under half a
+// second, but low enough that two bad rounds don't take the source down. This is
+// the fix this note originally called for when the list grew past ~40; raising
+// CONCURRENCY past 8 is not an option (SmartRecruiters' ceiling).
+//
+// A slow employer is not worth stalling the whole search for. Anything that
+// can't answer in 6s is treated as empty and skipped — the same as a 404.
 
 function withTimeout(url, ms){
   const controller = new AbortController();
