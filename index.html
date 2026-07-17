@@ -2049,7 +2049,25 @@ async function search(){
     // checkjobs function and drop clear non-degree/hourly roles, flag borderline
     // experience ones. Only Greenhouse/Lever jobs with an id can be checked.
     try {
-      const SUSPICIOUS_RX = /\b(operations|fulfillment|warehouse|logistics|hub|depot|fleet|store|retail|field|floor|shift|crew|team member|associate|coordinator|specialist|representative|assistant|agent|clerk)\b/i;
+      // Reset per-search: this is read when the status line renders, and a
+      // stale value from a previous search would report a truncation that
+      // didn't happen on this one.
+      window._scanSkipped = 0;
+      // Titles worth verifying against their real description. Two families:
+      //
+      //  (a) HOURLY-IN-DISGUISE — professional-sounding titles that hide
+      //      non-degree/shift work ("Operations Associate" at a warehouse).
+      //  (b) EXPERIENCE-IN-DISGUISE — legitimately professional titles whose
+      //      seniority a title regex simply cannot read. "Analyst" spans
+      //      new-grad through 6-year Senior Analyst; only the description
+      //      knows which. This family was previously absent, so a Greenhouse
+      //      "Data Analyst" demanding 2-4 years was never scanned at all —
+      //      the exact gap the Scrunch case exposed on Ashby.
+      //
+      // Widening this means more descriptions fetched per search and more jobs
+      // hitting checkjobs' cap. That's why the response now reports `skipped`
+      // and the UI says so, rather than silently truncating.
+      const SUSPICIOUS_RX = /\b(operations|fulfillment|warehouse|logistics|hub|depot|fleet|store|retail|field|floor|shift|crew|team member|associate|coordinator|specialist|representative|assistant|agent|clerk|analyst|scientist|engineer|developer|consultant|manager|designer|researcher|strategist|architect|administrator|technician)\b/i;
       // Which jobs can have their description fetched (Greenhouse/Lever with an id).
       // Which jobs can have their description fetched (Greenhouse/Lever with a
       // server-resolvable id). GH jobs given a synthetic string id (a rare
@@ -2078,9 +2096,28 @@ async function search(){
           const data = await resp.json();
           const verdicts = (data && data.verdicts) || {};
           const sponsorship = (data && data.sponsorship) || {};
+          const experience = (data && data.experience) || {};
           // Drop the clear non-degree/hourly ones; flag the borderline ones.
           jobs = jobs.filter(j => verdicts[j.id] !== 'drop');
           jobs.forEach(j => { if(verdicts[j.id] === 'flag') j.expFlag = true; });
+
+          // Attach parsed experience floors. This is what experienceTier() reads,
+          // so Greenhouse/Lever results now tier exactly like Ashby's — the tier
+          // function is source-agnostic and needed no changes. Jobs whose
+          // description couldn't be trusted are simply absent from `experience`
+          // and stay untiered rather than being given a number we'd be guessing.
+          jobs.forEach(j => {
+            const e = experience[j.id];
+            if(e){
+              j.minYears = e.minYears;
+              j.yearsPreferred = e.preferred;
+            }
+          });
+
+          // How many qualified for verification but were cut by the server cap.
+          // Surfaced below so an unverified role is distinguishable from a
+          // verified one — otherwise the cap silently mislabels the overflow.
+          window._scanSkipped = (data && data.skipped) || 0;
 
           if(hideClear){
             // Attach real (description-based) sponsorship status to each job.
@@ -2133,7 +2170,15 @@ async function search(){
       totalFetched, matched: jobs.length
     });
 
-    statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>`;
+    // If the description scan hit its cap, say so plainly. A student comparing
+    // two cards can't otherwise tell that one was verified against its posting
+    // and the other was never read — and the unread one wears no tier, which
+    // looks identical to "no experience required".
+    const skipNote = (window._scanSkipped > 0)
+      ? `<br><span class="hint src-fail">${window._scanSkipped} role${window._scanSkipped===1?'':'s'} not verified against ${window._scanSkipped===1?'its':'their'} full description (scan limit reached) — check the posting itself before ruling one in or out.</span>`
+      : '';
+
+    statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>${skipNote}`;
 
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
 
