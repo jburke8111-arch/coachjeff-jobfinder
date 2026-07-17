@@ -110,6 +110,13 @@
   .chip.clear-all{cursor:pointer;color:var(--faint);border-style:dashed}
   .chip.clear-all:hover{color:#c0392b;border-color:#c0392b}
   .chip:hover{border-color:var(--amber);background:#fff;color:var(--amber-deep)}
+  /* Results that no longer match the form. Dimmed, not hidden — the student's
+     previous results are still useful, they're just not the answer to the
+     question now on screen. */
+  .stale{opacity:.45;transition:opacity .15s}
+  .stale-note{font-size:12.5px;font-weight:600;color:var(--amber-deep);
+    background:rgba(217,138,43,.1);border:1px solid rgba(217,138,43,.3);
+    border-radius:7px;padding:8px 12px;margin:10px 0}
   .role-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;min-height:20px;align-items:center}
   .role-chips-hint{font-size:12px;color:var(--faint)}
   .role-chip{display:inline-flex;align-items:center;gap:4px;padding:0;overflow:hidden;
@@ -136,9 +143,8 @@
   .save-empty{font-size:12.5px;color:var(--faint)}
 
   .hero-search{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:14px;box-shadow:0 1px 2px rgba(18,32,58,.04),0 8px 24px rgba(18,32,58,.05)}
-  .hero-grid{display:grid;grid-template-columns:1.2fr 1fr auto auto auto;gap:12px;align-items:end}
-  .hero-grid .field{min-width:0}
-  .hero-grid button{height:42px}
+  /* .hero-grid retired in V21 — the keyword/location/actions row was split into
+     bands 2 and 3, which use .grid2. .hero-actions is still live (band 3). */
   .hero-actions{display:flex;gap:8px;align-items:end}
   .hero-actions button{width:auto;padding:0 18px}
   .quickbar{background:transparent;border:none;padding:0;margin:14px 0 0;box-shadow:none}
@@ -150,8 +156,8 @@
   .advancedbar[open] summary::before,.profilebar[open] summary::before{content:"▾ "}
   .advanced-body{padding:0 16px 16px}
   .advanced-body .controls{grid-template-columns:repeat(3,1fr)}
-  @media(max-width:900px){.hero-grid{grid-template-columns:1fr 1fr}.hero-actions{grid-column:1 / -1}.advanced-body .controls{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:560px){.hero-grid,.advanced-body .controls{grid-template-columns:1fr}.hero-actions{flex-wrap:wrap}.hero-actions button{flex:1}}
+  @media(max-width:900px){.advanced-body .controls{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.advanced-body .controls{grid-template-columns:1fr}.hero-actions{flex-wrap:wrap}.hero-actions button{flex:1}}
 
   @media(max-width:760px){.controls{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:440px){.controls{grid-template-columns:1fr}}
@@ -439,11 +445,9 @@
   .hero-actions button.secondary{
     padding:0 16px;
   }
-  @media(min-width:901px){
-    .hero-grid{
-      grid-template-columns:1.15fr .95fr auto auto auto !important;
-    }
-  }
+  /* The min-width:901px .hero-grid override that used to live here was removed
+     in V21 along with .hero-grid itself. It carried !important, so leaving it
+     behind would have silently overridden any future rule of that name. */
   @media(max-width:900px){
     .hero-actions button#go{flex:1 1 160px;}
   }
@@ -483,17 +487,38 @@
   .coaching-prompt:hover .cp-go{background:#e89a3c}
 
 
-  /* V20 major-based search guide — compact 2-step flow */
-  .majorbar{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--line)}
-  .majorbar-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
-  .major-help{font-size:12.5px;color:var(--faint);line-height:1.4;margin:0 0 12px}
-  .major-steps{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;align-items:start}
-  .major-step-label{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-deep);margin-bottom:2px}
-  .majorbar select{height:42px;font-size:14.5px;background-color:#fff}
+  /* V21 — three bands: browse / or keyword / then where + search.
+     Location and Search serve BOTH input routes, so they get their own band
+     instead of sitting in the keyword row where they read as keyword-only. */
+  .band{margin-bottom:16px}
+  .band:last-child{margin-bottom:0}
+  /* ONE separator per boundary. Band 1 has no border because the "or" rule
+     below it already draws the line; having both drew two rules ~14px apart. */
+  .band.ruled{padding-bottom:16px;border-bottom:1px solid var(--line)}
+  .band-or{display:flex;align-items:center;gap:12px;margin:0 0 14px}
+  .band-or::before,.band-or::after{content:"";flex:1;height:1px;background:var(--line)}
+  .band-or span{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  /* Every row shares these two tracks, so major/keyword/location line up down
+     the left and roles/buttons line up down the right. */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;align-items:start}
+  /* Only the action row is bottom-aligned: its left cell is label+input while
+     the right is buttons alone, so `start` left the buttons floating above the
+     input. The roles row must stay `start` or its chips stretch. */
+  .grid2.grid2-end{align-items:end}
+  /* Each route introduces itself. There is no card-level header: a single title
+     over the whole card would have to describe both the major path and the
+     keyword path, and the old one ("What's your major?") only described the
+     first — which is what made the keyword box look subordinate to a dropdown
+     it doesn't actually depend on. */
+  .route-lede{font-size:13px;color:var(--faint);line-height:1.4;margin:0 0 14px}
+  .route-lede b{color:var(--navy);font-weight:600}
+  .go-lede{font-size:13px;color:var(--faint);line-height:1.4;margin:0 0 12px}
+  .go-lede b{color:var(--navy);font-weight:600}
+  .band select{height:42px;font-size:14.5px;background-color:#fff}
   .title-select-wrap{position:relative}
   .title-select-wrap select{padding-right:46px}
   .title-select-wrap .search-glyph{position:absolute;right:30px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px;opacity:.65}
-  @media(max-width:760px){.major-steps{grid-template-columns:1fr}}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
 
 </style>
 
@@ -523,42 +548,53 @@
 
 
   <div class="hero-search">
-    <div class="majorbar" aria-label="Find jobs by major">
-      <div class="majorbar-title">🎓 What&rsquo;s your major?</div>
-      <p class="major-help">Choose your major, then pick up to 3 recommended roles to compare — results match any of them. The Keyword box is optional if you've picked roles.</p>
-      <div class="major-steps">
+    <!-- BAND 1 — browse: major populates the role list; roles ARE the query. -->
+    <div class="band" aria-label="Find jobs by major">
+      <p class="route-lede"><b>Not sure what job title to search for?</b> Start with your major.</p>
+      <div class="grid2">
         <div class="field">
-          <div class="major-step-label">Step 1</div>
           <label for="majorSelect">Major</label>
           <select id="majorSelect"></select>
         </div>
         <div class="field">
-          <div class="major-step-label">Step 2</div>
           <label for="majorTitleSelect">Recommended Job Titles (Pick up to 3 to compare)</label>
           <div class="title-select-wrap">
             <select id="majorTitleSelect"></select>
             <span class="search-glyph" aria-hidden="true">🔍</span>
           </div>
-          <div id="roleChips" class="role-chips" aria-live="polite">
-            <span class="role-chips-hint">Results match any role you add.</span>
-          </div>
+          <div id="roleChips" class="role-chips" aria-live="polite"></div>
         </div>
       </div>
     </div>
 
-    <div class="hero-grid">
-      <div class="field">
-        <label for="kw">Keyword <span class="label-optional">(job title or company)</span></label>
-        <input id="kw" type="text" placeholder="Or type your own: data analyst, marketing…" value="">
+    <!-- BAND 2 — keyword. The "or" rule is the ONLY separator here: a band
+         border as well would draw two lines for one break. -->
+    <div class="band ruled">
+      <div class="band-or"><span>or</span></div>
+      <div class="grid2">
+        <div class="field">
+          <label for="kw">Keyword <span class="label-optional">(job title or company)</span></label>
+          <input id="kw" type="text" placeholder="data analyst, marketing…" value="">
+        </div>
+        <div></div>
       </div>
-      <div class="field">
-        <label for="loc">Location</label>
-        <input id="loc" type="text" placeholder="Texas, Phoenix, remote…" value="">
-      </div>
-      <div class="hero-actions">
-        <button id="go">Search</button>
-        <button id="saveSearch" class="secondary" type="button">Save Search</button>
-        <button id="reset" class="secondary" type="button">Reset</button>
+    </div>
+
+    <!-- BAND 3 — shared. Location and Search serve BOTH routes above, so they
+         get their own band rather than living inside the keyword row, where
+         they read as belonging only to the keyword path. -->
+    <div class="band">
+      <p class="go-lede"><b>Then choose where — and search.</b> Leave Location blank to search the U.S. only.</p>
+      <div class="grid2 grid2-end">
+        <div class="field">
+          <label for="loc">Location <span class="label-optional">(optional)</span></label>
+          <input id="loc" type="text" placeholder="Texas, Phoenix, remote…" value="">
+        </div>
+        <div class="hero-actions">
+          <button id="go">Search</button>
+          <button id="saveSearch" class="secondary" type="button">Save Search</button>
+          <button id="reset" class="secondary" type="button">Reset</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1827,9 +1863,9 @@ function isStateSearch(input){
 }
 
 async function search(){
-  // Any real search cancels a pending debounced role-search, so clicking Search
-  // (or pressing Enter) right after picking a role can't cause a double search.
-  if(_roleSearchTimer){ clearTimeout(_roleSearchTimer); _roleSearchTimer = null; }
+  // A real search re-syncs the results with the form, so any "your roles
+  // changed" flag is now resolved.
+  clearResultsStale();
   syncExperienceControls();
   const kw = document.getElementById('kw').value.trim().toLowerCase();
   const loc = document.getElementById('loc').value.trim().toLowerCase();
@@ -2840,10 +2876,26 @@ function runKeywordSearch(term){
 // Debounced search for the role picker: rapid consecutive picks/removals
 // collapse into a single search fired ~600ms after the last change, so adding
 // three roles triggers one search instead of three (and one set of API calls).
-let _roleSearchTimer = null;
-function debouncedRoleSearch(){
-  if(_roleSearchTimer) clearTimeout(_roleSearchTimer);
-  _roleSearchTimer = setTimeout(()=>{ _roleSearchTimer = null; search(); }, 600);
+// Results on screen belong to the query that was last RUN, not the query
+// currently in the form. When a student changes their roles after searching,
+// the old cards are still sitting there looking authoritative. Rather than
+// wiping them (destroys work) or auto-searching (the bug this replaced —
+// searching before they'd reached Location), flag them and point at Search.
+function markResultsStale(){
+  if(!results || !results.innerHTML.trim()) return;   // nothing to go stale
+  results.classList.add('stale');
+  if(statusEl && !document.getElementById('staleNote')){
+    const note = document.createElement('div');
+    note.id = 'staleNote';
+    note.className = 'stale-note';
+    note.textContent = 'Your roles changed — press Search to update these results.';
+    statusEl.parentNode.insertBefore(note, statusEl.nextSibling);
+  }
+}
+function clearResultsStale(){
+  if(results) results.classList.remove('stale');
+  const note = document.getElementById('staleNote');
+  if(note) note.remove();
 }
 
 function initMajorSearch(){
@@ -2851,14 +2903,25 @@ function initMajorSearch(){
   const titleSelect = document.getElementById('majorTitleSelect');
   if(!majorSelect || !titleSelect || typeof MAJOR_TITLE_MAP === 'undefined') return;
 
+  // A blank first option rather than defaulting to the alphabetically-first
+  // major. Defaulting made "I picked Accounting" and "I never touched this"
+  // indistinguishable, and made the field look required — it isn't. Major only
+  // populates the role list; it never filters results.
   const majors = Object.keys(MAJOR_TITLE_MAP).sort((a,b)=>a.localeCompare(b));
-  majorSelect.innerHTML = majors.map((major, idx)=>
-    `<option value="${esc(major)}"${idx === 0 ? ' selected' : ''}>${esc(major)}</option>`
-  ).join('');
+  majorSelect.innerHTML = '<option value="" selected>Select a major…</option>' +
+    majors.map(major => `<option value="${esc(major)}">${esc(major)}</option>`).join('');
 
   const atCap = () => selectedRoles.length >= MAX_ROLES;
 
   function renderTitleOptions(){
+    // No major chosen yet -> there is no role list to offer. Say why rather
+    // than showing an empty "Add a role…" dropdown that appears broken.
+    if(!majorSelect.value){
+      titleSelect.innerHTML = '<option value="">Select a major first…</option>';
+      titleSelect.value = '';
+      titleSelect.disabled = true;
+      return;
+    }
     const groups = MAJOR_TITLE_MAP[majorSelect.value] || {popular:[]};
     const popular = groups.popular || [];
     const emerging = groups.emerging || [];
@@ -2874,22 +2937,41 @@ function initMajorSearch(){
     titleSelect.disabled = atCap();
   }
 
-  // Draw the selected-role chips (or the hint when empty), plus a cap note.
+  // Draw the selected-role chips, plus the OR-logic note once it means anything.
+  //
+  // The note used to show ONLY at zero chips — "Results match any role you add"
+  // before any role existed, which is exactly when the reader can't act on it.
+  // It's the opposite condition: "any" is meaningless with one role and only
+  // describes real behavior once two are competing. So: silent at 0 and 1,
+  // stated plainly at 2+.
   window.renderRoleChips = function renderRoleChips(){
     const box = document.getElementById('roleChips');
     if(!box) return;
     if(selectedRoles.length === 0){
-      box.innerHTML = '<span class="role-chips-hint">Results match any role you add.</span>';
+      box.innerHTML = '';
     } else {
-      box.innerHTML = selectedRoles.map((r,i)=>
+      const chips = selectedRoles.map((r,i)=>
         `<span class="role-chip"><span class="role-chip-label">${esc(r)}</span>`+
         `<button type="button" class="role-chip-del" data-i="${i}" aria-label="Remove ${esc(r)}">×</button></span>`
       ).join('');
+      // "either" is only correct for exactly two; MAX_ROLES is 3.
+      const orNote = selectedRoles.length >= 2
+        ? `<span class="role-chips-hint">Showing jobs matching ${selectedRoles.length === 2 ? 'either' : 'any'} role.</span>`
+        : '';
+      box.innerHTML = chips + orNote;
     }
     box.querySelectorAll('.role-chip-del').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const i = parseInt(btn.dataset.i, 10);
-        if(!isNaN(i)){ selectedRoles.splice(i,1); renderRoleChips(); renderTitleOptions(); debouncedRoleSearch(); }
+        if(!isNaN(i)){
+          selectedRoles.splice(i,1);
+          renderRoleChips();
+          renderTitleOptions();
+          // No auto-search on removal either — but results already on screen
+          // now match a query the student has changed, so say so rather than
+          // leaving stale cards looking current.
+          markResultsStale();
+        }
       });
     });
   };
@@ -2902,7 +2984,13 @@ function initMajorSearch(){
     selectedRoles.push(t);
     renderRoleChips();
     renderTitleOptions();
-    debouncedRoleSearch();
+    // NO auto-search. Picking a role BUILDS the query; Search RUNS it.
+    // Auto-firing here searched before the student had reached Location, so
+    // their first results were silently nationwide — and then a location they
+    // typed afterward did nothing until they found the Search button anyway.
+    // The keyword path never auto-fired, so this also makes both routes behave
+    // the same: one button, one meaning.
+    markResultsStale();
   }
 
   majorSelect.addEventListener('change', renderTitleOptions);
@@ -2964,6 +3052,7 @@ document.getElementById('reset').addEventListener('click', ()=>{
   results.innerHTML = '';
   countEl.textContent = '';
   statusEl.textContent = '';
+  clearResultsStale();
   if(document.getElementById('majorSelect') && document.getElementById('majorTitleSelect')){
     document.getElementById('majorSelect').selectedIndex = 0;
     const evt = new Event('change');
