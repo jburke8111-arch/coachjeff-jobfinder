@@ -1550,7 +1550,15 @@ function sponsorshipLabel(j){
   // No scan run for this job → no badge.
   return null;
 }
+// Prefer the salary the EMPLOYER actually published. Only fall back to a
+// field-wide estimate when the posting states nothing. Showing a generic
+// "typical entry-level range" over a real posted number is worse than showing
+// nothing: it silently contradicts the employer (the Scrunch AI Search Analyst
+// listed $115K-$145K while this function guessed $55K-$85K).
 function salaryEstimate(j){
+  const real = String(j.salary || '').trim();
+  if(real) return real;
+
   const t = (j.title||'').toLowerCase();
   const prefix = 'Typical entry-level range for this field';
   if(/software|engineer|developer|data scientist|machine learning|ml\b/.test(t)) return prefix + ': $75K\u2013$120K';
@@ -1586,7 +1594,10 @@ function whyThisJob(j, kw, loc){
   }
   // A senior title is a strike against an entry-level search, not a reason for
   // it, so it is deliberately absent here. The other branches stay.
-  if(isSeniorTitle(title)) { /* no positive reason to add */ }
+  // A description-stated experience floor also disqualifies the early-career
+  // ✓ — the title may read junior while the requirements say otherwise.
+  const yearsGated = Number(j.minYears || 0) >= 2;
+  if(isSeniorTitle(title) || yearsGated) { /* no positive reason to add */ }
   else if(INTERN_RX.test(title)) reasons.push('Internship signal');
   else if(NEWGRAD_RX.test(title)) reasons.push('New-grad signal');
   else if(ENTRYLVL_RX.test(title) || REALISTIC_GRAD_RX.test(title) || ANY_EARLY_RX.test(title)) reasons.push('Early-career title');
@@ -1603,7 +1614,14 @@ function whyThisJob(j, kw, loc){
 function renderJob(j, kw, loc){
   const sponsor = sponsorshipLabel(j);
   const experienced = isSeniorTitle(j.title || '');
-  const early = hasEntrySignal(j.title || '') && !experienced;
+  // A stated experience floor of 2+ years overrides any title-based early
+  // signal. "Analyst" is in ENTRYLVL_RX, so without this a role demanding 2-4
+  // years still wore an "entry / grad" badge — the exact failure the headline
+  // promise ("no senior roles in disguise") is meant to prevent. Only sources
+  // that actually parse the description set minYears; where it's undefined we
+  // fall back to title-only behavior rather than guessing.
+  const gated = Number(j.minYears || 0) >= 2;
+  const early = hasEntrySignal(j.title || '') && !experienced && !gated;
   const why = whyThisJob(j, kw, loc).map(r=>`<span>✓ ${esc(r)}</span>`).join('');
   const id = jobId(j);
   const saved = isJobSaved(id);
@@ -1620,7 +1638,7 @@ function renderJob(j, kw, loc){
             <span class="tag blue">${esc(freshnessText(j.posted))}</span>
             ${sponsor ? `<span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>` : ''}
             ${(!experienced && (j.score || 0) >= 8) ? '<span class="tag strong">high-priority lead</span>' : ''}
-            ${j.expFlag ? '<span class="tag warn">may require experience</span>' : ''}
+            ${j.expFlag ? `<span class="tag warn">${j.minYears ? `requires ${j.minYears}+ yrs experience` : 'may require experience'}</span>` : ''}
             ${j.source === 'adzuna' ? '<span class="tag gray">Adzuna</span>' : ''}
             ${j.aggregator ? `<span class="tag warn">via ${esc(j.aggregatorName || 'aggregator')} — signup may be required</span>` : ''}
             ${j.resolvedDirect ? '<span class="tag strong">direct employer link found</span>' : ''}
@@ -1789,7 +1807,7 @@ async function search(){
     statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'}…</span>`;
 
     let jobs = [];
-    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0 };
+    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, smartrecruiters:0 };
     let okCos = 0, failCos = 0;
     const BATCH = 10;
     for(let i=0;i<pool.length;i+=BATCH){
@@ -2029,9 +2047,20 @@ async function search(){
     } catch(e){ /* fail-open: if the checker errors, show everything */ }
 
     const hiddenByFilters = Math.max(0, totalFetched - jobs.length);
-    const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + USAJobs + Adzuna + Ashby + Greenhouse searched`;
+    // Built from one array so adding a source can't leave these strings stale.
+    // SmartRecruiters was fetched and merged for weeks while being absent from
+    // every status line below, because each name was hardcoded in six places.
+    const API_SOURCES = [
+      { label: 'USAJobs',         key: 'usajobs' },
+      { label: 'Adzuna',          key: 'adzuna' },
+      { label: 'Ashby',           key: 'ashby' },
+      { label: 'Greenhouse',      key: 'greenhouse' },
+      { label: 'SmartRecruiters', key: 'smartrecruiters' },
+    ];
+    const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + ${API_SOURCES.map(s=>s.label).join(' + ')} searched`;
     const evalLine = `${totalFetched.toLocaleString()} job${totalFetched===1?'':'s'} evaluated · ${jobs.length.toLocaleString()} matched filters · ${hiddenByFilters.toLocaleString()} filtered out`;
-    const sourceBreakdown = `Source results: employer boards ${sourceStats.direct.toLocaleString()}, USAJobs ${sourceStats.usajobs.toLocaleString()}, Adzuna ${sourceStats.adzuna.toLocaleString()}, Ashby ${sourceStats.ashby.toLocaleString()}, Greenhouse ${sourceStats.greenhouse.toLocaleString()}`;
+    const sourceBreakdown = 'Source results: employer boards ' + sourceStats.direct.toLocaleString()
+      + ', ' + API_SOURCES.map(s => `${s.label} ${(sourceStats[s.key]||0).toLocaleString()}`).join(', ');
 
     // --- Source-health logging (developer instrument, local only) ---
     // Records what each source returned per search so Jeff can confirm
@@ -2042,6 +2071,7 @@ async function search(){
       direct: sourceStats.direct, usajobs: sourceStats.usajobs,
       adzuna: sourceStats.adzuna, ashby: sourceStats.ashby,
       greenhouse: sourceStats.greenhouse,
+      smartrecruiters: sourceStats.smartrecruiters,
       adzunaResolved: sourceStats.adzunaResolved || 0,
       boardsOk: okCos, boardsFail: failCos,
       totalFetched, matched: jobs.length
@@ -2193,7 +2223,7 @@ function logSourceHealth(rec){
         `[jobfinder] "${rec.kw||'(all)'}"${rec.loc?(' @ '+rec.loc):''} — ` +
         `boards ${rec.direct} (ok ${rec.boardsOk}/fail ${rec.boardsFail}), ` +
         `USAJobs ${rec.usajobs}, Adzuna ${rec.adzuna}, Ashby ${rec.ashby}, ` +
-        `Greenhouse ${rec.greenhouse} → ${rec.matched} matched`
+        `Greenhouse ${rec.greenhouse}, SmartRecruiters ${rec.smartrecruiters||0} → ${rec.matched} matched`
       );
     }
   } catch(e){ /* storage full or blocked — ignore, never break search */ }
@@ -2211,7 +2241,8 @@ function computeHealthSummary(){
     ['USAJobs','usajobs'],
     ['Adzuna','adzuna'],
     ['Ashby','ashby'],
-    ['Greenhouse','greenhouse']
+    ['Greenhouse','greenhouse'],
+    ['SmartRecruiters','smartrecruiters']
   ];
   const rows = sources.map(([label,key])=>{
     const vals = log.map(r => Number(r[key])||0);
@@ -2247,7 +2278,8 @@ function coachJeffHealth(showRecent){
       when: (r.t||'').replace('T',' ').slice(0,16),
       keyword: r.kw||'(all)', location: r.loc||'',
       boards: r.direct, USAJobs: r.usajobs, Adzuna: r.adzuna,
-      Ashby: r.ashby, Greenhouse: r.greenhouse, matched: r.matched
+      Ashby: r.ashby, Greenhouse: r.greenhouse,
+      SmartRecruiters: r.smartrecruiters||0, matched: r.matched
     }));
     console.log(`%cLast ${k} searches`, 'font-weight:bold');
     (console.table ? console.table : console.log)(recent);
