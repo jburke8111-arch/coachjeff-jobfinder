@@ -180,6 +180,11 @@
   .tag.risk{background:rgba(185,88,35,.12);color:#9a4b1f}
   .tag.strong{background:rgba(31,122,77,.12);color:#1f7a4d}
   .tag.warn{background:rgba(217,138,43,.15);color:#b6701c}
+  /* Experience tiers — reuse the existing green/amber/orange palette so the
+     chips read as the same family as the sponsorship badges. */
+  .tag.tier-ok{background:rgba(31,122,77,.12);color:#1f7a4d}
+  .tag.tier-mid{background:rgba(217,138,43,.15);color:#b6701c}
+  .tag.tier-warn{background:rgba(185,88,35,.14);color:#9a4b1f}
   .tag.sp-yes{background:rgba(31,122,77,.14);color:#1f7a4d;font-weight:700}
   .tag.sp-no{background:rgba(185,45,45,.12);color:#a12b2b;font-weight:700}
   .tag.sp-unk{background:#f4f1ea;color:#8a7d5f;font-weight:600}
@@ -1570,6 +1575,48 @@ function salaryEstimate(j){
   if(/coordinator|assistant|program|project/.test(t)) return prefix + ': $42K\u2013$65K';
   return ''; // no field match -> show nothing rather than a guess
 }
+// ---- Experience tiers (Early-Career Experience Equivalency Guide) ----------
+// Maps a posting's stated years-floor to the coaching verdict from the guide,
+// so a student sees "how reachable is this, and with what?" instead of a bare
+// number. Replaces the old raw "requires N+ yrs experience" tag.
+//
+// Deliberately source-agnostic: it reads j.minYears / j.yearsPreferred and
+// nothing else, so every fetcher that learns to scan descriptions (Greenhouse
+// and Lever next, via checkjobs) gets tiering for free with no changes here.
+// Sources that don't scan leave minYears undefined and simply get no tier —
+// silence rather than a false "no experience required".
+//
+// A softened requirement ("3+ years preferred") is treated one tier gentler
+// than the same number stated as hard-required, per the guide's 3-5yr row:
+// "usually not genuinely entry-level unless listed as preferred rather than
+// required."
+// The guide's rows overlap (0-1, 1, 1-2, 2-3, 3-5) but a parsed posting gives
+// one number: its floor. A floor of N is matched to the row whose LOWER bound
+// is N — so "2-4 years" (floor 2) reads as the guide's 2-3 row, not its 1-2
+// row. Where a floor touches two rows, that rule picks the harder one, which is
+// the right direction to err: overstating reachability wastes applications.
+// `from` is the row's lower bound; the last row is the open-ended catch-all.
+const EXPERIENCE_TIERS = [
+  { from: 3, label: 'Proceed with caution',           cls: 'tier-warn',
+    note: 'Reflects experience inflation. Rarely crossable without direct industry proof-of-work or a referral.' },
+  { from: 2, label: 'Possible — not automatic',       cls: 'tier-mid',
+    note: 'Needs real ownership: tools used, outcomes owned, deadlines met. Multiple internships plus a capstone can clear this; a weak portfolio will not.' },
+  { from: 1, label: 'Defensible with internships',    cls: 'tier-ok',
+    note: 'An internship or co-op is the strongest framing here — it is the experience employers most directly recognize at entry level.' },
+  { from: 0, label: 'Reachable with strong projects', cls: 'tier-ok',
+    note: 'Coursework alone is insufficient — lead with 1–2 portfolio projects that show measurable outcomes.' },
+];
+
+function experienceTier(j){
+  const y = Number(j.minYears || 0);
+  if(!y) return null;                       // nothing stated (or source didn't scan)
+  // "Preferred" softens the ask by one year for tiering purposes.
+  const effective = j.yearsPreferred ? Math.max(1, y - 1) : y;
+  const tier = EXPERIENCE_TIERS.find(t => effective >= t.from);
+  const yrsText = `${y}+ yr${y === 1 ? '' : 's'}${j.yearsPreferred ? ' preferred' : ''}`;
+  return { label: tier.label, cls: tier.cls, note: tier.note, yrsText };
+}
+
 // Age in days for a posting, or null if we can't determine it.
 function postedAgeDays(posted){
   if(!posted) return null;
@@ -1596,7 +1643,7 @@ function whyThisJob(j, kw, loc){
   // it, so it is deliberately absent here. The other branches stay.
   // A description-stated experience floor also disqualifies the early-career
   // ✓ — the title may read junior while the requirements say otherwise.
-  const yearsGated = Number(j.minYears || 0) >= 2;
+  const yearsGated = Number(j.minYears || 0) >= (j.yearsPreferred ? 3 : 2);
   if(isSeniorTitle(title) || yearsGated) { /* no positive reason to add */ }
   else if(INTERN_RX.test(title)) reasons.push('Internship signal');
   else if(NEWGRAD_RX.test(title)) reasons.push('New-grad signal');
@@ -1620,7 +1667,9 @@ function renderJob(j, kw, loc){
   // promise ("no senior roles in disguise") is meant to prevent. Only sources
   // that actually parse the description set minYears; where it's undefined we
   // fall back to title-only behavior rather than guessing.
-  const gated = Number(j.minYears || 0) >= 2;
+  // Uses the same softening rule as experienceTier(): "2+ years preferred" is
+  // not the same wall as "2+ years required", so it shouldn't strip the badge.
+  const gated = Number(j.minYears || 0) >= (j.yearsPreferred ? 3 : 2);
   const early = hasEntrySignal(j.title || '') && !experienced && !gated;
   const why = whyThisJob(j, kw, loc).map(r=>`<span>✓ ${esc(r)}</span>`).join('');
   const id = jobId(j);
@@ -1638,7 +1687,14 @@ function renderJob(j, kw, loc){
             <span class="tag blue">${esc(freshnessText(j.posted))}</span>
             ${sponsor ? `<span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>` : ''}
             ${(!experienced && (j.score || 0) >= 8) ? '<span class="tag strong">high-priority lead</span>' : ''}
-            ${j.expFlag ? `<span class="tag warn">${j.minYears ? `requires ${j.minYears}+ yrs experience` : 'may require experience'}</span>` : ''}
+            ${(()=>{
+              // Tier label replaces the raw years tag — it carries the number
+              // AND the coaching read in one chip. Falls back to the old vague
+              // tag for sources that flag experience without a parsed number.
+              const tier = experienceTier(j);
+              if(tier) return `<span class="tag ${tier.cls}" title="${esc(tier.note)}">${esc(tier.label)} · ${esc(tier.yrsText)}</span>`;
+              return j.expFlag ? '<span class="tag warn">may require experience</span>' : '';
+            })()}
             ${j.source === 'adzuna' ? '<span class="tag gray">Adzuna</span>' : ''}
             ${j.aggregator ? `<span class="tag warn">via ${esc(j.aggregatorName || 'aggregator')} — signup may be required</span>` : ''}
             ${j.resolvedDirect ? '<span class="tag strong">direct employer link found</span>' : ''}
