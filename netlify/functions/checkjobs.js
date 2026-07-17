@@ -13,6 +13,56 @@
 
 // ---- Scan patterns ----------------------------------------------------------
 
+// ===========================================================================
+// DUPLICATED CODE — keep in sync with netlify/functions/ashby.js
+// ===========================================================================
+// experienceRequirement() and its two helpers are logically identical to the
+// copy in ashby.js (comments differ; behavior is verified equivalent). They
+// live in both files rather than a shared module because the functions
+// directory is flat and there's no package.json / netlify.toml declaring module
+// resolution — adding one is a separate change, not a rider on this feature.
+// If you edit either copy, edit both. The test cases live with the ashby.js
+// copy.
+//
+// Ashby can call this on its board response directly (descriptionPlain ships in
+// the same payload). Greenhouse/Lever need a per-job fetch, which is why this
+// copy runs here instead.
+// ===========================================================================
+
+const SOFT_RX = /\b(preferred|preferable|a plus|nice[- ]to[- ]have|desired|ideally|bonus)\b/;
+
+function isSoftened(haystack, index, matchLen){
+  const from = Math.max(0, index - 60);
+  const to   = Math.min(haystack.length, index + matchLen + 60);
+  return SOFT_RX.test(haystack.slice(from, to));
+}
+
+// Returns { minYears, preferred }. See ashby.js for the full rationale.
+function experienceRequirement(text){
+  if(!text) return { minYears: 0, preferred: false };
+  const original = String(text).toLowerCase();
+  let t = original;
+  let max = 0;
+  let maxSoft = false;
+
+  const range = /\b(\d{1,2})\s*(?:-|–|—|to)\s*\d{1,2}\s*\+?\s*years?\b/g;
+  t = t.replace(range, (full, low, offset) => {
+    const n = parseInt(low, 10);
+    if(n > max){ max = n; maxSoft = isSoftened(original, offset, full.length); }
+    return " ".repeat(full.length);
+  });
+
+  const single = /\b(?:minimum(?: of)?\s*|at least\s*)?(\d{1,2})\s*\+?\s*years?\b/g;
+  let m;
+  while((m = single.exec(t)) !== null){
+    const n = parseInt(m[1], 10);
+    if(n > max){ max = n; maxSoft = isSoftened(original, m.index, m[0].length); }
+  }
+
+  if(max > 15) return { minYears: 0, preferred: false };
+  return { minYears: max, preferred: max > 0 && maxSoft };
+}
+
 // DROP: clear non-degree / hourly / physical-labor signals.
 const DROP_RX = [
   /\bhigh school diploma\b/i,
@@ -31,10 +81,18 @@ const DROP_RX = [
 
 // FLAG: borderline — an experience gate that a new grad may not clear, but the
 // role could still be worth showing with a warning.
+//
+// NOTE: this is now a BACKSTOP, not the primary signal. experienceRequirement()
+// above extracts an actual number, which the client turns into a tier label.
+// These patterns still run because they catch the wordy gates that carry no
+// number ("proven track record"), and because they apply to untrusted scraped
+// text where a number can't be trusted. The numeric patterns start at 2 rather
+// than 3 to match the parser — the old floor of 3 meant a "2-4 years" posting
+// (the Scrunch AI Search Analyst case) came back 'ok' with no warning at all.
 const FLAG_RX = [
-  /\b([3-9]|1[0-9])\+?\s*years?\b/i,               // "3+ years", "5 years"
-  /\bminimum (of )?([3-9]|1[0-9])\s*years?\b/i,     // "minimum of 3 years"
-  /\b([3-9]|1[0-9])\s*[-–]\s*\d+\s*years?\b/i,      // "3-5 years"
+  /\b([2-9]|1[0-9])\+?\s*years?\b/i,               // "2+ years", "5 years"
+  /\bminimum (of )?([2-9]|1[0-9])\s*years?\b/i,     // "minimum of 3 years"
+  /\b([2-9]|1[0-9])\s*[-–]\s*\d+\s*years?\b/i,      // "2-4 years", "3-5 years"
   /\bproven track record\b/i,
   /\bextensive experience\b/i,
 ];
@@ -103,10 +161,22 @@ async function withTimeout(promise, ms){
 }
 
 // Fetch one job's description text. Handles Greenhouse and Lever job URLs.
+//
+// Returns { text, trusted }. `trusted` is true only when the text came from a
+// structured API field that contains the job description and nothing else.
+//
+// WHY THIS MATTERS FOR YEARS-PARSING: the fallback path below scrapes a public
+// HTML page and strips every tag, so the text includes nav, footer, cookie
+// banners, "About us — 20 years in business", and often other job listings.
+// A boolean scan tolerates that noise (a false 'flag' is cheap). But
+// experienceRequirement() returns a NUMBER and takes the max, so one stray
+// "8 years" in a footer would report an 8-year requirement on an entry-level
+// role. Untrusted text therefore yields minYears: null (= not scanned) rather
+// than a number we'd be guessing at.
 async function fetchDescription(job){
   try {
     const url = job.url || '';
-    if(!url) return '';
+    if(!url) return { text: '', trusted: false };
 
     // Greenhouse individual job JSON: boards-api.greenhouse.io/v1/boards/{co}/jobs/{id}
     // The job.url is usually the public apply URL; we derive the API URL when possible.
@@ -116,7 +186,7 @@ async function fetchDescription(job){
       const r = await withTimeout(fetch(api), 7000);
       if(r.ok){
         const d = await r.json();
-        return stripHtml(d && d.content);
+        return { text: stripHtml(d && d.content), trusted: true };
       }
     }
 
@@ -129,18 +199,19 @@ async function fetchDescription(job){
         const d = await r.json();
         const parts = [d.descriptionPlain || d.description || ''];
         if(Array.isArray(d.lists)) d.lists.forEach(l => { parts.push(l.text||''); parts.push(l.content||''); });
-        return stripHtml(parts.join(' '));
+        return { text: stripHtml(parts.join(' ')), trusted: true };
       }
     }
 
-    // Fallback: fetch the public page and scan its raw text.
+    // Fallback: fetch the public page and scan its raw text. Good enough for
+    // the boolean drop/flag scans, NOT good enough to extract a number from.
     const r = await withTimeout(fetch(url), 7000);
     if(r.ok){
       const html = await r.text();
-      return stripHtml(html);
+      return { text: stripHtml(html), trusted: false };
     }
   } catch(e){ /* ignore, treat as unknown */ }
-  return '';
+  return { text: '', trusted: false };
 }
 
 // ---- Handler ----------------------------------------------------------------
@@ -166,27 +237,39 @@ export default async (request) => {
     const cap = checkSponsorship ? 60 : 30;
 
     const toCheck = jobs.slice(0, cap);
+    // How many the browser asked us to check but we didn't get to. The client
+    // surfaces this: a student must be able to tell an unverified role from a
+    // verified one, and silently truncating makes those two look identical.
+    const skipped = Math.max(0, jobs.length - toCheck.length);
 
     const verdicts = {};      // id -> "drop" | "flag" | "ok"
     const sponsorship = {};   // id -> "available" | "none" | "unknown"
+    const experience = {};    // id -> { minYears, preferred } | omitted if unscannable
     const BATCH = 8;
     for(let i = 0; i < toCheck.length; i += BATCH){
       const slice = toCheck.slice(i, i + BATCH);
       const results = await Promise.all(slice.map(async (job) => {
-        const desc = await fetchDescription(job);
+        const { text: desc, trusted } = await fetchDescription(job);
         const verdict = desc ? scanDescription(desc) : 'ok';
         const sp = (checkSponsorship && desc) ? scanSponsorship(desc) : 'unknown';
-        return { id: job.id, verdict, sp };
+        // Only parse a years-figure out of structured API text. See the note on
+        // fetchDescription() for why scraped page text is excluded.
+        const exp = (desc && trusted) ? experienceRequirement(desc) : null;
+        return { id: job.id, verdict, sp, exp };
       }));
       results.forEach(r => {
         if(r.id != null){
           verdicts[r.id] = r.verdict;
           if(checkSponsorship) sponsorship[r.id] = r.sp;
+          if(r.exp) experience[r.id] = r.exp;
         }
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, verdicts, sponsorship }), { status: 200, headers: cors });
+    return new Response(JSON.stringify({
+      ok: true, verdicts, sponsorship, experience,
+      scanned: toCheck.length, skipped
+    }), { status: 200, headers: cors });
   } catch(err){
     // On any failure, return empty verdicts so the browser just shows everything
     // (fail-open: never hide jobs because the checker had a problem).
