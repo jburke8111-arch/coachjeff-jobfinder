@@ -59,31 +59,61 @@ const ASHBY_BOARDS = [
 // descriptionPlain in the SAME board response, so this costs no extra fetch
 // (unlike the Greenhouse/Lever path, which needs a per-job call).
 //
-// Returns the minimum years of experience demanded, or 0 if none stated.
+// Returns { minYears, preferred }:
+//   minYears  - the highest years-floor stated anywhere in the posting, 0 if none
+//   preferred - true when THAT binding requirement was softened ("preferred",
+//               "a plus", "nice to have") rather than hard-required
+//
 // Deliberately conservative: it reads the LOW end of a range ("2-4 years" -> 2)
 // and ignores unrelated numbers by requiring the word "year(s)" adjacent.
-function minYearsRequired(text){
-  if(!text) return 0;
-  let t = String(text).toLowerCase();
+//
+// WHY preferred MATTERS: the Early-Career Experience Equivalency Guide treats
+// "3-5 years preferred" very differently from "3-5 years required" — the former
+// is often crossable with a strong internship-heavy portfolio, the latter rarely
+// is. A bare number can't carry that distinction, so we track it per-match: the
+// softness of the requirement that SET minYears is what counts, not whether the
+// word "preferred" happens to appear somewhere else in the posting (it usually
+// does — in the benefits or EEO boilerplate).
+const SOFT_RX = /\b(preferred|preferable|a plus|nice[- ]to[- ]have|desired|ideally|bonus)\b/;
+
+// Look at a window of text around a match to decide if it was softened.
+// 60 chars each way covers "3+ years of experience preferred" and
+// "Preferred: 5 years in B2B SaaS" without bleeding into neighboring bullets.
+function isSoftened(haystack, index, matchLen){
+  const from = Math.max(0, index - 60);
+  const to   = Math.min(haystack.length, index + matchLen + 60);
+  return SOFT_RX.test(haystack.slice(from, to));
+}
+
+function experienceRequirement(text){
+  if(!text) return { minYears: 0, preferred: false };
+  const original = String(text).toLowerCase();
+  let t = original;
   let max = 0;
+  let maxSoft = false;
 
   // Ranges FIRST: "2-4 years", "2 to 4 years", "2–4 years" -> the low end (2).
   // Each match is then blanked out of the text, because the single-value regex
   // below would otherwise re-match the range's tail ("4 years") and report the
   // HIGH end — overstating the requirement on every range in the posting.
   const range = /\b(\d{1,2})\s*(?:-|–|—|to)\s*\d{1,2}\s*\+?\s*years?\b/g;
-  t = t.replace(range, (_full, low) => {
-    max = Math.max(max, parseInt(low, 10));
-    return " ";
+  t = t.replace(range, (full, low, offset) => {
+    const n = parseInt(low, 10);
+    if(n > max){ max = n; maxSoft = isSoftened(original, offset, full.length); }
+    return " ".repeat(full.length);   // keep offsets aligned for the pass below
   });
 
   // "3+ years", "5 years of experience", "minimum 3 years"
   const single = /\b(?:minimum(?: of)?\s*|at least\s*)?(\d{1,2})\s*\+?\s*years?\b/g;
   let m;
-  while((m = single.exec(t)) !== null) max = Math.max(max, parseInt(m[1], 10));
+  while((m = single.exec(t)) !== null){
+    const n = parseInt(m[1], 10);
+    if(n > max){ max = n; maxSoft = isSoftened(original, m.index, m[0].length); }
+  }
 
   // Sanity ceiling: "401(k)" style noise and decade references shouldn't count.
-  return max > 15 ? 0 : max;
+  if(max > 15) return { minYears: 0, preferred: false };
+  return { minYears: max, preferred: max > 0 && maxSoft };
 }
 
 async function withTimeout(promise, ms){
@@ -211,7 +241,7 @@ export default async (request) => {
           }
 
           // Read the real requirements, not just the title.
-          const minYears = minYearsRequired(j.descriptionPlain || "");
+          const { minYears, preferred } = experienceRequirement(j.descriptionPlain || "");
 
           out.push({
             title,
@@ -222,8 +252,9 @@ export default async (request) => {
             posted: j.publishedAt ? Date.parse(j.publishedAt) : null,
             salary,
             source: "ashby",
-            minYears,                  // 0 = nothing stated
-            expFlag: minYears >= 2,    // matches index.html's "may require experience" tag
+            minYears,                    // 0 = nothing stated
+            yearsPreferred: preferred,   // true = "preferred"/"a plus", not hard-required
+            expFlag: minYears >= 2,      // kept: index.html still reads it
           });
         }
         return out;
