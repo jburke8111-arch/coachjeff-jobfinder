@@ -1443,7 +1443,14 @@ function normalizeForSearch(s){
 }
 
 
-// --- Search Expansion v16: role synonyms + metro/state expansion ---
+// --- Search Expansion v17: role synonyms + metro/state expansion ---
+// v17 adds tech/AI/ML/data role families to ROLE_EXPANSIONS + fallback routing in
+// getRoleExpansionTerms. Fixes the bug where "Machine Learning Engineer" and "ML
+// Engineer" searches returned zero because neither was expanded, so a search for
+// one could never match a job titled the other. Now ML/AI/SWE/Data/HPC titles
+// cross-match. NOTE: this does not change the Level filter — with Level set to an
+// early-career bucket, many ML/AI roles (rarely labeled "new grad") are still
+// hidden; switch Level to "All levels" to see them.
 const ROLE_EXPANSIONS = {
   "data analyst": ["data analyst","business analyst","analytics analyst","bi analyst","business intelligence analyst","reporting analyst","insights analyst","operations analyst","research analyst","data specialist","data associate","workforce analyst","revenue analyst"],
   "data analytics": ["data analyst","analytics analyst","bi analyst","business intelligence analyst","reporting analyst","insights analyst","data specialist"],
@@ -1453,7 +1460,24 @@ const ROLE_EXPANSIONS = {
   "sales": ["sales","sales development","business development","sdr","bdr","account executive","inside sales","client service","customer success"],
   "sales development": ["sales development","business development","sdr","bdr","inside sales","account executive","sales associate","client service"],
   "it support": ["it support","help desk","desktop support","technical support","support specialist","service desk","systems support"],
-  "project coordinator": ["project coordinator","program coordinator","project assistant","program assistant","operations coordinator","implementation coordinator"]
+  "project coordinator": ["project coordinator","program coordinator","project assistant","program assistant","operations coordinator","implementation coordinator"],
+  // v17: tech / AI / ML / data role families. These emerging CS titles are posted
+  // under many near-synonymous names; without expansion, searching one exact title
+  // (e.g. "machine learning engineer") would never match a job titled "ML Engineer"
+  // and vice versa. Each family cross-maps so any entry finds the others.
+  "machine learning engineer": ["machine learning engineer","ml engineer","ai engineer","ai/ml engineer","applied scientist","applied ml engineer","machine learning scientist","deep learning engineer","ml scientist","research engineer","ai researcher","machine learning"],
+  "ml engineer": ["ml engineer","machine learning engineer","ai engineer","ai/ml engineer","applied scientist","applied ml engineer","machine learning scientist","deep learning engineer","ml scientist","research engineer"],
+  "ai engineer": ["ai engineer","machine learning engineer","ml engineer","ai/ml engineer","applied scientist","llm engineer","generative ai engineer","ai/ml","machine learning","deep learning engineer"],
+  "data engineer": ["data engineer","analytics engineer","data platform engineer","etl engineer","big data engineer","data infrastructure engineer","data pipeline engineer","dataops engineer"],
+  "software engineer": ["software engineer","software developer","sde","backend engineer","back end engineer","full stack engineer","full stack developer","application developer","programmer","software engineer i"],
+  "software developer": ["software developer","software engineer","application developer","programmer","full stack developer","sde"],
+  "backend engineer": ["backend engineer","back end engineer","back-end engineer","software engineer","backend developer","server side engineer","api engineer"],
+  "frontend engineer": ["frontend engineer","front end engineer","front-end engineer","ui engineer","frontend developer","web developer","javascript engineer"],
+  "full stack developer": ["full stack developer","full stack engineer","fullstack developer","full-stack engineer","software engineer","web developer"],
+  "qa engineer": ["qa engineer","quality assurance engineer","test engineer","sdet","automation engineer","quality engineer","qa analyst"],
+  "data scientist": ["data scientist","machine learning engineer","applied scientist","ml scientist","research scientist","quantitative analyst","ai scientist"],
+  "research engineer": ["research engineer","research scientist","applied scientist","machine learning engineer","ml engineer","ai researcher"],
+  "hpc engineer": ["hpc engineer","high performance computing engineer","performance engineer","gpu engineer","cuda engineer","scientific computing engineer","parallel computing engineer","computational scientist"]
 };
 
 const LOCATION_EXPANSIONS = {
@@ -1475,6 +1499,19 @@ function getRoleExpansionTerms(kw){
   if(q.includes("sales")) return ROLE_EXPANSIONS["sales"];
   if(q.includes("support") || q.includes("help desk")) return ROLE_EXPANSIONS["it support"];
   if(q.includes("project") || q.includes("program")) return ROLE_EXPANSIONS["project coordinator"];
+  // v17: tech / AI / ML / data family fallbacks so variants like "senior machine
+  // learning engineer" or "ai/ml engineer" still route to the right synonym set.
+  if((q.includes("machine learning") || /\bml\b/.test(q)) ) return ROLE_EXPANSIONS["machine learning engineer"];
+  if(q.includes("data engineer")) return ROLE_EXPANSIONS["data engineer"];
+  if(q.includes("data scientist")) return ROLE_EXPANSIONS["data scientist"];
+  if(/\bai\b/.test(q) && q.includes("engineer")) return ROLE_EXPANSIONS["ai engineer"];
+  if(q.includes("hpc") || q.includes("high performance") || q.includes("high-performance")) return ROLE_EXPANSIONS["hpc engineer"];
+  if(q.includes("full stack") || q.includes("fullstack")) return ROLE_EXPANSIONS["full stack developer"];
+  if(q.includes("backend") || q.includes("back end") || q.includes("back-end")) return ROLE_EXPANSIONS["backend engineer"];
+  if(q.includes("frontend") || q.includes("front end") || q.includes("front-end")) return ROLE_EXPANSIONS["frontend engineer"];
+  if(q.includes("qa") || q.includes("quality assurance") || q.includes("test engineer") || q.includes("sdet")) return ROLE_EXPANSIONS["qa engineer"];
+  if(q.includes("research") && (q.includes("engineer") || q.includes("scientist"))) return ROLE_EXPANSIONS["research engineer"];
+  if(q.includes("software") || (q.includes("engineer") && !q.includes("data")) || q.includes("developer")) return ROLE_EXPANSIONS["software engineer"];
   return [q];
 }
 
