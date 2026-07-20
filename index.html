@@ -4,19 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coach Jeff's Job Finder</title>
-<meta name="description" content="A free job finder for new graduates and early-career job seekers. Search internships and entry-level roles across 110+ employer career sites, filtered to skip senior roles. Built by Coach Jeff, Experience Career System.">
+<meta name="description" content="A free job finder for new graduates and early-career job seekers. Search internships and entry-level roles across employer career sites and major job-data sources, filtered to skip senior roles. Built by Coach Jeff, Experience Career System.">
 <!-- Social sharing (Open Graph + Twitter) — controls how the link looks when shared on LinkedIn, etc.
      After deploying to Netlify, set og:url (and optionally og:image) to your live site URL. -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Coach Jeff's Job Finder — Early-Career Jobs for New Grads">
-<meta property="og:description" content="Search internships and entry-level roles across 110+ employer career sites, filtered for new graduates. Free, from Experience Career System.">
+<meta property="og:description" content="Search internships and entry-level roles across employer career sites and major job-data sources, filtered for new graduates. Free, from Experience Career System.">
 <meta property="og:site_name" content="Experience Career System">
 <meta property="og:url" content="https://coachjeff-jobfinder.netlify.app/">
 <!-- Optional: add a preview image later, then uncomment and point to it -->
 <!-- <meta property="og:image" content="https://coachjeff-jobfinder.netlify.app/preview.png"> -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Coach Jeff's Job Finder — Early-Career Jobs for New Grads">
-<meta name="twitter:description" content="Search internships and entry-level roles across 110+ employer career sites, filtered for new graduates.">
+<meta name="twitter:description" content="Search internships and entry-level roles across employer career sites and major job-data sources, filtered for new graduates.">
 <meta name="author" content="Jeff Burke — Experience Career System">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -314,8 +314,6 @@
   .note{font-size:13px;color:var(--faint);border-top:1px solid var(--line);
     padding:20px 0 44px;max-width:62ch;line-height:1.5;text-wrap:pretty}
   .src-fail{color:var(--amber-deep);font-weight:600}
-    color:var(--mute);list-style:none;user-select:none}
-    color:var(--mute);line-height:1.7;word-break:break-word}
 @media(max-width:560px){.job-top{flex-direction:column;gap:2px}.co{white-space:normal}}
 
   /* V7 polish: match mockup spacing and font hierarchy */
@@ -557,7 +555,7 @@
           <select id="majorSelect"></select>
         </div>
         <div class="field">
-          <label for="majorTitleSelect">Recommended Job Titles (Pick up to 3 to compare)</label>
+          <label for="majorTitleSelect">Recommended Job Titles (select up to 3)</label>
           <div class="title-select-wrap">
             <select id="majorTitleSelect"></select>
             <span class="search-glyph" aria-hidden="true">🔍</span>
@@ -592,6 +590,7 @@
         </div>
         <div class="hero-actions">
           <button id="go">Search</button>
+          <button id="tryExample" class="secondary" type="button" title="Fills in a sample search so you can see how it works">Try an example</button>
           <button id="saveSearch" class="secondary" type="button">Save Search</button>
           <button id="reset" class="secondary" type="button">Reset</button>
         </div>
@@ -649,6 +648,7 @@
             <option value="title">Title</option>
             <option value="newest">Newest (where dated)</option>
           </select>
+          <span class="hint">"Most relevant" ranks by fit to your search — title, location, entry-level signals, and anything you set in "Improve My Matches." It is a search-relevance estimate, not a resume-to-posting ATS score.</span>
         </div>
         <div class="field checkbox" style="grid-column:1 / -1">
           <span class="chk">
@@ -672,8 +672,8 @@
           <span class="chk">
             <input id="noclear" type="checkbox">
             <span class="chk-text">
-              <label for="noclear" class="inline">Work Authorization Requirements</label>
-              <span class="hint">Reads each role's full description for visa/sponsorship language, badges every result 🟢/🔴/🟡, and hides roles that explicitly won't sponsor. Slower, but thorough — best for international students.</span>
+              <label for="noclear" class="inline">Check sponsorship eligibility</label>
+              <span class="hint">Scans each role's full description for visa/sponsorship and work-authorization language, badges every result 🟢/🔴/🟡, and removes roles that explicitly won't sponsor. Slower, but thorough — best for international students.</span>
               <span id="sponsorFilterWrap" class="sponsor-filter" style="display:none;">
                 <label for="sponsorFilter" class="inline">Show:</label>
                 <select id="sponsorFilter">
@@ -705,12 +705,14 @@
         <div class="field"><label for="profileGrad">Graduation</label><select id="profileGrad"><option value="any">Any</option><option value="2026">2026</option><option value="2025">2025</option><option value="recent">Recent grad</option></select></div>
         
         <div class="field"><label for="profileGoal">Target Career</label><select id="profileGoal"><option value="any">Any</option><option value="analyst">Analyst</option><option value="sales">Sales / client service</option><option value="tech">Tech / IT</option><option value="program">Program / coordinator</option></select></div>
+
+        <div class="field"><label for="profileAuth">Work authorization</label><select id="profileAuth"><option value="any">Any</option><option value="authorized">Authorized — no sponsorship needed</option><option value="needs">Will need sponsorship</option></select></div>
       </div>
     </div>
   </details>
 
   <div class="meta">
-    <span id="status"></span>
+    <span id="status" role="status" aria-live="polite"></span>
     <span class="count" id="count"></span>
   </div>
 
@@ -1781,8 +1783,28 @@ function postedAgeDays(posted){
 // a ✓ next to "Posted 30+ days ago" tells the student the opposite of the
 // truth. Those signals still show in the tag row via freshnessText(), which
 // is neutral reporting rather than a checkmarked endorsement.
+// How deeply did we actually inspect this listing? Users trust the result more
+// when they can see whether we read the real description or only screened the
+// title. Built from the same flags the badges use — minYears defined means the
+// description was fetched and parsed; sponsorScan set means visa language was
+// read. Never overclaims: title-only stays title-only.
+function verificationStatus(j){
+  const descChecked = j.minYears !== undefined && j.minYears !== null;
+  const sponsorChecked = j.sponsorScan !== undefined && j.sponsorScan !== null;
+  if(descChecked && sponsorChecked)
+    return {text:'✅ Description + sponsorship checked', cls:'green', note:'We read this posting\'s full description and its work-authorization language.'};
+  if(descChecked)
+    return {text:'✅ Description checked', cls:'green', note:'We read this posting\'s full description to verify the role level.'};
+  if(sponsorChecked)
+    return {text:'🟢 Sponsorship language checked', cls:'green', note:'We scanned this posting for visa / sponsorship language.'};
+  return {text:'🟡 Title screening only', cls:'gray', note:'This source doesn\'t expose the description, so we screened by title only. Read the posting before ruling it in or out.'};
+}
 function whyThisJob(j, kw, loc){
   const reasons = [];
+  // Profile matches lead — they reflect what the user told us in "Improve My
+  // Matches" and are the strongest personalized signal. Captured during scoring
+  // so this list can never claim a match the score didn't actually credit.
+  if(Array.isArray(j.profileReasons)) j.profileReasons.forEach(r => reasons.push(r));
   const title = j.title || '';
   const blob = (title + ' ' + (j.location||'') + ' ' + (j.company||'')).toLowerCase();
   if(kw || selectedRoles.length){
@@ -1852,6 +1874,7 @@ function renderJob(j, kw, loc){
             ${early ? '<span class="tag">entry / grad</span>' : ''}
             ${experienced ? '<span class="tag warn">experienced role</span>' : ''}
             <span class="tag blue">${esc(freshnessText(j.posted))}</span>
+            ${(()=>{ const v = verificationStatus(j); return `<span class="tag ${v.cls}" title="${esc(v.note)}">${esc(v.text)}</span>`; })()}
             ${sponsor ? `<span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>` : ''}
             ${(!experienced && (j.score || 0) >= 8) ? '<span class="tag strong">high-priority lead</span>' : ''}
             ${(()=>{
@@ -2211,15 +2234,19 @@ async function search(){
       const goal = document.getElementById('profileGoal')?.value || 'any';
       const auth = document.getElementById('profileAuth')?.value || 'any';
       const blob = ((j.title||'') + ' ' + (j.sector||'') + ' ' + (j.location||'')).toLowerCase();
-      if(degree === 'analytics' && /data|analyst|analytics|insights|reporting|business intelligence/.test(blob)) score += 2;
-      if(degree === 'business' && /business|sales|client|finance|operations|analyst|coordinator/.test(blob)) score += 1;
-      if(degree === 'cs' && /software|engineer|developer|it support|technical|data/.test(blob)) score += 2;
-      if(degree === 'marketing' && /marketing|content|communications|brand|social/.test(blob)) score += 2;
-      if(degree === 'healthcare' && /health|clinical|medical|public health|hospital/.test(blob)) score += 2;
-      if(goal !== 'any' && blob.includes(goal)) score += 2;
-      if(auth === 'needs' && CLEAR_RX.test(blob)) score -= 4;
-      if(auth === 'authorized' && NO_SPONSOR_RX.test(blob)) score -= 1;
-      return Object.assign({}, j, {score});
+      const pReasons = [];
+      if(degree === 'analytics' && /data|analyst|analytics|insights|reporting|business intelligence/.test(blob)){ score += 2; pReasons.push('Fits your Analytics / Data background'); }
+      if(degree === 'business' && /business|sales|client|finance|operations|analyst|coordinator/.test(blob)){ score += 1; pReasons.push('Fits your Business background'); }
+      if(degree === 'cs' && /software|engineer|developer|it support|technical|data/.test(blob)){ score += 2; pReasons.push('Fits your CS / IT background'); }
+      if(degree === 'marketing' && /marketing|content|communications|brand|social/.test(blob)){ score += 2; pReasons.push('Fits your Marketing background'); }
+      if(degree === 'healthcare' && /health|clinical|medical|public health|hospital/.test(blob)){ score += 2; pReasons.push('Fits your Healthcare background'); }
+      if(goal !== 'any' && blob.includes(goal)){ score += 2; pReasons.push('Matches your target career'); }
+      if(auth === 'needs' && CLEAR_RX.test(blob)){ score -= 4; }
+      if(auth === 'authorized' && NO_SPONSOR_RX.test(blob)){ score -= 1; }
+      // Sponsorship-compatible ✓ only when a real description scan confirms it —
+      // never off the title alone, matching the honesty rule the badges follow.
+      if(auth === 'needs' && j.sponsorScan === 'available') pReasons.push('Sponsorship compatible');
+      return Object.assign({}, j, {score, profileReasons: pReasons});
     });
 
     if(sortBy === 'title'){
@@ -3205,6 +3232,31 @@ document.getElementById('sponsorFilter').addEventListener('change', ()=>{
   if(document.getElementById('noclear').checked) search();
 });
 
+// "Try an example" — populates a representative search the way a user would,
+// then runs it, so first-time visitors see the full flow (major → role →
+// location → results) in one click. Uses event dispatch so the same role-chip
+// and title-list wiring fires as if the user selected it by hand.
+const tryExampleBtn = document.getElementById('tryExample');
+if(tryExampleBtn){
+  tryExampleBtn.addEventListener('click', ()=>{
+    const majorSel = document.getElementById('majorSelect');
+    const titleSel = document.getElementById('majorTitleSelect');
+    // Clear any in-progress picks so the example starts clean.
+    selectedRoles = [];
+    if(majorSel){
+      majorSel.value = 'Business Analytics';
+      majorSel.dispatchEvent(new Event('change'));
+    }
+    // After the title list repopulates, pick Data Analyst the same way a click would.
+    if(titleSel){
+      titleSel.value = 'Data Analyst';
+      titleSel.dispatchEvent(new Event('change'));
+    }
+    document.getElementById('loc').value = 'Texas';
+    if(typeof window.renderRoleChips === 'function') window.renderRoleChips();
+    search();
+  });
+}
 document.getElementById('reset').addEventListener('click', ()=>{
   document.getElementById('kw').value = '';
   document.getElementById('loc').value = '';
