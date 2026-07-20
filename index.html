@@ -145,8 +145,8 @@
   .hero-search{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:14px;box-shadow:0 1px 2px rgba(18,32,58,.04),0 8px 24px rgba(18,32,58,.05)}
   /* .hero-grid retired in V21 — the keyword/location/actions row was split into
      bands 2 and 3, which use .grid2. .hero-actions is still live (band 3). */
-  .hero-actions{display:flex;gap:8px;align-items:end}
-  .hero-actions button{width:auto;padding:0 18px}
+  .hero-actions{display:flex;gap:8px;align-items:end;flex-wrap:wrap;justify-content:flex-end}
+  .hero-actions button{width:auto;padding:0 14px;white-space:nowrap}
   .quickbar{background:transparent;border:none;padding:0;margin:14px 0 0;box-shadow:none}
   .quickbar-title{margin-bottom:8px}
   .advancedbar{background:#fff;border:1px solid var(--line);border-radius:10px;padding:0;margin-bottom:14px}
@@ -503,6 +503,11 @@
      the right is buttons alone, so `start` left the buttons floating above the
      input. The roles row must stay `start` or its chips stretch. */
   .grid2.grid2-end{align-items:end}
+  /* Action band: 4 buttons need more than half the card, so give Location a
+     narrower fixed column and let the button row take the rest. Collapses to
+     stacked full-width on narrow screens via the 560px rule below. */
+  .grid2.action-row{grid-template-columns:minmax(220px,1fr) auto}
+  @media(max-width:640px){.grid2.action-row{grid-template-columns:1fr}}
   /* Each route introduces itself. There is no card-level header: a single title
      over the whole card would have to describe both the major path and the
      keyword path, and the old one ("What's your major?") only described the
@@ -583,8 +588,8 @@
          they read as belonging only to the keyword path. -->
     <div class="band">
       <p class="go-lede"><b>Then choose where — and search.</b> Leave Location blank to search the U.S. only.</p>
-      <div class="grid2 grid2-end">
-        <div class="field">
+      <div class="grid2 grid2-end action-row">
+        <div class="field action-loc">
           <label for="loc">Location <span class="label-optional">(optional)</span></label>
           <input id="loc" type="text" placeholder="Texas, Phoenix, remote…" value="">
         </div>
