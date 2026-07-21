@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://coachjeff-jobfinder.netlify.app/sitemap.xml
