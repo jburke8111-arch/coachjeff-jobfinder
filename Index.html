@@ -1224,6 +1224,12 @@ function isUSLocation(loc){
   if(NONUS_RX.test(t)) return false;         // names a foreign place → drop
   if(US_RX.test(t)) return true;             // names a US place → keep
   if(/\bremote\b/i.test(t)) return true;     // bare "Remote" with no country → keep
+  // Adzuna returns "City, County Name" with no state or country — e.g.
+  // "Commerce, Los Angeles County", "Alameda, Bernalillo County". These were
+  // being dropped as foreign, discarding every Adzuna result. County/Parish/
+  // Borough are US administrative terms; NONUS_RX has already excluded known
+  // foreign places above, so anything reaching here with one is US.
+  if(/\b(county|parish|borough)\b/i.test(t)) return true;
   return false;                              // names some other place, not US → drop
 }
 
@@ -2416,6 +2422,25 @@ async function search(){
     const sourceBreakdown = 'Source results: employer boards ' + sourceStats.direct.toLocaleString()
       + ', ' + API_SOURCES.map(s => `${s.label} ${(sourceStats[s.key]||0).toLocaleString()}`).join(', ');
 
+    // --- Filter funnel (diagnostic) --------------------------------------------
+    // Visible only with ?diag=1 in the URL. The filter chain already counts
+    // survivors at each stage but never showed them, which made a total wipeout
+    // indistinguishable from an empty API response. Each number is how many jobs
+    // remained AFTER that stage, so the first big drop names the culprit.
+    let diagLine = '';
+    if(new URLSearchParams(location.search).get('diag') === '1'){
+      diagLine = 'Filter funnel: fetched ' + totalFetched
+        + ' → level ' + afterLevel
+        + ' → keyword ' + afterKeyword
+        + ' → location ' + afterLocation
+        + ' → sector ' + afterSector
+        + ' → work ' + afterWork
+        + ' → clearance ' + afterClear
+        + ' → US-only ' + afterUS
+        + ' → degree ' + afterDegree
+        + ' → final ' + jobs.length;
+    }
+
     // --- Source-health logging (developer instrument, local only) ---
     // Records what each source returned per search so Jeff can confirm
     // fixes (e.g. Greenhouse id/ats) actually produce results in the wild
@@ -2440,7 +2465,7 @@ async function search(){
       ? `<br><span class="hint src-fail">${window._scanSkipped} lower-ranked role${window._scanSkipped===1?'':'s'} could not be verified against ${window._scanSkipped===1?'its':'their'} full description (scan limit reached). Your top matches were checked first — check the posting itself before ruling out anything further down.</span>`
       : '';
 
-    statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>${skipNote}`;
+    statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>${diagLine ? `<br><span class="hint" style="color:#b6701c">${diagLine}</span>` : ''}${skipNote}`;
 
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
 
