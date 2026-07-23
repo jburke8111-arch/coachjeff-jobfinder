@@ -3,18 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google-site-verification" content="UvSx3JNmC06bBb-PposrVoCBYkXVRzZFklco-yvN1oA" />
 <title>Free Job Finder for New Grads — No Signup | Coach Jeff</title>
 <meta name="description" content="A free job finder for new graduates and early-career job seekers. Search internships and entry-level roles across employer career sites and major job-data sources, filtered to skip senior roles. Built by Coach Jeff, Experience Career System.">
 <!-- Social sharing (Open Graph + Twitter) — controls how the link looks when shared on LinkedIn, etc.
-     After deploying to Netlify, set og:url (and optionally og:image) to your live site URL. -->
+     Requires preview.png (1200x630) in the site root, deployed alongside this file. -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Coach Jeff's Job Finder — Early-Career Jobs for New Grads">
 <meta property="og:description" content="Search internships and entry-level roles across employer career sites and major job-data sources, filtered for new graduates. Free, from Experience Career System.">
 <meta property="og:site_name" content="Experience Career System">
 <meta property="og:url" content="https://coachjeff-jobfinder.netlify.app/">
-<!-- Optional: add a preview image later, then uncomment and point to it -->
-<!-- <meta property="og:image" content="https://coachjeff-jobfinder.netlify.app/preview.png"> -->
+<meta property="og:image" content="https://coachjeff-jobfinder.netlify.app/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Coach Jeff's Job Finder — free early-career job search, no signup required">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://coachjeff-jobfinder.netlify.app/preview.png">
 <meta name="twitter:title" content="Coach Jeff's Job Finder — Early-Career Jobs for New Grads">
 <meta name="twitter:description" content="Search internships and entry-level roles across employer career sites and major job-data sources, filtered for new graduates.">
 <meta name="author" content="Jeff Burke — Experience Career System">
@@ -141,6 +145,9 @@
   .why-list span{white-space:nowrap}
   .salary{font-size:12.5px;color:var(--mute);margin-top:6px}
   .save-empty{font-size:12.5px;color:var(--faint)}
+  .more-wrap{display:flex;justify-content:center;margin:22px 0 6px}
+  .more-wrap button.secondary{width:auto;padding:0 22px;height:42px;border:1px solid var(--line-strong);border-radius:7px;background:#fff;color:var(--navy)}
+  .more-wrap button.secondary:hover{border-color:var(--navy);background:var(--paper)}
 
   .hero-search{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:14px;box-shadow:0 1px 2px rgba(18,32,58,.04),0 8px 24px rgba(18,32,58,.05)}
   /* .hero-grid retired in V21 — the keyword/location/actions row was split into
@@ -742,6 +749,24 @@
     <span class="cp-go">Free Coaching →</span>
   </a>
 
+  <div style="max-width:620px;margin:8px auto 0;padding-top:24px;border-top:1px solid #e2e8f0;">
+    <div style="max-width:620px;margin:0 auto 32px;padding:18px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+      <div style="font-weight:600;font-size:15px;color:#1e293b;margin-bottom:4px;">Quick feedback on the Job Finder?</div>
+      <div style="font-size:13.5px;color:#64748b;margin-bottom:14px;">Tell me what worked or what you'd change — I read every note.</div>
+      <form name="jobfinder-feedback" method="POST" data-netlify="true" netlify-honeypot="bot-field" onsubmit="setTimeout(function(){document.getElementById('jf-fb-thanks').style.display='block';document.getElementById('jf-fb-form').style.display='none';},100)" id="jf-fb-form">
+        <input type="hidden" name="form-name" value="jobfinder-feedback" />
+        <input type="hidden" name="tool" value="job-finder" />
+        <p style="display:none"><label>Skip: <input name="bot-field" /></label></p>
+        <textarea name="message" required placeholder="Your feedback…" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;color:#1e293b;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:9px;min-height:70px;resize:vertical;background:#fff;"></textarea>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+          <input type="email" name="email" placeholder="Email (optional, for a reply)" style="flex:1;min-width:180px;box-sizing:border-box;font-family:inherit;font-size:14px;color:#1e293b;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;" />
+          <button type="submit" style="font-family:inherit;font-weight:600;font-size:14px;color:#fff;background:#1f5c8f;border:none;padding:10px 20px;border-radius:9px;cursor:pointer;">Send</button>
+        </div>
+      </form>
+      <div id="jf-fb-thanks" style="display:none;padding:12px 14px;border-radius:9px;background:#eaf4ec;border:1px solid #bfe0c6;color:#1f5c33;font-size:14px;font-weight:500;">Thanks — got it. I appreciate the feedback.</div>
+    </div>
+  </div>
+
   <div class="health-panel" id="healthPanel" role="dialog" aria-label="Source health" style="display:none;">
     <div class="health-card">
       <div class="health-head">
@@ -1202,6 +1227,12 @@ function isUSLocation(loc){
   if(NONUS_RX.test(t)) return false;         // names a foreign place → drop
   if(US_RX.test(t)) return true;             // names a US place → keep
   if(/\bremote\b/i.test(t)) return true;     // bare "Remote" with no country → keep
+  // Adzuna returns "City, County Name" with no state or country — e.g.
+  // "Commerce, Los Angeles County", "Alameda, Bernalillo County". These were
+  // being dropped as foreign, discarding every Adzuna result. County/Parish/
+  // Borough are US administrative terms; NONUS_RX has already excluded known
+  // foreign places above, so anything reaching here with one is US.
+  if(/\b(county|parish|borough)\b/i.test(t)) return true;
   return false;                              // names some other place, not US → drop
 }
 
@@ -1487,15 +1518,6 @@ const ROLE_EXPANSIONS = {
   "hpc engineer": ["hpc engineer","high performance computing engineer","performance engineer","gpu engineer","cuda engineer","scientific computing engineer","parallel computing engineer","computational scientist"]
 };
 
-const LOCATION_EXPANSIONS = {
-  "texas": ["texas","tx","dallas","fort worth","arlington","plano","frisco","irving","austin","houston","san antonio","richardson","remote-us","remote us","remote - us","united states"],
-  "tx": ["texas","tx","dallas","fort worth","arlington","plano","frisco","irving","austin","houston","san antonio","richardson","remote-us","remote us","remote - us","united states"],
-  "phoenix": ["phoenix","scottsdale","tempe","mesa","gilbert","chandler","glendale","arizona","az","remote-us","remote us","remote - us","united states"],
-  "arizona": ["arizona","az","phoenix","scottsdale","tempe","mesa","gilbert","chandler","glendale","remote-us","remote us","remote - us","united states"],
-  "az": ["arizona","az","phoenix","scottsdale","tempe","mesa","gilbert","chandler","glendale","remote-us","remote us","remote - us","united states"],
-  "remote": ["remote","remote-us","remote us","remote - us","united states","usa","u.s."]
-};
-
 function getRoleExpansionTerms(kw){
   const q = normalizeForSearch(kw);
   if(!q) return [];
@@ -1520,26 +1542,6 @@ function getRoleExpansionTerms(kw){
   if(q.includes("research") && (q.includes("engineer") || q.includes("scientist"))) return ROLE_EXPANSIONS["research engineer"];
   if(q.includes("software") || (q.includes("engineer") && !q.includes("data")) || q.includes("developer")) return ROLE_EXPANSIONS["software engineer"];
   return [q];
-}
-
-function getLocationExpansionTerms(loc){
-  const q = normalizeForSearch(loc);
-  if(!q) return [];
-  if(LOCATION_EXPANSIONS[q]) return LOCATION_EXPANSIONS[q];
-  if(q.includes("texas") || q === "tx") return LOCATION_EXPANSIONS["texas"];
-  if(q.includes("phoenix")) return LOCATION_EXPANSIONS["phoenix"];
-  if(q.includes("arizona") || q === "az") return LOCATION_EXPANSIONS["arizona"];
-  if(q.includes("remote")) return LOCATION_EXPANSIONS["remote"];
-  return [q];
-}
-
-function locationMatches(jobLocation, loc){
-  const l = normalizeForSearch(jobLocation || '');
-  const q = normalizeForSearch(loc || '');
-  if(!q) return true;
-  if(l.includes(q)) return true;
-  const terms = getLocationExpansionTerms(q);
-  return terms.some(term => l.includes(normalizeForSearch(term)));
 }
 
 function shouldShowFallbackLinks(liveCount){
@@ -2007,6 +2009,63 @@ function locationTerms(input){
   return [q];
 }
 
+// Cheap, synchronous subset of the real filter chain, used only for the
+// progressive preview paints while sources are still arriving. It applies the
+// same title/keyword/location/sector/work/clearance/US/degree gates and the same
+// dedup, but deliberately skips the server-side description scan (that needs a
+// network round trip and only runs once, at the end). Results are score-sorted
+// so the preview shows plausible top matches rather than arrival order.
+// Anything this lets through that the real chain later drops simply disappears
+// on the final render — a preview is allowed to be slightly generous, never
+// slightly wrong about a job it shows.
+function previewFilter(all, o){
+  const seen = new Set();
+  const out = [];
+  for(const j of all){
+    if(!j) continue;
+    const key = [
+      (j.url || '').split('?')[0].toLowerCase(),
+      (j.title || '').toLowerCase().replace(/\s+/g,' ').trim(),
+      (j.company || '').toLowerCase().replace(/\s+/g,' ').trim(),
+      (j.location || '').toLowerCase().replace(/\s+/g,' ').trim()
+    ].join('|');
+    if(seen.has(key)) continue;
+    seen.add(key);
+
+    const t = (j.title || '');
+    const blob = (t + ' ' + (j.location||'') + ' ' + (j.company||'')).toLowerCase();
+
+    if(!o.showExperienced && isSeniorTitle(t)) continue;
+    if(o.level !== 'all'){
+      if(o.level === 'intern' && !INTERN_RX.test(t)) continue;
+      if(o.level === 'newgrad' && !NEWGRAD_RX.test(t)) continue;
+      if(o.level === 'entrylevel' && !ENTRYLVL_RX.test(t)) continue;
+      if(o.level === 'early' && !(ANY_EARLY_RX.test(t) || REALISTIC_GRAD_RX.test(t))) continue;
+    }
+    if((o.kw || selectedRoles.length) && !keywordMatchesAny(blob, o.kw)) continue;
+    if(o.loc && !locationMatches(j.location, o.loc)) continue;
+    if(o.sector !== 'any' && j.sector !== o.sector) continue;
+    if(o.work === 'remote' && !REMOTE_RX.test(blob)) continue;
+    if(o.work === 'hybrid' && !HYBRID_RX.test(blob)) continue;
+    if(o.work === 'onsite' && (REMOTE_RX.test(blob) || HYBRID_RX.test(blob))) continue;
+    if(o.hideClear && CLEAR_RX.test(blob)) continue;
+    if(o.usOnly && !isUSJob(j)) continue;
+    if(o.degreeOnly && NONDEGREE_RX.test(t) && !CLINICAL_RX.test(t)) continue;
+    if(GIGWORK_RX.test(t)) continue;
+    if(LICENSED_RX.test(t)) continue;
+    if(j.aggregator && ANON_COMPANY_RX.test(j.company || '')) continue;
+
+    out.push(j);
+  }
+  // Score into a side table rather than onto the job objects: the real pipeline
+  // recomputes score anyway, and mutating shared objects mid-search is a good
+  // way to create a bug that only shows up on the second search.
+  const s = new Map();
+  for(const j of out) s.set(j, scoreJob(j, o.kw, o.loc));
+  out.sort((a,b) => (s.get(b)||0) - (s.get(a)||0));
+  return out;
+}
+
 function locationMatches(locText, input){
   const q = normalizeLocationText(input);
   if(!q) return true;
@@ -2065,11 +2124,55 @@ async function search(){
       ? directCompanies
       : directCompanies.filter(c => c.slug === company);
 
-    statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'}…</span>`;
-
     let jobs = [];
     const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, smartrecruiters:0 };
     let okCos = 0, failCos = 0;
+
+    // ---- (1) All six sources start NOW, in parallel ---------------------------
+    // Previously each source was awaited in turn, so wall-clock time was the SUM
+    // of six round trips. Kicking the five API sources off here means they run
+    // while the direct-board sweep below is still going; total time is now the
+    // slowest single source rather than the sum. Each promise resolves to a
+    // {key, jobs} record and swallows its own errors, so one dead source can
+    // never take down the search.
+    const apiSource = (key, fn) => fn(kw, loc)
+      .then(list => ({ key, jobs: Array.isArray(list) ? list : [] }))
+      .catch(() => ({ key, jobs: [] }));
+
+    const apiPromises = [
+      apiSource('usajobs',        fetchUSAJobs),
+      apiSource('adzuna',         fetchAdzuna),
+      apiSource('ashby',          fetchAshby),
+      apiSource('greenhouse',     fetchGreenhouseAPI),
+      apiSource('smartrecruiters',fetchSmartRecruiters),
+    ];
+
+    // ---- (2) Progressive render: paint each source as it lands ----------------
+    // Nothing used to appear until every source returned. Now each API promise
+    // triggers a re-render of everything received so far, so cards start
+    // appearing within a second or two and fill in as the slower sources report.
+    // The full filter/score/sort pipeline runs again at the end, so these early
+    // paints are a preview — clearly labeled as such — not the final answer.
+    let progressiveDone = false;
+    const paintProgressive = () => {
+      if(progressiveDone) return;
+      try {
+        const preview = previewFilter(jobs, {kw, loc, level, work, sector, hideClear, usOnly, degreeOnly, showExperienced});
+        if(!preview.length) return;
+        countEl.textContent = `${preview.length} matching job${preview.length===1?'':'s'} so far…`;
+        results.innerHTML = preview.slice(0, 50).map(j => renderJob(j, kw, loc)).join('');
+      } catch(e){ /* preview is best-effort; never break the real render */ }
+    };
+
+    apiPromises.forEach(p => p.then(r => {
+      if(progressiveDone) return;
+      sourceStats[r.key] = r.jobs.length;
+      if(r.jobs.length) jobs = jobs.concat(r.jobs);
+      paintProgressive();
+    }));
+
+    statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'} and 5 job APIs…</span>`;
+
     const BATCH = 10;
     for(let i=0;i<pool.length;i+=BATCH){
       const slice = pool.slice(i, i+BATCH);
@@ -2083,49 +2186,24 @@ async function search(){
         }
         else { failCos++; }
       });
-      statusEl.innerHTML = `<span class="loading">Searched ${Math.min(i+BATCH,pool.length)} / ${pool.length} direct employer job boards…</span>`;
-      await new Promise(r=>setTimeout(r, 80));
+      statusEl.innerHTML = `<span class="loading">Searched ${Math.min(i+BATCH,pool.length)} / ${pool.length} direct employer job boards… (job APIs still running)</span>`;
+      paintProgressive();
     }
 
-    // Also pull federal jobs from USAJobs (our serverless function) and merge them in.
-    try {
-      statusEl.innerHTML = `<span class="loading">Adding federal (USAJobs) roles…</span>`;
-      const fedJobs = await fetchUSAJobs(kw, loc);
-      sourceStats.usajobs = fedJobs.length;
-      if(fedJobs.length){ jobs = jobs.concat(fedJobs); }
-    } catch(e){ /* ignore federal errors, keep board results */ }
+    // Wait for whatever the five API sources have left to do. They have been
+    // running since before the board sweep started, so by this point most or all
+    // have already resolved and merged themselves via the .then() handlers above.
+    // allSettled (not all) so a rejected promise can't abort the search — though
+    // apiSource already catches, this is belt-and-braces.
+    const pending = jobs.length;
+    if(pending === 0){
+      statusEl.innerHTML = `<span class="loading">Waiting on the job APIs…</span>`;
+    }
+    await Promise.allSettled(apiPromises);
 
-    // Also pull broader public postings from Adzuna and merge them in.
-    try {
-      statusEl.innerHTML = `<span class="loading">Adding broader Adzuna roles…</span>`;
-      const adzunaJobs = await fetchAdzuna(kw, loc);
-      sourceStats.adzuna = adzunaJobs.length;
-      if(adzunaJobs.length){ jobs = jobs.concat(adzunaJobs); }
-    } catch(e){ /* ignore Adzuna errors, keep other results */ }
-
-    // Also pull Ashby-hosted job boards and merge them in.
-    try {
-      statusEl.innerHTML = `<span class="loading">Adding Ashby roles…</span>`;
-      const ashbyJobs = await fetchAshby(kw, loc);
-      sourceStats.ashby = ashbyJobs.length;
-      if(ashbyJobs.length){ jobs = jobs.concat(ashbyJobs); }
-    } catch(e){ /* ignore Ashby errors, keep other results */ }
-
-    // Also pull Greenhouse-hosted roles through our Netlify function and merge them in.
-    try {
-      statusEl.innerHTML = `<span class="loading">Adding Greenhouse roles…</span>`;
-      const greenhouseJobs = await fetchGreenhouseAPI(kw, loc);
-      sourceStats.greenhouse = greenhouseJobs.length;
-      if(greenhouseJobs.length){ jobs = jobs.concat(greenhouseJobs); }
-    } catch(e){ /* ignore Greenhouse errors, keep other results */ }
-
-    // Also pull SmartRecruiters-hosted roles through our Netlify function and merge them in.
-    try {
-      statusEl.innerHTML = `<span class="loading">Adding SmartRecruiters roles…</span>`;
-      const srJobs = await fetchSmartRecruiters(kw, loc);
-      sourceStats.smartrecruiters = srJobs.length;
-      if(srJobs.length){ jobs = jobs.concat(srJobs); }
-    } catch(e){ /* ignore SmartRecruiters errors, keep other results */ }
+    // Progressive painting is over; the real filter/score/sort pipeline owns the
+    // DOM from here. Any late .then() must not fight it.
+    progressiveDone = true;
 
     // (3) Company-direct resolution: some Adzuna results link to aggregator walls
     // (ZipRecruiter etc.) that gate the job behind a signup. When the Adzuna job's
@@ -2394,6 +2472,25 @@ async function search(){
     const sourceBreakdown = 'Source results: employer boards ' + sourceStats.direct.toLocaleString()
       + ', ' + API_SOURCES.map(s => `${s.label} ${(sourceStats[s.key]||0).toLocaleString()}`).join(', ');
 
+    // --- Filter funnel (diagnostic) --------------------------------------------
+    // Visible only with ?diag=1 in the URL. The filter chain already counts
+    // survivors at each stage but never showed them, which made a total wipeout
+    // indistinguishable from an empty API response. Each number is how many jobs
+    // remained AFTER that stage, so the first big drop names the culprit.
+    let diagLine = '';
+    if(new URLSearchParams(location.search).get('diag') === '1'){
+      diagLine = 'Filter funnel: fetched ' + totalFetched
+        + ' → level ' + afterLevel
+        + ' → keyword ' + afterKeyword
+        + ' → location ' + afterLocation
+        + ' → sector ' + afterSector
+        + ' → work ' + afterWork
+        + ' → clearance ' + afterClear
+        + ' → US-only ' + afterUS
+        + ' → degree ' + afterDegree
+        + ' → final ' + jobs.length;
+    }
+
     // --- Source-health logging (developer instrument, local only) ---
     // Records what each source returned per search so Jeff can confirm
     // fixes (e.g. Greenhouse id/ats) actually produce results in the wild
@@ -2418,7 +2515,7 @@ async function search(){
       ? `<br><span class="hint src-fail">${window._scanSkipped} lower-ranked role${window._scanSkipped===1?'':'s'} could not be verified against ${window._scanSkipped===1?'its':'their'} full description (scan limit reached). Your top matches were checked first — check the posting itself before ruling out anything further down.</span>`
       : '';
 
-    statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>${skipNote}`;
+    statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>${diagLine ? `<br><span class="hint" style="color:#b6701c">${diagLine}</span>` : ''}${skipNote}`;
 
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
 
@@ -2437,12 +2534,25 @@ async function search(){
     }
 
     let html = '';
+    const RENDER_CAP = 50;
 
     // Register this result set so Save buttons can persist full job data by ID.
+    // All jobs are registered, not just the first page, so Save still works on
+    // results revealed later via "Show more".
     registerJobsForSaving(jobs);
 
     if(jobs.length){
-      html += jobs.map(j => renderJob(j, kw, loc)).join('');
+      // Render the first page only. A broad search across six sources can return
+      // hundreds of results; painting them all in one innerHTML pass is slow on
+      // phones. The count above still reports the full total.
+      const firstPage = jobs.slice(0, RENDER_CAP);
+      html += firstPage.map(j => renderJob(j, kw, loc)).join('');
+      if(jobs.length > RENDER_CAP){
+        const remaining = jobs.length - RENDER_CAP;
+        html += `<div class="more-wrap">
+          <button id="showMore" class="secondary">Show ${remaining} more result${remaining===1?'':'s'}</button>
+        </div>`;
+      }
     } else {
       // Build targeted, CLICKABLE suggestions from the filters actually in effect.
       // Each carries data-loosen so one tap resets that control and re-runs search.
@@ -2495,6 +2605,19 @@ async function search(){
     }
 
     results.innerHTML = html;
+
+    // "Show more" appends the remaining results in one pass. Save / Mark-applied
+    // use delegated listeners on #results, so appended cards wire automatically.
+    const moreBtn = document.getElementById('showMore');
+    if(moreBtn){
+      const rest = jobs.slice(RENDER_CAP);
+      moreBtn.addEventListener('click', ()=>{
+        const wrap = moreBtn.closest('.more-wrap');
+        if(!wrap) return;
+        wrap.insertAdjacentHTML('beforebegin', rest.map(j => renderJob(j, kw, loc)).join(''));
+        wrap.remove();
+      });
+    }
 
     // Wire up the clickable "loosen filter" buttons in the empty state
     results.querySelectorAll('.loosen-btn').forEach(btn=>{
