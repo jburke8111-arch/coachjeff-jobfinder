@@ -284,6 +284,31 @@
   .savedjobs-cue.has-saved{border-color:var(--amber);background:rgba(217,138,43,.08)}
   .savedjobs-cue.has-saved .sjc-count{color:var(--amber-deep)}
   .sponsor-filter{display:block;margin-top:8px}
+
+  /* (6) Backup link is the recovery path that actually restores state, so it
+     leads the toolbar; CSV stays as the unlimited-size fallback. */
+  .jbtn.primary-tool{background:#eaf4ec;border-color:#1f7a4d;color:#1f7a4d;font-weight:700}
+  .jbtn.primary-tool:hover{background:#d9ecdf}
+  .savedjobs-warn{border-left:3px solid #b6701c;padding-left:10px}
+
+  /* (7) Top-level sponsorship toggle — deliberately quiet. It sits under the
+     search row as an amber-tinted card so it reads as an available option for
+     the students who need it, without shouting at the ~90% who don't. */
+  .sponsor-toplevel{margin-top:14px}
+  .sponsor-toggle{display:flex;align-items:flex-start;gap:11px;padding:12px 15px;
+    background:#fdf3e6;border:1px solid #e8c99a;border-left:4px solid #b6701c;
+    border-radius:9px;cursor:pointer;max-width:760px}
+  .sponsor-toggle:hover{background:#fcecd9}
+  .sponsor-toggle input{margin-top:3px;flex:0 0 auto;cursor:pointer;
+    width:17px;height:17px;accent-color:#b6701c}
+  .sponsor-toggle-text{display:block;line-height:1.45}
+  .sponsor-toggle-text b{color:#8a4a1a;font-size:15px}
+  .sponsor-toggle-text .hint{display:block;margin-top:3px}
+  .sponsor-toggle:focus-within{outline:2px solid #b6701c;outline-offset:2px}
+  @media (max-width:640px){
+    .sponsor-toggle{padding:11px 13px}
+    .sponsor-toggle-text b{font-size:14px}
+  }
   .sponsor-filter label{font-size:12px;color:var(--mute);margin-right:6px}
   .sponsor-filter select{font-size:12.5px;padding:4px 8px;border:1px solid var(--line-strong);
     border-radius:6px;background:#fff;color:var(--navy)}
@@ -607,6 +632,23 @@
           <button id="reset" class="secondary" type="button">Reset</button>
         </div>
       </div>
+
+      <!-- (7) Sponsorship scan, surfaced at the top level.
+           International students are the highest-need segment and this is the
+           feature built for them, but it was buried in Advanced Filters behind a
+           checkbox. This control is a MIRROR of #noclear, not a second source of
+           truth: both directions sync through syncSponsorControls(), so the
+           search pipeline still reads only #noclear and nothing downstream had
+           to change. -->
+      <div class="sponsor-toplevel">
+        <label class="sponsor-toggle" for="sponsorTop">
+          <input id="sponsorTop" type="checkbox">
+          <span class="sponsor-toggle-text">
+            <b>Need visa sponsorship?</b>
+            <span class="hint">Scans each posting's full description, badges results 🟢/🔴/🟡, and hides employers who explicitly won't sponsor. Adds a few seconds.</span>
+          </span>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -732,11 +774,12 @@
     <div class="savedjobs-head">
       <div class="savedjobs-title">★ My saved jobs <span class="cnt" id="savedJobsCount"></span></div>
       <div class="savedjobs-tools">
+        <button class="jbtn primary-tool" id="copySavedLink" title="Creates a link containing your saved jobs. Open it on any device to restore them."><span class="ic">🔗</span> Copy backup link</button>
         <button class="jbtn" id="exportSavedJobs" title="Download your saved jobs as a CSV spreadsheet"><span class="ic">⬇</span> Export CSV</button>
         <button class="jbtn" id="clearSavedJobs" title="Remove all saved jobs">Clear all</button>
       </div>
     </div>
-    <p class="savedjobs-hint">Saved on this device and browser only — they won't appear on your phone or another computer. Use <strong>Export CSV</strong> to keep a copy.</p>
+    <p class="savedjobs-hint savedjobs-warn"><strong>These live only in this browser.</strong> On a shared or library computer they can vanish when the session ends. <strong>Copy backup link</strong> puts them in a URL you can email yourself — open it anywhere to get them back.</p>
     <div class="savedjobs-list" id="savedJobsList"></div>
   </div>
 
@@ -1695,6 +1738,10 @@ function sponsorshipLabel(j){
   if(j.sponsorScan === 'available') return {text:'🟢 Sponsorship available', cls:'sp-yes'};
   if(j.sponsorScan === 'none')      return {text:'🔴 No sponsorship', cls:'sp-no'};
   if(j.sponsorScan === 'unknown')   return {text:'🟡 Sponsorship not specified', cls:'sp-unk'};
+  // Preview paint with the sponsorship scan requested: the scan hasn't run yet.
+  // This is the badge international students are here for, so an empty space
+  // that later fills in is worse than saying it's coming.
+  if(j._previewPending && j._previewSponsor) return {text:'⏳ Checking sponsorship…', cls:'sp-unk'};
   // No scan run for this job → no badge.
   return null;
 }
@@ -1798,6 +1845,14 @@ function postedAgeDays(posted){
 function verificationStatus(j){
   const descChecked = j.minYears !== undefined && j.minYears !== null;
   const sponsorChecked = j.sponsorScan !== undefined && j.sponsorScan !== null;
+  // PREVIEW PAINT: the description scan runs once, after every source has
+  // reported, so during progressive rendering nothing has been scanned yet.
+  // Showing "🟡 Title screening only" here would be a lie that silently
+  // upgrades to "✅ Description checked" a few seconds later — the student
+  // would have no way to know the badge they read was provisional. Say we're
+  // still working instead.
+  if(j._previewPending && !descChecked && !sponsorChecked)
+    return {text:'⏳ Still checking…', cls:'gray', note:'We\'re still reading this posting\'s full description. This badge will update when the check finishes.'};
   if(descChecked && sponsorChecked)
     return {text:'✅ Description + sponsorship checked', cls:'green', note:'We read this posting\'s full description and its work-authorization language.'};
   if(descChecked)
@@ -1897,6 +1952,10 @@ function renderJob(j, kw, loc){
               const wasScanned = j.minYears !== undefined && j.minYears !== null;
               const ambiguous = !INTERN_RX.test(j.title||'') && !NEWGRAD_RX.test(j.title||'')
                                 && hasEntrySignal(j.title||'');
+              // During a preview paint the scan simply hasn't run yet, so
+              // "experience not verified" would state a conclusion we haven't
+              // reached. The ⏳ verification chip already says we're working.
+              if(j._previewPending) return '';
               if(!wasScanned && ambiguous){
                 return '<span class="tag gray" title="This source doesn\'t expose the job description, so we couldn\'t check the experience requirement. Titles like &quot;Analyst&quot; span new-grad to 6+ years — read the posting before ruling it in or out.">experience not verified</span>';
               }
@@ -2148,20 +2207,38 @@ async function search(){
     ];
 
     // ---- (2) Progressive render: paint each source as it lands ----------------
-    // Nothing used to appear until every source returned. Now each API promise
-    // triggers a re-render of everything received so far, so cards start
-    // appearing within a second or two and fill in as the slower sources report.
-    // The full filter/score/sort pipeline runs again at the end, so these early
-    // paints are a preview — clearly labeled as such — not the final answer.
+    // Nothing used to appear until every source returned. Now each source paints
+    // as it reports, so cards appear within a second or two and fill in.
+    //
+    // WHY THE YIELDING MATTERS: a .then() callback cannot run until the JS call
+    // stack is empty. The board sweep below awaits batches back to back, and a
+    // dead board holds its batch for up to 15s (timeout + retry), so without an
+    // explicit yield the queued paint handlers all fire AFTER the sweep — which
+    // is exactly one paint at the end, the bug this was supposed to fix.
+    // yieldToBrowser() releases the stack between batches; rAF then gives the
+    // browser an actual frame to composite in.
+    const yieldToBrowser = () => new Promise(r => setTimeout(r, 0));
+
     let progressiveDone = false;
+    let paintQueued = false;
     const paintProgressive = () => {
-      if(progressiveDone) return;
-      try {
-        const preview = previewFilter(jobs, {kw, loc, level, work, sector, hideClear, usOnly, degreeOnly, showExperienced});
-        if(!preview.length) return;
-        countEl.textContent = `${preview.length} matching job${preview.length===1?'':'s'} so far…`;
-        results.innerHTML = preview.slice(0, 50).map(j => renderJob(j, kw, loc)).join('');
-      } catch(e){ /* preview is best-effort; never break the real render */ }
+      if(progressiveDone || paintQueued) return;
+      paintQueued = true;
+      requestAnimationFrame(() => {
+        paintQueued = false;
+        if(progressiveDone) return;
+        try {
+          const preview = previewFilter(jobs, {kw, loc, level, work, sector, hideClear, usOnly, degreeOnly, showExperienced});
+          if(!preview.length) return;
+          countEl.textContent = `${preview.length} matching job${preview.length===1?'':'s'} so far…`;
+          // Flag these as provisional so renderJob shows "⏳ Still checking…"
+          // instead of asserting a verification verdict the scan hasn't reached.
+          // Copies, so the flag can never leak into the final render.
+          const shown = preview.slice(0, 50).map(j =>
+            Object.assign({}, j, {_previewPending:true, _previewSponsor:hideClear}));
+          results.innerHTML = shown.map(j => renderJob(j, kw, loc)).join('');
+        } catch(e){ /* preview is best-effort; never break the real render */ }
+      });
     };
 
     apiPromises.forEach(p => p.then(r => {
@@ -2172,6 +2249,12 @@ async function search(){
     }));
 
     statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'} and 5 job APIs…</span>`;
+
+    // Yield once before the sweep starts. The five APIs are usually much faster
+    // than 18 employer boards, so this gives any that have already returned a
+    // chance to paint before the long board loop begins — first cards on screen
+    // in ~1s rather than after the sweep.
+    await yieldToBrowser();
 
     const BATCH = 10;
     for(let i=0;i<pool.length;i+=BATCH){
@@ -2188,6 +2271,11 @@ async function search(){
       });
       statusEl.innerHTML = `<span class="loading">Searched ${Math.min(i+BATCH,pool.length)} / ${pool.length} direct employer job boards… (job APIs still running)</span>`;
       paintProgressive();
+      // Release the call stack so any API .then() handlers queued while this
+      // batch was in flight can run and paint. Without this the whole sweep
+      // blocks them until it finishes. Zero delay: the point is yielding, not
+      // waiting — this is NOT the old artificial 80ms throttle.
+      await yieldToBrowser();
     }
 
     // Wait for whatever the five API sources have left to do. They have been
@@ -2201,9 +2289,11 @@ async function search(){
     }
     await Promise.allSettled(apiPromises);
 
-    // Progressive painting is over; the real filter/score/sort pipeline owns the
-    // DOM from here. Any late .then() must not fight it.
-    progressiveDone = true;
+    // Fetching is done. Progressive painting stays ARMED through the description
+    // scan below: that scan is a single blocking request that can run for
+    // several seconds, and killing the preview here would blank the results for
+    // its whole duration. progressiveDone flips just before the real render.
+    
 
     // (3) Company-direct resolution: some Adzuna results link to aggregator walls
     // (ZipRecruiter etc.) that gate the job behind a signup. When the Adzuna job's
@@ -2403,6 +2493,12 @@ async function search(){
         statusEl.innerHTML = hideClear
           ? `<span class="loading">Checking ${checkable.length} roles for work-authorization &amp; sponsorship…</span>`
           : `<span class="loading">Verifying ${checkable.length} role${checkable.length===1?'':'s'} against their descriptions…</span>`;
+        // Paint what we have before the scan blocks. Everything is fetched and
+        // filtered by now, so this preview is complete apart from the scan
+        // verdicts — the ⏳ chips say exactly that. Then yield so the frame
+        // actually composites before the request starts.
+        paintProgressive();
+        await yieldToBrowser();
         const payload = scanOrder.map(j => ({ id:j.id, url:j.url, ats:j.ats, company:j.company, board:j.board }));
         const resp = await fetch('/.netlify/functions/checkjobs', {
           method:'POST',
@@ -2535,6 +2631,11 @@ async function search(){
 
     let html = '';
     const RENDER_CAP = 50;
+
+    // Real render owns the DOM from here — stop any queued preview paint from
+    // overwriting it. Set immediately before the render, not earlier, so the
+    // preview stayed visible during the description scan above.
+    progressiveDone = true;
 
     // Register this result set so Save buttons can persist full job data by ID.
     // All jobs are registered, not just the first page, so Save still works on
@@ -2911,6 +3012,7 @@ function applySearchState(st){
   selectedRoles = Array.isArray(st.roles) ? st.roles.slice(0, MAX_ROLES) : [];
   if(typeof window.renderRoleChips === 'function') window.renderRoleChips();
   syncExperienceControls();
+  syncSponsorFilter();   // a restored search may carry noclear:true — mirror it up top
 }
 function savedSearches(){
   try { return JSON.parse(localStorage.getItem('coachJeffSavedSearches') || '[]'); }
@@ -2980,6 +3082,147 @@ function jobId(j){
   const s = basis.toLowerCase().trim();
   for(let i=0;i<s.length;i++){ h = ((h<<5)-h + s.charCodeAt(i))|0; }
   return 'j' + (h>>>0).toString(36);
+}
+
+/* ============================================================
+   (6) SAVED-JOBS BACKUP LINK
+   localStorage is per-browser, so a student saving 15 roles on a
+   library machine can lose all of them. CSV export already helped,
+   but a spreadsheet of URLs doesn't restore the saved state.
+
+   This encodes the saved list INTO a URL. Note it cannot encode ids
+   alone: jobId() is a local hash of the URL, meaningless on another
+   device with an empty store. The payload therefore carries the
+   actual fields, compacted to single-letter keys, base64url encoded.
+
+   Round-trip: Copy backup link → email to self → open anywhere →
+   jobs are restored (merged, never clobbering what's already there).
+   ============================================================ */
+
+// Compact one saved record to short keys. Only the fields needed to
+// restore a usable saved job are carried: title, company, url, location,
+// and applied status. Sector/source/sponsor are display-only garnish that
+// cost ~40 chars each and are re-derivable on the next search — dropping
+// them is what keeps a 15-job link inside email-client limits.
+//
+// Common URL prefixes are folded to a one-character token (see URL_PREFIXES),
+// which reclaims another ~30 chars per Greenhouse/Lever/Ashby role.
+const URL_PREFIXES = [
+  ['1','https://boards.greenhouse.io/'],
+  ['2','https://jobs.lever.co/'],
+  ['3','https://jobs.ashbyhq.com/'],
+  ['4','https://careers.smartrecruiters.com/'],
+  ['5','https://www.usajobs.gov/job/'],
+  ['6','https://www.adzuna.com/'],
+  ['7','https://'],
+];
+function foldUrl(u){
+  const s = String(u || '');
+  for(const [tok, pre] of URL_PREFIXES){ if(s.startsWith(pre)) return tok + '|' + s.slice(pre.length); }
+  return '0|' + s;
+}
+function unfoldUrl(v){
+  const s = String(v || '');
+  const i = s.indexOf('|');
+  if(i < 0) return s;
+  const tok = s.slice(0,i), rest = s.slice(i+1);
+  if(tok === '0') return rest;
+  const hit = URL_PREFIXES.find(p => p[0] === tok);
+  return hit ? hit[1] + rest : rest;
+}
+
+function packSavedJob(j){
+  const o = {t:j.title, c:j.company, u:foldUrl(j.url)};
+  if(j.location) o.l = j.location;
+  if(j.applied)  o.a = 1;
+  return o;
+}
+function unpackSavedJob(o){
+  const rec = {
+    title: o.t || 'Saved role',
+    company: o.c || '',
+    location: o.l || '',
+    url: unfoldUrl(o.u),
+    sector: '',
+    source: '',
+    sponsor: '',
+    applied: !!o.a,
+    savedAt: new Date().toISOString()
+  };
+  // Recompute the id locally so it matches what jobId() would produce
+  // here — ids from the sending device are not portable.
+  rec.id = jobId(rec);
+  return rec;
+}
+
+// base64url so the payload survives email clients and query parsing.
+function b64urlEncode(str){
+  return btoa(unescape(encodeURIComponent(str)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64urlDecode(str){
+  const s = str.replace(/-/g,'+').replace(/_/g,'/');
+  return decodeURIComponent(escape(atob(s)));
+}
+
+function buildSavedJobsLink(){
+  const jobs = savedJobs();
+  if(!jobs.length) return null;
+  const payload = b64urlEncode(JSON.stringify(jobs.map(packSavedJob)));
+  return location.origin + location.pathname + '?saved=' + payload;
+}
+
+// Restore on load. Merges rather than replaces: opening a backup link on a
+// device that already has saves adds the missing ones instead of wiping the
+// existing list. The param is stripped afterward so a refresh doesn't re-import
+// (and so the long URL doesn't sit in the address bar).
+function importSavedJobsFromURL(){
+  let param;
+  try { param = new URLSearchParams(location.search).get('saved'); }
+  catch(e){ return; }
+  if(!param) return;
+
+  let incoming;
+  try {
+    incoming = JSON.parse(b64urlDecode(param));
+    if(!Array.isArray(incoming)) throw new Error('not a list');
+  } catch(e){
+    // A truncated link (email clients wrap long URLs) is the likely cause.
+    try {
+      const s = document.getElementById('status');
+      if(s) s.innerHTML = '<span class="src-fail">That backup link could not be read — it may have been cut short by your email client. Try copying the whole link, or use the CSV.</span>';
+    } catch(_){}
+    return;
+  }
+
+  const existing = savedJobs();
+  const have = new Set(existing.map(x => x.id));
+  let added = 0;
+  for(const o of incoming){
+    if(!o || typeof o !== 'object') continue;
+    const rec = unpackSavedJob(o);
+    if(!rec.url && !rec.title) continue;
+    if(have.has(rec.id)) continue;
+    existing.push(rec);
+    have.add(rec.id);
+    added++;
+  }
+  if(added) writeSavedJobs(existing);
+  renderSavedJobs();
+
+  try {
+    const s = document.getElementById('status');
+    if(s) s.innerHTML = added
+      ? `<span class="src-ok">Restored ${added} saved job${added===1?'':'s'} from your backup link.</span>`
+      : `<span class="hint">Those saved jobs were already on this device.</span>`;
+  } catch(_){}
+
+  // Strip ?saved= from the address bar without reloading.
+  try {
+    const u = new URL(location.href);
+    u.searchParams.delete('saved');
+    history.replaceState({}, '', u.pathname + (u.search || '') + u.hash);
+  } catch(_){}
 }
 
 function savedJobs(){
@@ -3155,6 +3398,42 @@ document.getElementById('savedJobsList').addEventListener('click', (e)=>{
   refreshCardButtons(id);
 });
 
+// Copy backup link. Warns above ~1900 chars, where email clients start
+// wrapping URLs and the link arrives broken — at that point CSV is the
+// honest recommendation rather than a link that silently fails.
+document.getElementById('copySavedLink').addEventListener('click', function(){
+  const btn = this;
+  const link = buildSavedJobsLink();
+  if(!link){ return; }
+
+  const restore = (msg) => {
+    const prev = btn.innerHTML;
+    btn.innerHTML = msg;
+    setTimeout(()=>{ btn.innerHTML = prev; }, 2600);
+  };
+
+  if(link.length > 1900){
+    const n = savedJobs().length;
+    alert('Your ' + n + ' saved jobs make a link that\'s too long for most email clients to send in one piece '
+      + '(' + link.length.toLocaleString() + ' characters).\n\n'
+      + 'Use Export CSV instead — it holds any number of jobs.\n\n'
+      + 'Or un-save a few roles and try the link again.');
+    return;
+  }
+
+  const ok = () => restore('✓ Link copied');
+  const fail = () => {
+    // Clipboard API needs a secure context and can be blocked; fall back to a
+    // prompt so the student can still copy manually rather than hitting a
+    // dead button.
+    window.prompt('Copy this link and email it to yourself:', link);
+    restore('Link ready');
+  };
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(link).then(ok, fail);
+  } else { fail(); }
+});
 document.getElementById('exportSavedJobs').addEventListener('click', exportSavedJobsCsv);
 document.getElementById('clearSavedJobs').addEventListener('click', ()=>{
   if(!savedJobs().length) return;
@@ -3185,6 +3464,8 @@ document.getElementById('savedJobsCue').addEventListener('click', ()=>{
 });
 
 renderSavedJobs();
+// If the page was opened from a backup link, restore those jobs now.
+importSavedJobsFromURL();
 
 function titleCaseMajorSearch(term){
   return (term || '').toString().trim();
@@ -3347,14 +3628,39 @@ renderSavedSearches();
 document.getElementById('lvl').addEventListener('change', syncExperienceControls);
 syncExperienceControls();
 
-// Show the sponsorship filter dropdown only when "Work Authorization" is checked.
+// Show the sponsorship filter dropdown only when "Work Authorization" is checked,
+// and keep the top-level toggle (7) in lockstep with the Advanced Filters box.
+//
+// #noclear remains the ONLY state the search pipeline reads. #sponsorTop is a
+// mirror. Syncing both ways means a student can use whichever control they find
+// first — and someone who ticks the top-level toggle then opens Advanced Filters
+// sees it already checked there, rather than two controls disagreeing.
 function syncSponsorFilter(){
   const on = document.getElementById('noclear').checked;
   const wrap = document.getElementById('sponsorFilterWrap');
   if(wrap) wrap.style.display = on ? 'block' : 'none';
+  const top = document.getElementById('sponsorTop');
+  if(top && top.checked !== on) top.checked = on;
 }
 document.getElementById('noclear').addEventListener('change', syncSponsorFilter);
 syncSponsorFilter();
+
+// Top-level toggle → drive #noclear, then re-run if there are results on screen.
+// Re-running only when a search has already happened avoids firing an empty
+// search at someone who ticks the box before typing anything.
+(function(){
+  const top = document.getElementById('sponsorTop');
+  if(!top) return;
+  top.addEventListener('change', ()=>{
+    const box = document.getElementById('noclear');
+    box.checked = top.checked;
+    syncSponsorFilter();
+    const kwEl = document.getElementById('kw');
+    const hasQuery = (kwEl && kwEl.value.trim()) || selectedRoles.length;
+    const hasResults = document.getElementById('results').children.length > 0;
+    if(hasQuery && hasResults) search();
+  });
+})();
 // Re-run the search when the sponsorship filter changes (only meaningful with box on).
 document.getElementById('sponsorFilter').addEventListener('change', ()=>{
   if(document.getElementById('noclear').checked) search();
@@ -3399,6 +3705,7 @@ document.getElementById('reset').addEventListener('click', ()=>{
   document.getElementById('noclear').checked = false;
   document.getElementById('showsuggest').checked = false;
   syncExperienceControls();
+  syncSponsorFilter();   // keeps the top-level sponsorship toggle in step with the reset
   selectedRoles = [];
   if(typeof window.renderRoleChips === 'function') window.renderRoleChips();
   results.innerHTML = '';
