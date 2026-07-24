@@ -29,30 +29,14 @@
 //   4. Delete the dead/empty rows, deploy again.
 
 const LEVER_BOARDS = [
-  // ---- Starter set. VERIFY WITH ?diag=1 BEFORE TRUSTING THIS LIST. ----
-  // These are companies commonly reported to use Lever, but slugs change and
-  // some customers turn the public endpoint off. Anything that comes back
-  // dead or empty should be deleted rather than left to waste a fetch.
-  { board: "netflix", company: "Netflix", sector: "tech" },
-  { board: "kickstarter", company: "Kickstarter", sector: "tech" },
-  { board: "atlassian", company: "Atlassian", sector: "tech" },
-  { board: "shopify", company: "Shopify", sector: "tech" },
-  { board: "spotify", company: "Spotify", sector: "tech" },
-  { board: "twitch", company: "Twitch", sector: "tech" },
-  { board: "quora", company: "Quora", sector: "tech" },
-  { board: "nerdwallet", company: "NerdWallet", sector: "finance" },
-  { board: "betterment", company: "Betterment", sector: "finance" },
-  { board: "brex", company: "Brex", sector: "finance" },
-  { board: "carta", company: "Carta", sector: "finance" },
-  { board: "chime", company: "Chime", sector: "finance" },
-  { board: "flexport", company: "Flexport", sector: "logistics" },
-  { board: "eventbrite", company: "Eventbrite", sector: "tech" },
-  { board: "lyft", company: "Lyft", sector: "tech" },
-  { board: "coursera", company: "Coursera", sector: "education" },
-  { board: "khanacademy", company: "Khan Academy", sector: "education" },
-  { board: "mozilla", company: "Mozilla", sector: "tech" },
-  { board: "wikimedia", company: "Wikimedia Foundation", sector: "nonprofit" },
-  { board: "consumerreports", company: "Consumer Reports", sector: "nonprofit" },
+  // Pruned 2026-07-24 after the first ?diag=1 run: 17 of the original 20
+  // guessed slugs returned 404 and 2 more returned empty boards. Lever
+  // publishes no customer list and slugs are not reliably derivable from
+  // company names, so candidates must come from real jobs.lever.co/SLUG
+  // careers URLs rather than from guessing — and every batch should be
+  // verified with ?diag=1 before being trusted.
+  { board: "spotify", company: "Spotify", sector: "media" },
+  { board: "palantir", company: "Palantir", sector: "defense" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -140,8 +124,12 @@ function cleanText(value){
 // Greenhouse/Ashby). Customers with the public endpoint disabled return an
 // HTML page with a 200 status, so we verify both the content type and the
 // array shape before trusting the payload.
-async function fetchBoard(board, ms = 7000){
-  const apiUrl = `https://api.lever.co/v0/postings/${encodeURIComponent(board)}?mode=json&limit=100`;
+const PAGE = 100;        // Lever's max page size
+const MAX_PAGES = 5;     // ceiling of 500 postings/board — Spotify alone exceeds one page
+
+async function fetchPage(board, skip, ms){
+  const apiUrl = `https://api.lever.co/v0/postings/${encodeURIComponent(board)}`
+               + `?mode=json&limit=${PAGE}&skip=${skip}`;
   const resp = await withTimeout(fetch(apiUrl, {
     headers: { "Accept": "application/json" }
   }), ms);
@@ -161,6 +149,23 @@ async function fetchBoard(board, ms = 7000){
 
   if(!Array.isArray(data)) return { ok: false, httpStatus: resp.status, disabled: true, jobs: [] };
   return { ok: true, httpStatus: resp.status, jobs: data };
+}
+
+// Walk pages until a short one comes back. The first ?diag=1 run showed
+// Spotify returning exactly 100 — the old limit, not their real total — so a
+// single-page fetch was silently truncating the largest board on the list.
+async function fetchBoard(board, ms = 7000){
+  let all = [];
+  let first = null;
+  for(let page = 0; page < MAX_PAGES; page++){
+    const res = await fetchPage(board, page * PAGE, ms);
+    if(page === 0) first = res;
+    if(!res.ok) break;
+    all = all.concat(res.jobs);
+    if(res.jobs.length < PAGE) break;   // short page = last page
+  }
+  if(first && !first.ok) return first;
+  return { ok: true, httpStatus: first ? first.httpStatus : 200, jobs: all };
 }
 
 // Lever nests location under categories, with allLocations as an array for
