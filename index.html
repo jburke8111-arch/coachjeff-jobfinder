@@ -767,7 +767,7 @@
 
   <div class="meta">
     <span id="status" role="status" aria-live="polite"></span>
-    <span class="count" id="count"></span>
+    <span class="count" id="count" role="status" aria-live="polite"></span>
   </div>
 
   <div class="savedjobs-bar" id="savedJobsBar" style="display:none;">
@@ -783,7 +783,13 @@
     <div class="savedjobs-list" id="savedJobsList"></div>
   </div>
 
-  <div class="results" id="results"></div>
+  <!-- aria-live="polite" so a screen reader announces when results arrive.
+       Announcements queue until the user is idle rather than interrupting,
+       which matters here because progressive rendering repaints this region
+       several times during one search. aria-busy is toggled in search() so
+       the intermediate preview paints don't each trigger an announcement —
+       only the final result set is read out. -->
+  <div class="results" id="results" role="region" aria-label="Job search results" aria-live="polite" aria-busy="false"></div>
 
   <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, and SmartRecruiters. Roles link directly to the application page.</p>
 
@@ -796,7 +802,7 @@
     <div style="max-width:620px;margin:0 auto 32px;padding:18px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
       <div style="font-weight:600;font-size:15px;color:#1e293b;margin-bottom:4px;">Quick feedback on the Job Finder?</div>
       <div style="font-size:13.5px;color:#64748b;margin-bottom:14px;">Tell me what worked or what you'd change — I read every note.</div>
-      <form name="jobfinder-feedback" method="POST" data-netlify="true" netlify-honeypot="bot-field" onsubmit="setTimeout(function(){document.getElementById('jf-fb-thanks').style.display='block';document.getElementById('jf-fb-form').style.display='none';},100)" id="jf-fb-form">
+      <form name="jobfinder-feedback" method="POST" data-netlify="true" netlify-honeypot="bot-field" id="jf-fb-form">
         <input type="hidden" name="form-name" value="jobfinder-feedback" />
         <input type="hidden" name="tool" value="job-finder" />
         <p style="display:none"><label>Skip: <input name="bot-field" /></label></p>
@@ -806,9 +812,44 @@
           <button type="submit" style="font-family:inherit;font-weight:600;font-size:14px;color:#fff;background:#1f5c8f;border:none;padding:10px 20px;border-radius:9px;cursor:pointer;">Send</button>
         </div>
       </form>
-      <div id="jf-fb-thanks" style="display:none;padding:12px 14px;border-radius:9px;background:#eaf4ec;border:1px solid #bfe0c6;color:#1f5c33;font-size:14px;font-weight:500;">Thanks — got it. I appreciate the feedback.</div>
+      <div id="jf-fb-thanks" role="status" aria-live="polite" style="display:none;padding:12px 14px;border-radius:9px;background:#eaf4ec;border:1px solid #bfe0c6;color:#1f5c33;font-size:14px;font-weight:500;">Thanks — got it. I appreciate the feedback.</div>
+      <div id="jf-fb-error" role="alert" style="display:none;margin-top:10px;padding:10px 12px;border-radius:9px;background:#fdecec;border:1px solid #f5c2c2;color:#8f2323;font-size:13.5px;">Sorry — that didn't send. Please try again, or email me directly.</div>
     </div>
   </div>
+
+  <script>
+  (function () {
+    var form = document.getElementById('jf-fb-form');
+    if (!form) return;
+    var thanks = document.getElementById('jf-fb-thanks');
+    var errBox = document.getElementById('jf-fb-error');
+    var btn = form.querySelector('button[type="submit"]');
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (typeof form.reportValidity === 'function' && !form.reportValidity()) return;
+
+      errBox.style.display = 'none';
+      var label = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+      fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(new FormData(form)).toString()
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          form.style.display = 'none';
+          thanks.style.display = 'block';
+        })
+        .catch(function () {
+          errBox.style.display = 'block';
+          if (btn) { btn.disabled = false; btn.textContent = label; }
+        });
+    });
+  })();
+  </script>
 
   <div class="health-panel" id="healthPanel" role="dialog" aria-label="Source health" style="display:none;">
     <div class="health-card">
@@ -2168,6 +2209,10 @@ async function search(){
   const showSuggest = document.getElementById('showsuggest') ? document.getElementById('showsuggest').checked : false;
 
   goBtn.disabled = true;
+  // Suppress screen-reader announcements while progressive previews repaint
+  // this region. Cleared once the final render lands, so exactly one
+  // announcement is made per search instead of one per paint.
+  results.setAttribute('aria-busy', 'true');
   results.innerHTML = '';
   countEl.textContent = '';
 
@@ -2750,6 +2795,10 @@ async function search(){
     results.innerHTML = `<div class="empty">Something went wrong while searching. The button has been reset. Technical detail: ${esc(err && err.message ? err.message : String(err))}</div>`;
   } finally {
     goBtn.disabled = false;
+    // Release the announcement hold on every exit path — success, empty
+    // result set, or error. In `finally` so a thrown error can't leave the
+    // region permanently silent for screen-reader users.
+    results.setAttribute('aria-busy', 'false');
   }
 }
 
@@ -2772,6 +2821,14 @@ function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>
 const HEALTH_KEY = 'coachJeffSourceHealth';
 const HEALTH_MAX = 100;
 
+// Diagnostic mode, set once from ?diag=1 — the same switch the filter-funnel
+// status line uses. Gates developer console output so a normal visitor's
+// console stays clean.
+window._jfDiag = (function(){
+  try { return new URLSearchParams(location.search).get('diag') === '1'; }
+  catch(e){ return false; }
+})();
+
 function readHealthLog(){
   try { return JSON.parse(localStorage.getItem(HEALTH_KEY) || '[]'); }
   catch(e){ return []; }
@@ -2782,8 +2839,12 @@ function logSourceHealth(rec){
     log.unshift(Object.assign({ t: new Date().toISOString() }, rec));
     if(log.length > HEALTH_MAX) log.length = HEALTH_MAX;
     localStorage.setItem(HEALTH_KEY, JSON.stringify(log));
-    // Live one-liner in dev console for the search that just ran.
-    if(window.console && console.debug){
+    // (11) Per-search dev line. This used to fire on EVERY search for every
+    // visitor, which is the console noise worth removing — it's diagnostic
+    // output, not something a student should see. Now gated behind ?diag=1,
+    // the same switch the filter-funnel line already uses. The log itself
+    // still records every search, so coachJeffHealth() is unaffected.
+    if(window._jfDiag && window.console && console.debug){
       console.debug(
         `[jobfinder] "${rec.kw||'(all)'}"${rec.loc?(' @ '+rec.loc):''} — ` +
         `boards ${rec.direct} (ok ${rec.boardsOk}/fail ${rec.boardsFail}), ` +
