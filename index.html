@@ -198,6 +198,9 @@
   .tag.tier-ok{background:rgba(31,122,77,.12);color:#1f7a4d}
   .tag.tier-mid{background:rgba(217,138,43,.15);color:#b6701c}
   .tag.tier-warn{background:rgba(185,88,35,.14);color:#9a4b1f}
+  /* Above the guide's 3-5yr ceiling. Visually distinct from tier-warn: that
+     one means "hard"; this one means "no". Reads as a stop, not a caution. */
+  .tag.tier-out{background:rgba(150,38,38,.13);color:#8f2323;font-weight:700}
   .tag.sp-yes{background:rgba(31,122,77,.14);color:#1f7a4d;font-weight:700}
   .tag.sp-no{background:rgba(185,45,45,.12);color:#a12b2b;font-weight:700}
   .tag.sp-unk{background:#f4f1ea;color:#8a7d5f;font-weight:600}
@@ -720,7 +723,7 @@
             <input id="showexperienced" type="checkbox">
             <span class="chk-text">
               <label for="showexperienced" class="inline">Show experienced jobs</label>
-              <span class="hint">Default off. Hides senior, lead, manager, director, and level II+ roles.</span>
+              <span class="hint">Default off. Hides senior, lead, manager, director, and level II+ roles &mdash; and roles whose description requires 3+ years, even when the title sounds entry-level.</span>
             </span>
           </span>
           <span class="chk">
@@ -1704,6 +1707,26 @@ function scoreJob(j, kw, loc){
   if(CLEAR_RX.test(title + ' ' + locText)) s -= 1;                  // clearance/sponsorship friction
   if(/\b([2-9]|1[0-9])\s*\+?\s*years?\b/i.test(title)) s -= 5;       // explicit experience requirement in title
 
+  // A DESCRIPTION-STATED FLOOR MUST COST AS MUCH AS A TITLE-STATED ONE.
+  //
+  // The title regex above only fires when the years are IN the title. A role
+  // called "Compliance Analyst" whose body says "4+ years, including 2 as an
+  // AML investigator" took no penalty at all — it collected keyword, location,
+  // US and scanned-title points and cleared the badge threshold, so the tool
+  // showed a new grad a 7-year role wearing "high-priority lead" right next to
+  // a "Proceed with caution" tier chip. The two chips contradicted each other
+  // and the badge was the one users read first.
+  //
+  // Scales with the floor rather than a flat hit, because 3 years and 8 years
+  // are not the same distance from a graduating senior. Softened requirements
+  // ("preferred", "a plus") are discounted, matching the rule already used by
+  // experienceTier() and the gating checks.
+  const floorYears = Number(j.minYears || 0);
+  if(floorYears >= 2){
+    const effectiveFloor = j.yearsPreferred ? Math.max(1, floorYears - 1) : floorYears;
+    s -= Math.min(10, effectiveFloor * 2);
+  }
+
   // Guard: a role with NO genuine early-career signal in its title shouldn't
   // reach the "high-priority lead" badge on circumstantial points alone
   // (keyword + location + US). Cap it just below the badge threshold.
@@ -1716,6 +1739,15 @@ function scoreJob(j, kw, loc){
   // best matches, the other says we don't know if you can even apply.
   const unambiguousEarly = INTERN_RX.test(title) || NEWGRAD_RX.test(title);
   if(!scanned && !unambiguousEarly && s >= 8) s = 7;
+
+  // HARD CEILING: nothing at or above the guide's top tier can be a "lead".
+  // The Early-Career Experience Equivalency Guide tops out at 3-5 years and
+  // calls that row "rarely crossable without direct industry proof-of-work or
+  // a referral" — that is not a high-priority lead for a graduating senior, no
+  // matter how well the keyword and location line up. Above 5 years the guide
+  // has no row at all, because there is no defensible framing to offer.
+  // Applied after the caps above so no later addition can reopen the gap.
+  if(floorYears >= (j.yearsPreferred ? 4 : 3) && s >= 8) s = 7;
 
   return s;
 }
@@ -1810,6 +1842,13 @@ function salaryEstimate(j){
 // the right direction to err: overstating reachability wastes applications.
 // `from` is the row's lower bound; the last row is the open-ended catch-all.
 const EXPERIENCE_TIERS = [
+  // ABOVE THE GUIDE'S RANGE. The Early-Career Experience Equivalency Guide
+  // stops at 3-5 years — there is no row past it because there is no honest
+  // framing to give a graduating senior for a 7-year requirement. Saying
+  // "proceed with caution" here would imply a judgment call the student is
+  // equipped to make; they aren't, and the answer is no. Say so plainly.
+  { from: 6, label: 'Not an entry-level role',        cls: 'tier-out',
+    note: 'The stated requirement is beyond the range where internships, projects, or coursework can substitute. Time is better spent on roles you can actually win.' },
   { from: 3, label: 'Proceed with caution',           cls: 'tier-warn',
     note: 'Reflects experience inflation. Rarely crossable without direct industry proof-of-work or a referral.' },
   { from: 2, label: 'Possible — not automatic',       cls: 'tier-mid',
@@ -1819,6 +1858,27 @@ const EXPERIENCE_TIERS = [
   { from: 0, label: 'Reachable with strong projects', cls: 'tier-ok',
     note: 'Coursework alone is insufficient — lead with 1–2 portfolio projects that show measurable outcomes.' },
 ];
+
+// Does a SCANNED description put this role out of reach for a new grad?
+//
+// The existing gate checks isSeniorTitle() only, which reads the title. That
+// misses the case that prompted this: a role titled "Compliance Analyst" whose
+// body requires 4+ years including 2 as an AML investigator. The title is
+// neutral, so the role sailed through every filter and landed in a graduating
+// senior's results.
+//
+// Threshold follows the Early-Career Experience Equivalency Guide: its 3-5yr
+// row is "usually not genuinely entry-level unless listed as preferred rather
+// than required", so 3+ required (or 4+ preferred) is where a role stops being
+// worth a new grad's application slot.
+//
+// Returns false when minYears is undefined — sources that don't scan get
+// silence, never a guess. Those roles are still gated by title as before.
+function beyondEarlyCareer(j){
+  const y = Number(j.minYears || 0);
+  if(!y) return false;
+  return y >= (j.yearsPreferred ? 4 : 3);
+}
 
 function experienceTier(j){
   const y = Number(j.minYears || 0);
@@ -2101,7 +2161,7 @@ function previewFilter(all, o){
     const t = (j.title || '');
     const blob = (t + ' ' + (j.location||'') + ' ' + (j.company||'')).toLowerCase();
 
-    if(!o.showExperienced && isSeniorTitle(t)) continue;
+    if(!o.showExperienced && (isSeniorTitle(t) || beyondEarlyCareer(j))) continue;
     if(o.level !== 'all'){
       if(o.level === 'intern' && !INTERN_RX.test(t)) continue;
       if(o.level === 'newgrad' && !NEWGRAD_RX.test(t)) continue;
@@ -2361,7 +2421,14 @@ async function search(){
       // Experienced-role gate: default off, even if Level is set to "All levels".
       // This keeps senior/lead/director/manager/level II+ roles from being labeled
       // as entry/grad just because they match the keyword.
-      if(!showExperienced && isSeniorTitle(t)) return false;
+      //
+      // Two tests, because a role can be out of reach either way. isSeniorTitle
+      // catches "Senior Analyst". beyondEarlyCareer catches the harder case: a
+      // neutral title like "Compliance Analyst" whose description requires 4+
+      // years including 2 in a specialty. Both are hidden by default and both
+      // are revealed by the same toggle — a student who wants to see the tier
+      // above them still can, but it isn't the default view.
+      if(!showExperienced && (isSeniorTitle(t) || beyondEarlyCareer(j))) return false;
 
       if(level !== 'all'){
         if(level === 'intern' && !INTERN_RX.test(t)) return false;
