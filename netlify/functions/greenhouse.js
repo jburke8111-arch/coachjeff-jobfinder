@@ -21,6 +21,12 @@
 //   3. Added ?diag=1 board health check and the experience gate, both
 //      mirroring ashby.js.
 //
+// PRUNED 2026-07-24 after the first ?diag=1 run: temporal, plaid, and canva
+// all returned 404. Note that plaid and canva existed ONLY in the original
+// 12-board list here — a quarter of that list was dead and silently
+// contributing nothing, which is the case for running ?diag=1 after any
+// board edit rather than assuming a slug still works.
+//
 // TO ADD MORE BOARDS (same workflow as ashby.js / lever.js):
 //   1. Collect candidate board names from boards.greenhouse.io/SLUG or
 //      job-boards.greenhouse.io/SLUG careers URLs. Don't test one at a time.
@@ -133,7 +139,6 @@ const GREENHOUSE_BOARDS = [  // ---- tech / software ----
   { board: "abnormalsecurity", company: "Abnormal Security", sector: "security" },
   { board: "tailscale", company: "Tailscale", sector: "security" },
   { board: "okta", company: "Okta", sector: "security" },
-  { board: "temporal", company: "Temporal", sector: "tech" },
   { board: "planetscale", company: "PlanetScale", sector: "tech" },
   { board: "clickhouse", company: "ClickHouse", sector: "tech" },
 
@@ -149,10 +154,8 @@ const GREENHOUSE_BOARDS = [  // ---- tech / software ----
   { board: "everlaw", company: "Everlaw", sector: "tech" },
 
   // ---- finance / fintech ----
-  { board: "plaid", company: "Plaid", sector: "fintech" },
 
   // ---- tech / software ----
-  { board: "canva", company: "Canva", sector: "tech" },
 ];
 
 // How many boards to fetch at once. 95 sequential fetches would blow the
