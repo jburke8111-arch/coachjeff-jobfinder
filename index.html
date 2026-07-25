@@ -1480,15 +1480,63 @@ async function fetchSmartRecruiters(keyword, location){
 // The serverless function returns clean records today; the mapping below is
 // defensive so that if any future record arrives missing a field, it can't
 // render a broken/dead-link card. Records with no usable apply URL are dropped.
+// Fetch Lever jobs from our own serverless /lever function, which sweeps a
+// curated board list server-side (mirrors fetchGreenhouseAPI / fetchAshby).
+// This is SEPARATE from the older fetchLever(c) above, which was the per-company
+// client-side sweep over ats:'lever' entries in COMPANIES — that list is now
+// empty, so this function is where Lever coverage actually comes from.
+// Returns [] on any failure so it never breaks the rest of the search.
+async function fetchLeverAPI(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('keyword', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/lever?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    if(!(data && data.ok && Array.isArray(data.jobs))) return [];
+    return data.jobs
+      .filter(j => j && j.url)
+      .map(j => ({
+        title: j.title || 'Untitled role',
+        company: j.company || j.board || 'Employer',
+        board: j.board || '',
+        sector: j.sector || '',
+        location: j.location || '—',
+        url: j.url,
+        posted: j.posted || null,
+        salary: j.salary || '',
+        source: 'lever',
+        id: (j.id != null ? j.id : ('lv-' + (j.board||'') + '-' + (j.url||''))),
+        ats: 'lv',
+        minYears: j.minYears,
+        yearsPreferred: j.yearsPreferred,
+        expFlag: j.expFlag
+      }));
+  } catch(e){
+    return [];
+  }
+}
+
 async function fetchGreenhouseAPI(keyword, location){
   try {
     const params = new URLSearchParams();
     if(keyword) params.set('keyword', keyword);
     if(location) params.set('location', location);
     const resp = await fetch('/.netlify/functions/greenhouse?' + params.toString());
-    if(!resp.ok) return [];
+    // A failed request is NOT the same as "no matches". Record it so the status
+    // line can distinguish a Greenhouse outage from a genuine zero — the old
+    // silent `return []` is exactly what hid the broad-query timeout bug for
+    // as long as it was happening.
+    if(!resp.ok){ window._ghFailed = true; return []; }
     const data = await resp.json();
-    if(!(data && data.ok && Array.isArray(data.jobs))) return [];
+    if(!(data && data.ok && Array.isArray(data.jobs))){ window._ghFailed = true; return []; }
+    // When the server's board sweep was cut short by its time budget, these are
+    // partial results. Remember it so the UI can note the source was incomplete
+    // rather than implying it found everything.
+    if(data.complete === false){
+      window._ghPartial = { covered: data.boardsCovered, total: data.boardsTotal };
+    }
     return data.jobs
       .filter(j => j && j.url)                       // no apply link => unusable, skip
       .map(j => ({
@@ -2256,6 +2304,11 @@ async function search(){
   // A real search re-syncs the results with the form, so any "your roles
   // changed" flag is now resolved.
   clearResultsStale();
+  // Reset per-search source-health flags (set by fetchGreenhouseAPI on a failed
+  // or partial sweep) so a stale flag from a previous search can't mislabel
+  // this one.
+  window._ghFailed = false;
+  window._ghPartial = null;
   syncExperienceControls();
   const kw = document.getElementById('kw').value.trim().toLowerCase();
   const loc = document.getElementById('loc').value.trim().toLowerCase();
@@ -2291,7 +2344,7 @@ async function search(){
       : directCompanies.filter(c => c.slug === company);
 
     let jobs = [];
-    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, smartrecruiters:0 };
+    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0 };
     let okCos = 0, failCos = 0;
 
     // ---- (1) All six sources start NOW, in parallel ---------------------------
@@ -2310,6 +2363,7 @@ async function search(){
       apiSource('adzuna',         fetchAdzuna),
       apiSource('ashby',          fetchAshby),
       apiSource('greenhouse',     fetchGreenhouseAPI),
+      apiSource('lever',          fetchLeverAPI),
       apiSource('smartrecruiters',fetchSmartRecruiters),
     ];
 
@@ -2684,6 +2738,7 @@ async function search(){
       { label: 'Adzuna',          key: 'adzuna' },
       { label: 'Ashby',           key: 'ashby' },
       { label: 'Greenhouse',      key: 'greenhouse' },
+      { label: 'Lever',           key: 'lever' },
       { label: 'SmartRecruiters', key: 'smartrecruiters' },
     ];
     const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + ${API_SOURCES.map(s=>s.label).join(' + ')} searched`;
@@ -2719,6 +2774,7 @@ async function search(){
       direct: sourceStats.direct, usajobs: sourceStats.usajobs,
       adzuna: sourceStats.adzuna, ashby: sourceStats.ashby,
       greenhouse: sourceStats.greenhouse,
+      lever: sourceStats.lever,
       smartrecruiters: sourceStats.smartrecruiters,
       adzunaResolved: sourceStats.adzunaResolved || 0,
       boardsOk: okCos, boardsFail: failCos,
@@ -2734,7 +2790,17 @@ async function search(){
       ? `<br><span class="hint src-fail">${window._scanSkipped} lower-ranked role${window._scanSkipped===1?'':'s'} could not be verified against ${window._scanSkipped===1?'its':'their'} full description (scan limit reached). Your top matches were checked first — check the posting itself before ruling out anything further down.</span>`
       : '';
 
-    statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>${diagLine ? `<br><span class="hint" style="color:#b6701c">${diagLine}</span>` : ''}${skipNote}`;
+    // Greenhouse source-health notes. These make a failed or partial Greenhouse
+    // sweep VISIBLE instead of silently absent — the bug was never that the
+    // sweep sometimes fell short, it was that falling short looked identical to
+    // "no matches" and no one could tell.
+    const ghNote = window._ghFailed
+      ? `<br><span class="hint src-fail">Greenhouse could not be reached for this search — its results are missing. Try again in a moment, or narrow the search.</span>`
+      : (window._ghPartial
+        ? `<br><span class="hint src-fail">Greenhouse results are partial — ${window._ghPartial.covered} of ${window._ghPartial.total} boards were searched before the time limit. Narrow the search (add a location, or a more specific title) to sweep all of them.</span>`
+        : '');
+
+    statusEl.innerHTML = `${sourceLine}${failCos ? ` · <span class="src-fail">${failCos} unreachable</span>` : ''}<br><span class="hint">${evalLine}</span><br><span class="hint">${sourceBreakdown}</span>${diagLine ? `<br><span class="hint" style="color:#b6701c">${diagLine}</span>` : ''}${skipNote}${ghNote}`;
 
     countEl.textContent = `${jobs.length} matching job${jobs.length===1?'':'s'} found`;
 
