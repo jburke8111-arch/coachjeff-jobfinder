@@ -554,8 +554,12 @@
   .go-lede b{color:var(--navy);font-weight:600}
   .band select{height:42px;font-size:16px;background-color:#fff}
   .title-select-wrap{position:relative}
-  .title-select-wrap select{padding-right:46px}
-  .title-select-wrap .search-glyph{position:absolute;right:30px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px;opacity:.65}
+  /* Reserve room on the right for BOTH the search glyph and the native caret,
+     and force the option text to ellipsize rather than run under them. The
+     at-cap label ("3 of 3 selected") collided with the glyph on narrow phones
+     because the text wasn't truncating and the glyph sat inside the text area. */
+  .title-select-wrap select{padding-right:52px;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+  .title-select-wrap .search-glyph{position:absolute;right:34px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px;opacity:.65}
   @media(max-width:760px){.grid2{grid-template-columns:1fr}}
 
 </style>
@@ -3630,7 +3634,7 @@ function initMajorSearch(){
     const popularOptions = popular.map(title=>`<option value="${esc(title)}">${esc(title)}</option>`).join('');
     const emergingOptions = emerging.map(title=>`<option value="${esc(title)}">${esc(title)}</option>`).join('');
     const lead = atCap()
-      ? '3 of 3 selected — remove one to change'
+      ? '3 of 3 selected'
       : (selectedRoles.length ? 'Add another role…' : 'Add a role…');
     titleSelect.innerHTML = `<option value="">${esc(lead)}</option>` +
       (popular.length ? `<optgroup label="Popular Entry-Level Roles">${popularOptions}</optgroup>` : '') +
