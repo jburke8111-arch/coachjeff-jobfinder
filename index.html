@@ -734,7 +734,7 @@
             <input id="noclear" type="checkbox">
             <span class="chk-text">
               <label for="noclear" class="inline">Check sponsorship eligibility</label>
-              <span class="hint">Scans each role's full description for visa/sponsorship and work-authorization language, badges every result 🟢/🔴/🟡, and removes roles that explicitly won't sponsor. Slower, but thorough — best for international students.</span>
+              <span class="hint">Scans each role's full description for visa/sponsorship and work-authorization language, badges every result 🟢/🔴/🟡, and removes roles that explicitly won't sponsor. Slower, but thorough — best for international students. Defense and export-controlled roles are flagged as often US-person or clearance gated and hidden while this is on — a likelihood, not a verdict; permanent residents may still qualify. This is general information, not legal or immigration advice — your eligibility depends on your specific status.</span>
               <span id="sponsorFilterWrap" class="sponsor-filter" style="display:none;">
                 <label for="sponsorFilter" class="inline">Show:</label>
                 <select id="sponsorFilter">
@@ -799,6 +799,7 @@
   <div class="results" id="results" role="region" aria-label="Job search results" aria-live="polite" aria-busy="false"></div>
 
   <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, and SmartRecruiters. Roles link directly to the application page.</p>
+  <p class="note">Match scores, experience tiers, sponsorship badges, and defense/clearance flags are automated estimates read from public job postings — general information to guide your search, not legal, immigration, or career advice. Eligibility for any role depends on your specific situation and the employer's actual requirements; verify on the posting before ruling a job in or out.</p>
 
   <a class="coaching-prompt" href="/coaching.html">
     <span class="cp-text"><strong>Want a second set of eyes on your search?</strong> Coach Jeff offers free 1-on-1 coaching for new grads — resume, LinkedIn, job search &amp; interviews.</span>
@@ -1773,6 +1774,36 @@ function freshnessText(posted){
   if(days <= 30) return `Posted ${Math.ceil(days/7)} weeks ago`;
   return 'Posted 30+ days ago';
 }
+// LIKELY US-PERSON / CLEARANCE GATED?
+//
+// Defense and export-controlled roles are, in practice, usually restricted to
+// "US persons" (citizens, permanent residents, asylees, refugees) or require a
+// security clearance — but the POSTING almost never says so. By law it can't:
+// per DOJ/IER guidance, restricting a job posting on citizenship or immigration
+// status can violate the INA/Title VII even when the role genuinely requires
+// export authorization. So the sponsorship scanner reads these as "not
+// specified" — technically true, practically misleading for an international
+// student, who burns an application on a role that was never reachable.
+//
+// This flags the likelihood from sector + description language, and is
+// deliberately phrased as "often" downstream, never "will": "US person"
+// includes green-card holders, so some of these ARE open to non-citizens who
+// have permanent residence. We inform; we don't assert a certainty the posting
+// itself withholds.
+const ITAR_RX = /\b(itar|ear\b|export[- ]control|export controlled|security clearance|active clearance|ts\/sci|top secret|secret clearance|us person|u\.s\. person|us citizen|u\.s\. citizen|citizenship (is )?required|must be a? ?(us|u\.s\.) citizen|clearance (is )?required|dod\b|department of defense)\b/i;
+
+function likelyUSPersonGated(j){
+  const sector = String(j.sector || '').toLowerCase();
+  if(sector.includes('defense')) return true;
+  // Description text isn't returned to the client, so title language is the
+  // only other signal available here. That catches roles that name the barrier
+  // outright ("... - Active Clearance Required", "US Citizen"). Roles that hide
+  // it in the body are caught only when their sector is defense — which covers
+  // the common case, since the sector tag comes from the board's own metadata.
+  if(ITAR_RX.test(String(j.title || ''))) return true;
+  return false;
+}
+
 function sponsorshipLabel(j){
   // Only show a sponsorship badge when a real description-based scan has run
   // (i.e. the student ticked "Work Authorization Requirements"). Without a scan
@@ -1925,11 +1956,11 @@ function verificationStatus(j){
   if(j._previewPending && !descChecked && !sponsorChecked)
     return {text:'⏳ Still checking…', cls:'gray', note:'We\'re still reading this posting\'s full description. This badge will update when the check finishes.'};
   if(descChecked && sponsorChecked)
-    return {text:'✅ Description + sponsorship checked', cls:'green', note:'We read this posting\'s full description and its work-authorization language.'};
+    return {text:'✅ Full description scanned', cls:'green', note:'We read this posting\'s full description, including its work-authorization language. Any sponsorship or experience badges reflect what that scan found.'};
   if(descChecked)
-    return {text:'✅ Description checked', cls:'green', note:'We read this posting\'s full description to verify the role level.'};
+    return {text:'✅ Description scanned', cls:'green', note:'We read this posting\'s full description to verify the role level.'};
   if(sponsorChecked)
-    return {text:'🟢 Sponsorship language checked', cls:'green', note:'We scanned this posting for visa / sponsorship language.'};
+    return {text:'🟢 Sponsorship language scanned', cls:'green', note:'We scanned this posting for visa / sponsorship language.'};
   return {text:'🟡 Title screening only', cls:'gray', note:'This source doesn\'t expose the description, so we screened by title only. Read the posting before ruling it in or out.'};
 }
 function whyThisJob(j, kw, loc){
@@ -2009,6 +2040,7 @@ function renderJob(j, kw, loc){
             <span class="tag blue">${esc(freshnessText(j.posted))}</span>
             ${(()=>{ const v = verificationStatus(j); return `<span class="tag ${v.cls}" title="${esc(v.note)}">${esc(v.text)}</span>`; })()}
             ${sponsor ? `<span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>` : ''}
+            ${likelyUSPersonGated(j) ? '<span class="tag warn" title="Defense and export-controlled roles are usually limited to US persons (citizens or permanent residents) or require a security clearance. By law the posting often cannot say so — this is a likelihood, not a certainty. If you have permanent residence, you may still qualify.">⚠️ Defense role — often US-person / clearance gated</span>' : ''}
             ${(!experienced && (j.score || 0) >= 8) ? '<span class="tag strong">high-priority lead</span>' : ''}
             ${(()=>{
               // Tier label replaces the raw years tag — it carries the number
@@ -2619,6 +2651,15 @@ async function search(){
             jobs.forEach(j => { j.sponsorScan = sponsorship[j.id] || 'unknown'; });
             // Always hide the explicit "no sponsorship" roles.
             jobs = jobs.filter(j => j.sponsorScan !== 'none');
+            // Also hide roles that are LIKELY US-person / clearance gated —
+            // defense and export-controlled work the student almost certainly
+            // can't take on a visa. These scan as "not specified" (the posting
+            // legally can't state the restriction), so without this they'd slip
+            // through the filter a sponsorship-needing student explicitly set.
+            // Exception: if the scan actually found sponsorship AVAILABLE, the
+            // employer said yes outright — trust that over the heuristic.
+            window._usPersonHidden = jobs.filter(j => likelyUSPersonGated(j) && j.sponsorScan !== 'available').length;
+            jobs = jobs.filter(j => !(likelyUSPersonGated(j) && j.sponsorScan !== 'available'));
             // Remember the pools for the helpful note.
             window._spAvailable = jobs.filter(j => j.sponsorScan === 'available').length;
             window._spUnknown = jobs.filter(j => j.sponsorScan === 'unknown').length;
@@ -2708,6 +2749,16 @@ async function search(){
         note.innerHTML = `Only <strong>${avail}</strong> role${avail===1?'':'s'} explicitly confirm sponsorship. ` +
           `<strong>${unk}</strong> more didn't specify either way — switch “Show” to <strong>All</strong> or <strong>Unknown</strong> to see them.`;
         countEl.appendChild(note);
+      }
+      // Tell the student WHY defense roles vanished, so the drop isn't a mystery.
+      // Phrased as "often" — some of these are open to permanent residents, and
+      // the student is the one who knows their own status.
+      const gatedHidden = window._usPersonHidden || 0;
+      if(gatedHidden > 0){
+        const dn = document.createElement('div');
+        dn.className = 'sponsor-note';
+        dn.innerHTML = `<strong>${gatedHidden}</strong> defense / export-controlled role${gatedHidden===1?'':'s'} hidden — these are usually limited to US persons (citizens or permanent residents) or require a clearance, and the posting often can’t say so outright. If you have permanent residence, uncheck “Need visa sponsorship” to see them.`;
+        countEl.appendChild(dn);
       }
     }
 
