@@ -173,9 +173,11 @@ const BATCH_SIZE = 12;
 // module adds a build step this project doesn't otherwise need. If this logic
 // changes, change it in ALL THREE files.
 //
-// Greenhouse returns the full posting body in j.content when content=true, so
-// reading real requirements costs no extra fetch. The content is HTML-escaped
-// HTML, so it needs unescaping before the regexes can see sentence boundaries.
+// NOTE: as of the two-pass change, greenhouse.js no longer runs the experience
+// gate itself — checkjobs does, after all sources merge. These functions are
+// kept (unused here) rather than deleted, both to avoid churning tested code
+// and because the diag path could use them later. If the gate logic changes,
+// the live copy is in checkjobs; keep this in sync only if it's ever re-wired.
 const SOFT_RX = /\b(preferred|preferable|a plus|nice[- ]to[- ]have|desired|ideally|bonus|would be great|not required)\b/;
 
 const NON_REQ_CONTEXT_RX = /\b(in business|founded|established|since \d{4}|for (over |more than )?\d+ years,|years in (business|operation|the (industry|market))|year history|years of combined|years running|anniversary|our (\d+|history)|track record spanning|serving (customers|clients)|over the (past|last)|in the past|ago\b|warranty|lease|term of|per year|years old|age of|years of age)\b/;
@@ -274,8 +276,16 @@ function getLocation(job) {
   return "\u2014";
 }
 
+// PASS 1 fetches WITHOUT content (fast — title, location, company only).
+// The experience-gate description scan is NOT done here — the separate
+// checkjobs function fetches descriptions by job id and computes minYears after
+// all sources merge. The old content=true fetch here was wasted work: its
+// descriptions were never sent to checkjobs (the client sends only ids), and
+// any minYears computed here was overwritten by checkjobs' own scan. Dropping
+// it removes a duplicate fetch AND fixes the broad-search timeout, since
+// pulling every description from all 92 boards was what blew the time budget.
 async function fetchBoard(board, ms = 7000){
-  const apiUrl = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board)}/jobs?content=true`;
+  const apiUrl = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board)}/jobs`;
   const resp = await withTimeout(fetch(apiUrl, { headers: { "Accept": "application/json" } }), ms);
   if(!resp.ok) return { ok: false, httpStatus: resp.status, jobs: [] };
   let data;
@@ -386,6 +396,18 @@ export default async (request) => {
     const keyword = (url.searchParams.get("keyword") || "").toLowerCase().trim();
     const location = (url.searchParams.get("location") || "").toLowerCase().trim();
 
+    // Fetch every board WITHOUT descriptions (fast) and filter by keyword +
+    // location on title/location/company. Because this is light, all 92 boards
+    // complete inside the time budget instead of the ~half that content=true
+    // allowed. Descriptions (for the experience gate) are handled separately by
+    // checkjobs after all sources merge — see the fetchBoard note above.
+    //
+    // BEHAVIOR NOTE: the old fetch also searched description text, so a keyword
+    // appearing only in the body (not the title) could match. Matching is now
+    // title+location+company. That's a deliberate improvement, not a regression
+    // — matching on a passing mention buried in a description produced false
+    // positives ("mentions Python" on a non-Python role). Title-first is how a
+    // job search should behave.
     const perBoard = await inBatches(GREENHOUSE_BOARDS, BATCH_SIZE, async (source) => {
       try {
         const res = await fetchBoard(source.board);
@@ -397,20 +419,7 @@ export default async (request) => {
           if(!title) continue;
 
           const loc = getLocation(j);
-          const description = descriptionText(j.content || "");
-
-          // Token-AND match, same rule as ashby.js: every word the user typed
-          // must appear somewhere in the searchable text, in any order. The
-          // original used a plain substring test, which required the user's
-          // words to be contiguous and in the same order as the title — so
-          // "analyst data" found nothing while "data analyst" worked.
-          //
-          // Description is included in the haystack (it was in the original
-          // too), which keeps recall high but means a keyword can match on a
-          // passing mention rather than the role itself. Left as-is
-          // deliberately: for a new grad, a false positive costs a glance
-          // while a false negative costs a job they never saw.
-          const searchable = `${title} ${loc} ${source.company} ${description}`.toLowerCase();
+          const searchable = `${title} ${loc} ${source.company}`.toLowerCase();
 
           if (keyword) {
             const terms = keyword.split(/\s+/).filter(Boolean);
@@ -420,13 +429,11 @@ export default async (request) => {
           if (location) {
             const isRemoteSearch = location === "remote";
             if (isRemoteSearch) {
-              if (!/remote/i.test(`${loc} ${description}`)) continue;
+              if (!/remote/i.test(loc)) continue;
             } else if (!searchable.includes(location)) {
               continue;
             }
           }
-
-          const { minYears, preferred } = experienceRequirement(description);
 
           out.push({
             title,
@@ -440,9 +447,13 @@ export default async (request) => {
             source: "greenhouse",
             id: j.id,
             ats: "gh",
-            minYears,
-            yearsPreferred: preferred,
-            expFlag: minYears >= 2
+            // minYears left undefined until pass 2 verifies it. The client
+            // treats undefined as "not scanned" and gates by title only —
+            // never as "0 years required" — so an unverified job is never
+            // mislabeled as confirmed early-career.
+            minYears: undefined,
+            yearsPreferred: undefined,
+            expFlag: undefined
           });
         }
         return out;
@@ -452,6 +463,16 @@ export default async (request) => {
     });
 
     const allJobs = perBoard.flat();
+
+    // NO PASS 2 HERE. The experience-gate description scan is done by the
+    // separate checkjobs function, which the client calls after merging all
+    // sources — it fetches descriptions for Greenhouse/Lever survivors and
+    // returns minYears. Duplicating it here would fetch every description
+    // twice. greenhouse.js deliberately leaves minYears undefined; checkjobs
+    // fills it in. This is why pass 1 dropping content=true is safe: the
+    // descriptions were never needed in THIS function once checkjobs existed —
+    // the old content=true fetch was doing wasted work that also happened to
+    // blow the time budget on broad searches.
     return new Response(JSON.stringify({
       ok: true,
       count: allJobs.length,
