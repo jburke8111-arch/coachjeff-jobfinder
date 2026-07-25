@@ -285,13 +285,36 @@ async function fetchBoard(board, ms = 7000){
   return { ok: true, httpStatus: resp.status, jobs };
 }
 
-// Run an async mapper over the board list in fixed-size batches.
+// Run an async mapper over the board list in fixed-size batches, bounded by a
+// wall-clock budget. THIS IS THE FIX for the "broad query returns 0" bug: a
+// search like "analyst" matches across far more of the 92 boards than a narrow
+// one, so the whole invocation could run past Netlify's function timeout — and
+// a timeout returns NOTHING. The client's fetchGreenhouseAPI() sees the failed
+// request and falls open to [], which is indistinguishable from "no matches".
+// So "analyst" (broad) showed Greenhouse 0 while "data analyst" (narrow)
+// showed 730 — impossible unless the broad one was silently dying.
+//
+// Now: once we're within the budget, stop starting new batches and return what
+// finished. Partial Greenhouse results beat zero Greenhouse results every time
+// — a student sees most of the matches instead of a mysterious empty source.
+// The caller reports how complete the sweep was so the UI can say so.
+const TIME_BUDGET_MS = 8000;   // Netlify default function limit is 10s; leave headroom for JSON + response
+
 async function inBatches(items, size, fn){
+  const started = Date.now();
   const out = [];
+  let covered = 0;
   for (let i = 0; i < items.length; i += size) {
+    // Stop launching new work if we're out of budget. A batch already in flight
+    // is awaited; we just don't start the next one.
+    if (Date.now() - started > TIME_BUDGET_MS) break;
     const slice = items.slice(i, i + size);
     out.push(...await Promise.all(slice.map(fn)));
+    covered = i + slice.length;
   }
+  out._boardsCovered = covered;
+  out._boardsTotal = items.length;
+  out._complete = covered >= items.length;
   return out;
 }
 
@@ -432,7 +455,13 @@ export default async (request) => {
     return new Response(JSON.stringify({
       ok: true,
       count: allJobs.length,
-      jobs: allJobs
+      jobs: allJobs,
+      // Completeness of the board sweep. When complete is false, the time
+      // budget cut the sweep short and these are PARTIAL results — the client
+      // shows most matches rather than the empty set a timeout used to produce.
+      complete: perBoard._complete !== false,
+      boardsCovered: perBoard._boardsCovered != null ? perBoard._boardsCovered : GREENHOUSE_BOARDS.length,
+      boardsTotal: perBoard._boardsTotal != null ? perBoard._boardsTotal : GREENHOUSE_BOARDS.length
     }), {
       status: 200,
       headers: cors
