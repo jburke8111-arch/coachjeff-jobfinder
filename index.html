@@ -174,6 +174,44 @@
     display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center}
   .meta .count{font-weight:600;color:var(--navy)}
   .results{padding:6px 0 64px}
+  /* Post-result filter bar. Inline layout on desktop; collapses to a single
+     tap-to-expand button on narrow screens (the two mockups, unified). */
+  .resultfilter{margin:14px 2px 0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .rf-toggle{display:none;width:100%;height:auto;align-items:center;gap:9px;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;font-size:14px;color:var(--navy);font-weight:400;letter-spacing:0}
+  .rf-toggle .rf-t-label{font-weight:700}
+  .rf-toggle .rf-t-active{font-size:12px;color:var(--amber-deep);font-weight:700}
+  .rf-toggle .rf-t-shown{font-size:12px;color:var(--faint);margin-left:auto}
+  .rf-toggle .rf-caret{font-size:13px;color:var(--mute);transition:transform .15s}
+  .rf-panel{}
+  .rf-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .rf-head .rf-ic{font-size:14px;color:var(--mute)}
+  .rf-head .rf-title{font-size:13px;font-weight:700;color:var(--mute)}
+  .rf-head .rf-shown{font-size:12.5px;color:var(--faint);margin-left:auto}
+  .rf-groups{display:flex;flex-wrap:wrap;gap:16px}
+  .rf-group{flex:1;min-width:210px}
+  .rf-glabel{font-size:12px;color:var(--faint);margin-bottom:6px}
+  .rf-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .rf-chip{font-size:12px;padding:5px 11px;border-radius:14px;border:1px solid var(--line-strong);
+    background:#fff;color:var(--navy);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;line-height:1.2;
+    width:auto;height:auto;font-weight:500;letter-spacing:0}
+  .rf-chip:hover{background:var(--paper);border-color:var(--mute)}
+  .rf-chip .rf-n{color:var(--faint)}
+  .rf-chip[aria-pressed="true"]{background:var(--navy-bar);color:#fff;border-color:var(--navy-bar)}
+  .rf-chip[aria-pressed="true"]:hover{background:var(--navy-deep)}
+  .rf-chip[aria-pressed="true"] .rf-n{color:#c7d2e4}
+  .rf-clear{margin-top:11px}
+  .rf-clear button{font-size:12px;padding:5px 12px;border:1px solid var(--line-strong);background:#fff;
+    border-radius:7px;cursor:pointer;font-family:inherit;color:var(--navy);
+    width:auto;height:auto;font-weight:500;letter-spacing:0}
+  .rf-clear button:hover{background:var(--paper)}
+  @media (max-width:760px){
+    .rf-toggle{display:flex}
+    .rf-panel{display:none;margin-top:12px}
+    .resultfilter.rf-open .rf-panel{display:block}
+    .resultfilter.rf-open .rf-caret{transform:rotate(180deg)}
+    .rf-head{display:none}
+    .rf-group{min-width:0;flex-basis:100%}
+  }
   .job{border-bottom:1px solid var(--line);padding:18px 2px;display:block;
     text-decoration:none;color:inherit;transition:background .12s;border-radius:6px}
   .job:hover{background:#fff}
@@ -790,6 +828,12 @@
     <div class="savedjobs-list" id="savedJobsList"></div>
   </div>
 
+  <!-- Post-result filter bar. Populated by buildResultFilters() after a search
+       paints, from the states and roles actually present in the results. Filters
+       the already-fetched list instantly — no re-search. Hidden until there are
+       results worth filtering. -->
+  <div class="resultfilter" id="resultFilter" style="display:none;"></div>
+
   <!-- aria-live="polite" so a screen reader announces when results arrive.
        Announcements queue until the user is idle rather than interrupting,
        which matters here because progressive rendering repaints this region
@@ -1343,7 +1387,245 @@ function isUSJob(j){
 
 const results = document.getElementById('results');
 const statusEl = document.getElementById('status');
+document.getElementById('results').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-rf-clear]');
+  if(c && typeof RF !== 'undefined'){
+    RF.active.loc.clear(); RF.active.role.clear();
+    repaintFiltered();
+  }
+});
+
 const countEl = document.getElementById('count');
+
+// ===========================================================================
+// POST-RESULT FILTERING (RF)
+// ===========================================================================
+// Narrows the already-fetched result set by location and/or role, instantly,
+// with no re-search. Multi-select WITHIN a category (Texas OR Remote) and
+// combine ACROSS categories (that location set AND that role set) — the model
+// chosen because new grads are typically open to several locations at once and
+// have often already picked several roles on the way in.
+//
+// Location is derived from each job's `location` string by pulling a US state
+// (or "Remote"). Role is the selected search role a job matched, when the user
+// used the multi-role picker; on a plain keyword search there's one role or
+// none, so the role group auto-hides.
+const RF = {
+  allJobs: [], kw: '', loc: '', selectedRoles: [],
+  active: { loc: new Set(), role: new Set() },
+
+  // Map a free-text location to a coarse bucket for filtering. Full state names
+  // and common abbreviations both map to the state name; anything remote-ish
+  // buckets to "Remote"; unrecognized strings bucket to "Other".
+  US_STATES: {
+    'alabama':'Alabama','alaska':'Alaska','arizona':'Arizona','arkansas':'Arkansas','california':'California',
+    'colorado':'Colorado','connecticut':'Connecticut','delaware':'Delaware','florida':'Florida','georgia':'Georgia',
+    'hawaii':'Hawaii','idaho':'Idaho','illinois':'Illinois','indiana':'Indiana','iowa':'Iowa','kansas':'Kansas',
+    'kentucky':'Kentucky','louisiana':'Louisiana','maine':'Maine','maryland':'Maryland','massachusetts':'Massachusetts',
+    'michigan':'Michigan','minnesota':'Minnesota','mississippi':'Mississippi','missouri':'Missouri','montana':'Montana',
+    'nebraska':'Nebraska','nevada':'Nevada','new hampshire':'New Hampshire','new jersey':'New Jersey','new mexico':'New Mexico',
+    'new york':'New York','north carolina':'North Carolina','north dakota':'North Dakota','ohio':'Ohio','oklahoma':'Oklahoma',
+    'oregon':'Oregon','pennsylvania':'Pennsylvania','rhode island':'Rhode Island','south carolina':'South Carolina',
+    'south dakota':'South Dakota','tennessee':'Tennessee','texas':'Texas','utah':'Utah','vermont':'Vermont',
+    'virginia':'Virginia','washington':'Washington','west virginia':'West Virginia','wisconsin':'Wisconsin','wyoming':'Wyoming',
+    'district of columbia':'Washington, D.C.','washington, d.c.':'Washington, D.C.','washington dc':'Washington, D.C.'
+  },
+  ST_ABBR: {
+    'al':'Alabama','ak':'Alaska','az':'Arizona','ar':'Arkansas','ca':'California','co':'Colorado','ct':'Connecticut',
+    'de':'Delaware','fl':'Florida','ga':'Georgia','hi':'Hawaii','id':'Idaho','il':'Illinois','in':'Indiana','ia':'Iowa',
+    'ks':'Kansas','ky':'Kentucky','la':'Louisiana','me':'Maine','md':'Maryland','ma':'Massachusetts','mi':'Michigan',
+    'mn':'Minnesota','ms':'Mississippi','mo':'Missouri','mt':'Montana','ne':'Nebraska','nv':'Nevada','nh':'New Hampshire',
+    'nj':'New Jersey','nm':'New Mexico','ny':'New York','nc':'North Carolina','nd':'North Dakota','oh':'Ohio','ok':'Oklahoma',
+    'or':'Oregon','pa':'Pennsylvania','ri':'Rhode Island','sc':'South Carolina','sd':'South Dakota','tn':'Tennessee',
+    'tx':'Texas','ut':'Utah','vt':'Vermont','va':'Virginia','wa':'Washington','wv':'West Virginia','wi':'Wisconsin',
+    'wy':'Wyoming','dc':'Washington, D.C.'
+  },
+
+  locBucket(loc){
+    const s = String(loc || '').toLowerCase();
+    if(!s || s === '—') return 'Not specified';
+    if(/\bremote\b/.test(s)) return 'Remote';
+    // Full state name anywhere in the string.
+    for(const key in this.US_STATES){ if(s.includes(key)) return this.US_STATES[key]; }
+    // Trailing ", XX" abbreviation (e.g. "Austin, TX").
+    const m = s.match(/,\s*([a-z]{2})\b/);
+    if(m && this.ST_ABBR[m[1]]) return this.ST_ABBR[m[1]];
+    return 'Other';
+  },
+
+  // Which selected search-role(s) a job matches. MUST use the same matcher the
+  // search itself uses (expandedKeywordMatches) — otherwise a job that matched
+  // "Software Engineer" via a synonym like "Developer" wouldn't be attributed
+  // to any role here, the per-role counts would all collapse toward zero, and
+  // the whole Role group would wrongly hide. That was the original bug: this
+  // used a strict literal title match while the search used synonym expansion.
+  jobRoles(j){
+    if(!this.selectedRoles.length) return [];
+    // Match against title + company, the same blob field the search scores on
+    // for these ATS results (kept minimal — the title carries the role signal).
+    const blob = `${j.title || ''} ${j.company || ''}`;
+    return this.selectedRoles.filter(r => {
+      try { return expandedKeywordMatches(blob, r); }
+      catch(_) {
+        // Fallback to literal word match if the expander isn't available.
+        const t = String(j.title || '').toLowerCase();
+        return String(r).toLowerCase().split(/\s+/).filter(Boolean).every(term => t.includes(term));
+      }
+    });
+  },
+
+  filtered(jobs){
+    const src = jobs || this.allJobs;
+    const fl = this.active.loc, fr = this.active.role;
+    if(!fl.size && !fr.size) return src;
+    return src.filter(j => {
+      if(fl.size && !fl.has(this.locBucket(j.location))) return false;
+      if(fr.size){
+        const roles = this.jobRoles(j);
+        if(!roles.some(r => fr.has(r))) return false;
+      }
+      return true;
+    });
+  }
+};
+
+// Build the filter bar from the states/roles present in the current results.
+function buildResultFilters(){
+  const bar = document.getElementById('resultFilter');
+  if(!bar) return;
+  const jobs = RF.allJobs || [];
+
+  // Tally location buckets.
+  const locCounts = {};
+  jobs.forEach(j => { const b = RF.locBucket(j.location); locCounts[b] = (locCounts[b]||0)+1; });
+  // Tally role buckets (only if the multi-role picker was used).
+  const roleCounts = {};
+  if(RF.selectedRoles.length > 1){
+    jobs.forEach(j => RF.jobRoles(j).forEach(r => { roleCounts[r] = (roleCounts[r]||0)+1; }));
+  }
+
+  const locKeys = Object.keys(locCounts);
+  const roleKeys = Object.keys(roleCounts);
+
+  // Nothing worth filtering: 0-1 locations and no multi-role split. Hide the bar.
+  if(jobs.length < 2 || (locKeys.length < 2 && roleKeys.length < 2)){
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    return;
+  }
+
+  const chipHtml = (cat, key, n, on) =>
+    `<button class="rf-chip" role="button" aria-pressed="${on?'true':'false'}" data-rf-cat="${cat}" data-rf-key="${esc(key)}">${esc(key)} <span class="rf-n">${n}</span></button>`;
+
+  const orderByCount = (obj) => Object.keys(obj).sort((a,b)=> obj[b]-obj[a] || a.localeCompare(b));
+
+  const locGroup = locKeys.length >= 2 ? `
+    <div class="rf-group">
+      <div class="rf-glabel">Location</div>
+      <div class="rf-chips">${orderByCount(locCounts).map(k => chipHtml('loc', k, locCounts[k], RF.active.loc.has(k))).join('')}</div>
+    </div>` : '';
+
+  const roleGroup = roleKeys.length >= 2 ? `
+    <div class="rf-group">
+      <div class="rf-glabel">Role</div>
+      <div class="rf-chips">${orderByCount(roleCounts).map(k => chipHtml('role', k, roleCounts[k], RF.active.role.has(k))).join('')}</div>
+    </div>` : '';
+
+  const shownN = RF.filtered(jobs).length;
+  const anyActive = RF.active.loc.size + RF.active.role.size;
+
+  bar.innerHTML = `
+    <button class="rf-toggle" aria-expanded="false">
+      <span class="rf-t-label">Filter</span>
+      <span class="rf-t-active">${anyActive ? '· '+anyActive+' active' : ''}</span>
+      <span class="rf-t-shown">${shownN} shown</span>
+      <span class="rf-caret" aria-hidden="true">▾</span>
+    </button>
+    <div class="rf-panel">
+      <div class="rf-head">
+        <span class="rf-title">Filter these results</span>
+        <span class="rf-shown">${shownN} of ${jobs.length} shown</span>
+      </div>
+      <div class="rf-groups">${locGroup}${roleGroup}</div>
+      ${anyActive ? `<div class="rf-clear"><button data-rf-clear="1">✕ Clear filters</button></div>` : ''}
+    </div>`;
+  bar.style.display = 'block';
+  if(bar.classList.contains('rf-open')) bar.querySelector('.rf-toggle').setAttribute('aria-expanded','true');
+}
+
+// Re-paint results for the current filter selection, without re-searching.
+// Repaints ONLY the job cards from already-fetched data — no network, no
+// checkjobs, no coach-picks/direct-links rebuild. Those stay as the search
+// left them; filtering is a pure view operation over RF.allJobs.
+const RENDER_CAP_RF = 50;
+function repaintFiltered(){
+  if(!RF.allJobs.length) return;
+  const results = document.getElementById('results');
+  if(!results) return;
+
+  const view = RF.filtered(RF.allJobs);
+  const kw = RF.kw, loc = RF.loc;
+
+  // Rebuild the card region. We replace the cards but leave any trailing
+  // coach-picks / employer-link sections that follow them intact by scoping to
+  // a dedicated wrapper. On first paint the wrapper may not exist yet; if so,
+  // fall back to repainting the whole results node's card area.
+  let wrap = document.getElementById('rf-cards');
+  const cardsHtml = view.length
+    ? view.slice(0, RENDER_CAP_RF).map(j => renderJob(j, kw, loc)).join('') +
+      (view.length > RENDER_CAP_RF
+        ? `<div class="more-wrap"><button id="showMore" class="secondary">Show ${view.length - RENDER_CAP_RF} more result${view.length - RENDER_CAP_RF===1?'':'s'}</button></div>`
+        : '')
+    : `<div class="empty"><strong>No results match these filters.</strong>
+        <br>Your search found ${RF.allJobs.length} job${RF.allJobs.length===1?'':'s'}, but none match every filter you've selected.
+        <div class="empty-actions"><button class="loosen-btn" data-rf-clear="1">Clear result filters</button></div>
+      </div>`;
+
+  if(wrap){
+    wrap.innerHTML = cardsHtml;
+  } else {
+    // First-time: wrap the existing card area so future repaints are scoped.
+    results.innerHTML = `<div id="rf-cards">${cardsHtml}</div>` + results.innerHTML;
+  }
+
+  // Re-wire "show more" for the filtered view.
+  const moreBtn = document.getElementById('showMore');
+  if(moreBtn){
+    moreBtn.addEventListener('click', () => {
+      const rest = view.slice(RENDER_CAP_RF);
+      moreBtn.closest('.more-wrap').insertAdjacentHTML('beforebegin', rest.map(j => renderJob(j, kw, loc)).join(''));
+      moreBtn.closest('.more-wrap').remove();
+    });
+  }
+
+  buildResultFilters();   // refresh counts + active state in the bar
+}
+
+// Delegated handler for the filter bar: chip toggles, clear, and mobile expand.
+document.getElementById('resultFilter').addEventListener('click', (e) => {
+  const toggle = e.target.closest('.rf-toggle');
+  if(toggle){
+    const bar = document.getElementById('resultFilter');
+    const open = bar.classList.toggle('rf-open');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    return;
+  }
+  const chip = e.target.closest('.rf-chip');
+  if(chip){
+    const cat = chip.getAttribute('data-rf-cat');
+    const key = chip.getAttribute('data-rf-key');
+    const set = RF.active[cat];
+    if(set.has(key)) set.delete(key); else set.add(key);
+    repaintFiltered();
+    return;
+  }
+  if(e.target.closest('[data-rf-clear]')){
+    RF.active.loc.clear();
+    RF.active.role.clear();
+    repaintFiltered();
+    return;
+  }
+});
 const goBtn = document.getElementById('go');
 
 // Keep experience-level controls from contradicting each other.
@@ -2309,6 +2591,10 @@ async function search(){
   // this one.
   window._ghFailed = false;
   window._ghPartial = null;
+  // Reset post-result filters and hide the bar; a new search rebuilds them.
+  if(typeof RF !== 'undefined'){ RF.active = { loc: new Set(), role: new Set() }; }
+  const _rfBar = document.getElementById('resultFilter');
+  if(_rfBar){ _rfBar.style.display = 'none'; _rfBar.classList.remove('rf-open'); _rfBar.innerHTML = ''; }
   syncExperienceControls();
   const kw = document.getElementById('kw').value.trim().toLowerCase();
   const loc = document.getElementById('loc').value.trim().toLowerCase();
@@ -2841,19 +3127,46 @@ async function search(){
     // results revealed later via "Show more".
     registerJobsForSaving(jobs);
 
-    if(jobs.length){
+    // ---- Post-result filtering: stash the full ranked set + render context so
+    // the filter bar can re-paint a subset instantly, with no re-search. The
+    // bar is built from the states and roles actually present in `jobs`.
+    RF.allJobs = jobs;
+    RF.kw = kw;
+    RF.loc = loc;
+    RF.active = { loc: new Set(), role: new Set() };
+    RF.selectedRoles = (typeof selectedRoles !== 'undefined' && Array.isArray(selectedRoles)) ? selectedRoles.slice() : [];
+    buildResultFilters();
+
+    // The card list paints the FILTERED view (RF.active). On first render
+    // nothing is selected, so this is the full set; toggling a chip re-runs
+    // repaintFiltered() which re-enters this same path with a narrowed view.
+    const view = RF.filtered(jobs);
+
+    if(view.length){
       // Render the first page only. A broad search across six sources can return
       // hundreds of results; painting them all in one innerHTML pass is slow on
       // phones. The count above still reports the full total.
-      const firstPage = jobs.slice(0, RENDER_CAP);
-      html += firstPage.map(j => renderJob(j, kw, loc)).join('');
-      if(jobs.length > RENDER_CAP){
-        const remaining = jobs.length - RENDER_CAP;
+      // Cards go in #rf-cards so the post-result filter can repaint just this
+      // region without disturbing coach-picks / employer-link sections below.
+      const firstPage = view.slice(0, RENDER_CAP);
+      html += '<div id="rf-cards">' + firstPage.map(j => renderJob(j, kw, loc)).join('');
+      if(view.length > RENDER_CAP){
+        const remaining = view.length - RENDER_CAP;
         html += `<div class="more-wrap">
           <button id="showMore" class="secondary">Show ${remaining} more result${remaining===1?'':'s'}</button>
         </div>`;
       }
-    } else {
+      html += '</div>';
+    } else if(jobs.length && (RF.active.loc.size || RF.active.role.size)){
+      // Jobs exist but the post-result filter hid them all — distinct from a
+      // genuinely empty search. Offer to clear the filter rather than the
+      // search-broadening tips (which don't apply — the search found plenty).
+      html += `<div class="empty">
+        <strong>No results match these filters.</strong>
+        <br>Your search found ${jobs.length} job${jobs.length===1?'':'s'}, but none match every filter you've selected.
+        <div class="empty-actions"><button class="loosen-btn" data-rf-clear="1">Clear result filters</button></div>
+      </div>`;
+    } else if(jobs.length){
       // Build targeted, CLICKABLE suggestions from the filters actually in effect.
       // Each carries data-loosen so one tap resets that control and re-runs search.
       // Ordered most-likely-culprit first for our audience (keyword, location lead).
@@ -2910,7 +3223,7 @@ async function search(){
     // use delegated listeners on #results, so appended cards wire automatically.
     const moreBtn = document.getElementById('showMore');
     if(moreBtn){
-      const rest = jobs.slice(RENDER_CAP);
+      const rest = RF.filtered(jobs).slice(RENDER_CAP);
       moreBtn.addEventListener('click', ()=>{
         const wrap = moreBtn.closest('.more-wrap');
         if(!wrap) return;
@@ -2922,6 +3235,12 @@ async function search(){
     // Wire up the clickable "loosen filter" buttons in the empty state
     results.querySelectorAll('.loosen-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
+        // Post-result filter clear: reset RF and repaint, no re-search.
+        if(btn.hasAttribute('data-rf-clear')){
+          RF.active.loc.clear(); RF.active.role.clear();
+          repaintFiltered();
+          return;
+        }
         const act = btn.dataset.loosen;
         const set = (id,val)=>{ const el=document.getElementById(id); if(el) el.value=val; };
         const uncheck = id=>{ const el=document.getElementById(id); if(el) el.checked=false; };
