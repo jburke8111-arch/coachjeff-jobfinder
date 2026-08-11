@@ -2806,12 +2806,23 @@ async function search(){
       // above them still can, but it isn't the default view.
       if(!showExperienced && (isSeniorTitle(t) || beyondEarlyCareer(j))) return false;
 
-      if(level !== 'all'){
-        if(level === 'intern' && !INTERN_RX.test(t)) return false;
-        if(level === 'newgrad' && !NEWGRAD_RX.test(t)) return false;
-        if(level === 'entrylevel' && !ENTRYLVL_RX.test(t)) return false;
-        if(level === 'early' && !(ANY_EARLY_RX.test(t) || REALISTIC_GRAD_RX.test(t))) return false;
-      }
+      // Level gate — screen OUT seniority, don't require a level keyword IN the
+      // title. The experienced gate above already removed senior titles and
+      // (post-scan) description-confirmed 3-4+ yr roles. So for the early-career
+      // buckets, a neutral title like "Communications Specialist" is a valid
+      // entry-level target and MUST survive — the old code deleted it because
+      // the title didn't literally contain "entry level"/"new grad", which
+      // zeroed out most real searches (a bare "communications" search returned
+      // 0 of 3,452). Description-based seniority still filters these once
+      // scanned; unscanned neutral titles show with a "verify the posting"
+      // badge (verificationStatus() handles that).
+      //
+      // 'intern' stays title-bound: an internship announces itself in the title,
+      // and a student choosing "Internship" specifically doesn't want full-time
+      // neutral roles mixed in.
+      if(level === 'intern' && !INTERN_RX.test(t)) return false;
+      // newgrad / entrylevel / early: no positive-title requirement. Kept unless
+      // the senior gate above already cut them.
       afterLevel++;
 
       if((kw || selectedRoles.length) && !keywordMatchesAny(blob, kw)) return false;
