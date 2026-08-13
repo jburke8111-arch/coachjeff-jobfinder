@@ -842,7 +842,7 @@
        only the final result set is read out. -->
   <div class="results" id="results" role="region" aria-label="Job search results" aria-live="polite" aria-busy="false"></div>
 
-  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, SmartRecruiters, The Muse, and Careerjet. Most roles link directly to the application page; Careerjet and some Adzuna listings route through the aggregator and may require a quick signup, and are tagged as such.</p>
+  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, SmartRecruiters, and The Muse. Roles link directly to the application page.</p>
   <p class="note">Match scores, experience tiers, sponsorship badges, and defense/clearance flags are automated estimates read from public job postings — general information to guide your search, not legal, immigration, or career advice. Eligibility for any role depends on your specific situation and the employer's actual requirements; verify on the posting before ruling a job in or out.</p>
 
   <a class="coaching-prompt" href="/coaching.html">
@@ -1757,44 +1757,6 @@ async function fetchSmartRecruiters(keyword, location){
   }
 }
 
-// Fetch broad aggregator postings from Careerjet through our Netlify function.
-// Careerjet is a broad source (like Adzuna): one API, freetext keyword search,
-// millions of postings, no per-company slug discovery and no category mapping.
-// The function keeps CAREERJET_API_KEY server-side (Basic auth) and flags each
-// record aggregator:true so cards show the honest "via Careerjet" tag. Without
-// the key the function returns an empty list, so Careerjet never breaks the
-// search. Returns [] on any failure for the same reason.
-async function fetchCareerjet(keyword, location){
-  try {
-    const params = new URLSearchParams();
-    if(keyword) params.set('keyword', keyword);
-    if(location) params.set('location', location);
-    const resp = await fetch('/.netlify/functions/careerjet?' + params.toString());
-    if(!resp.ok) return [];
-    const data = await resp.json();
-    if(!(data && data.ok && Array.isArray(data.jobs))) return [];
-    return data.jobs
-      .filter(j => j && j.url)
-      .map(j => ({
-        title: j.title || 'Untitled role',
-        company: j.company || j.board || 'Employer',
-        board: j.board || '',
-        sector: j.sector || '',
-        location: j.location || '—',
-        url: j.url,
-        posted: j.posted || null,
-        salary: j.salary || '',
-        source: 'careerjet',
-        id: (j.id != null ? j.id : ('cj-' + (j.url||''))),
-        ats: 'cj',
-        aggregator: j.aggregator !== false,        // Careerjet links are redirects
-        aggregatorName: j.aggregatorName || 'Careerjet'
-      }));
-  } catch(e){
-    return [];
-  }
-}
-
 // Fetch early-career roles from The Muse through our Netlify function.
 // The Muse is a broad source (like Adzuna): one API returns roles from hundreds
 // of employers, no per-company slug discovery. The function maps the keyword to
@@ -2704,7 +2666,7 @@ async function search(){
       : directCompanies.filter(c => c.slug === company);
 
     let jobs = [];
-    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careerjet:0 };
+    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0 };
     let okCos = 0, failCos = 0;
 
     // ---- (1) All six sources start NOW, in parallel ---------------------------
@@ -2726,7 +2688,6 @@ async function search(){
       apiSource('lever',          fetchLeverAPI),
       apiSource('smartrecruiters',fetchSmartRecruiters),
       apiSource('themuse',        fetchTheMuse),
-      apiSource('careerjet',      fetchCareerjet),
     ];
 
     // ---- (2) Progressive render: paint each source as it lands ----------------
@@ -2771,7 +2732,7 @@ async function search(){
       paintProgressive();
     }));
 
-    statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'} and 8 job APIs…</span>`;
+    statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'} and 7 job APIs…</span>`;
 
     // Yield once before the sweep starts. The five APIs are usually much faster
     // than 18 employer boards, so this gives any that have already returned a
@@ -3114,7 +3075,6 @@ async function search(){
       { label: 'Lever',           key: 'lever' },
       { label: 'SmartRecruiters', key: 'smartrecruiters' },
       { label: 'The Muse',        key: 'themuse' },
-      { label: 'Careerjet',       key: 'careerjet' },
     ];
     const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + ${API_SOURCES.map(s=>s.label).join(' + ')} searched`;
     const evalLine = `${totalFetched.toLocaleString()} job${totalFetched===1?'':'s'} evaluated · ${jobs.length.toLocaleString()} matched filters · ${hiddenByFilters.toLocaleString()} filtered out`;
@@ -3152,7 +3112,6 @@ async function search(){
       lever: sourceStats.lever,
       smartrecruiters: sourceStats.smartrecruiters,
       themuse: sourceStats.themuse,
-      careerjet: sourceStats.careerjet,
       adzunaResolved: sourceStats.adzunaResolved || 0,
       boardsOk: okCos, boardsFail: failCos,
       totalFetched, matched: jobs.length
@@ -3413,7 +3372,7 @@ function logSourceHealth(rec){
         `[jobfinder] "${rec.kw||'(all)'}"${rec.loc?(' @ '+rec.loc):''} — ` +
         `boards ${rec.direct} (ok ${rec.boardsOk}/fail ${rec.boardsFail}), ` +
         `USAJobs ${rec.usajobs}, Adzuna ${rec.adzuna}, Ashby ${rec.ashby}, ` +
-        `Greenhouse ${rec.greenhouse}, SmartRecruiters ${rec.smartrecruiters||0}, The Muse ${rec.themuse||0}, Careerjet ${rec.careerjet||0} → ${rec.matched} matched`
+        `Greenhouse ${rec.greenhouse}, SmartRecruiters ${rec.smartrecruiters||0}, The Muse ${rec.themuse||0} → ${rec.matched} matched`
       );
     }
   } catch(e){ /* storage full or blocked — ignore, never break search */ }
@@ -3434,8 +3393,7 @@ function computeHealthSummary(){
     ['Greenhouse','greenhouse'],
     ['Lever','lever'],
     ['SmartRecruiters','smartrecruiters'],
-    ['The Muse','themuse'],
-    ['Careerjet','careerjet']
+    ['The Muse','themuse']
   ];
   const rows = sources.map(([label,key])=>{
     const vals = log.map(r => Number(r[key])||0);
@@ -3473,7 +3431,7 @@ function coachJeffHealth(showRecent){
       boards: r.direct, USAJobs: r.usajobs, Adzuna: r.adzuna,
       Ashby: r.ashby, Greenhouse: r.greenhouse,
       SmartRecruiters: r.smartrecruiters||0, 'The Muse': r.themuse||0,
-      Careerjet: r.careerjet||0, matched: r.matched
+      matched: r.matched
     }));
     console.log(`%cLast ${k} searches`, 'font-weight:bold');
     (console.table ? console.table : console.log)(recent);
