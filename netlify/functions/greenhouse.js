@@ -158,12 +158,18 @@ const GREENHOUSE_BOARDS = [  // ---- tech / software ----
   // ---- tech / software ----
 ];
 
-// How many boards to fetch at once. 95 sequential fetches would blow the
-// function's execution window; 95 fully parallel risks rate-limiting from
-// Greenhouse and a memory spike from holding every board's full job content
-// in flight simultaneously. 12 at a time keeps both in check — roughly 8
-// batches, each bounded by the 7s per-board timeout.
-const BATCH_SIZE = 12;
+// Max boards fetched concurrently. This is now a CONCURRENCY POOL cap (see
+// inBatches below), not a fixed batch size — the pool keeps this many requests
+// in flight at all times and starts the next board the instant any one
+// finishes, so a slow board no longer stalls the boards behind it.
+//
+// 20 in flight comfortably clears all 96 boards inside the budget while staying
+// well short of any rate-limit or memory concern (each fetch now pulls only the
+// lightweight jobs list, no descriptions). The old value of 12 combined with a
+// batch-boundary wait (await Promise.all per batch of 12) and a 7s per-board
+// timeout was the "36 of 92" bug: 2–3 slow boards, each stalling its whole
+// batch up to 7s, exhausted the budget after ~3 batches (~36 boards).
+const BATCH_SIZE = 20;
 
 // ---------------------------------------------------------------------------
 // EXPERIENCE GATE
@@ -284,7 +290,7 @@ function getLocation(job) {
 // any minYears computed here was overwritten by checkjobs' own scan. Dropping
 // it removes a duplicate fetch AND fixes the broad-search timeout, since
 // pulling every description from all 92 boards was what blew the time budget.
-async function fetchBoard(board, ms = 7000){
+async function fetchBoard(board, ms = 3500){
   const apiUrl = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board)}/jobs`;
   const resp = await withTimeout(fetch(apiUrl, { headers: { "Accept": "application/json" } }), ms);
   if(!resp.ok) return { ok: false, httpStatus: resp.status, jobs: [] };
@@ -295,33 +301,62 @@ async function fetchBoard(board, ms = 7000){
   return { ok: true, httpStatus: resp.status, jobs };
 }
 
-// Run an async mapper over the board list in fixed-size batches, bounded by a
-// wall-clock budget. THIS IS THE FIX for the "broad query returns 0" bug: a
-// search like "analyst" matches across far more of the 92 boards than a narrow
-// one, so the whole invocation could run past Netlify's function timeout — and
-// a timeout returns NOTHING. The client's fetchGreenhouseAPI() sees the failed
-// request and falls open to [], which is indistinguishable from "no matches".
-// So "analyst" (broad) showed Greenhouse 0 while "data analyst" (narrow)
-// showed 730 — impossible unless the broad one was silently dying.
+// Run an async mapper over the board list with a CONTINUOUS CONCURRENCY POOL,
+// bounded by a wall-clock budget. THIS IS THE FIX for the "broad query returns
+// partial / 0" bug.
 //
-// Now: once we're within the budget, stop starting new batches and return what
-// finished. Partial Greenhouse results beat zero Greenhouse results every time
-// — a student sees most of the matches instead of a mysterious empty source.
-// The caller reports how complete the sweep was so the UI can say so.
-const TIME_BUDGET_MS = 8000;   // Netlify default function limit is 10s; leave headroom for JSON + response
+// Background: a search like "analyst" matches across far more of the 96 boards
+// than a narrow one. If the whole invocation runs past Netlify's 10s function
+// limit, the function is killed and returns NOTHING — the client's
+// fetchGreenhouseAPI() sees the failed request and falls open to [], which is
+// indistinguishable from "no matches". That's why "analyst" (broad) once showed
+// Greenhouse 0 while "data analyst" (narrow) showed hundreds.
+//
+// The earlier fix batched 12 boards and did `await Promise.all` per batch — but
+// that waits for the SLOWEST board in each batch of 12 before starting the next
+// batch, so 2–3 slow boards (each up to the per-board timeout) exhausted the
+// budget after ~3 batches. Result: "36 of 92 boards searched".
+//
+// This version keeps `size` requests in flight AT ALL TIMES: the moment any one
+// board finishes, the next board starts immediately. A slow board no longer
+// blocks the boards behind it — it just occupies one of the N pool slots while
+// the other N-1 keep flowing. Combined with a tighter per-board timeout, the
+// full 96-board sweep now completes well inside the budget.
+//
+// Budget behavior is unchanged in spirit: once we pass the budget we stop
+// STARTING new boards and let in-flight ones finish, then report how complete
+// the sweep was so the UI can flag partial results. Return contract is
+// identical (_boardsCovered / _boardsTotal / _complete on the results array),
+// so the handler and the client's partial-results UI need no changes. Result
+// order is not guaranteed, which is fine — callers flat() and filter anyway.
+const TIME_BUDGET_MS = 9000;   // Netlify default function limit is 10s; leave ~1s for JSON + response
 
 async function inBatches(items, size, fn){
   const started = Date.now();
   const out = [];
   let covered = 0;
-  for (let i = 0; i < items.length; i += size) {
-    // Stop launching new work if we're out of budget. A batch already in flight
-    // is awaited; we just don't start the next one.
-    if (Date.now() - started > TIME_BUDGET_MS) break;
-    const slice = items.slice(i, i + size);
-    out.push(...await Promise.all(slice.map(fn)));
-    covered = i + slice.length;
+  let next = 0;              // index of the next board to start
+  const overBudget = () => (Date.now() - started) > TIME_BUDGET_MS;
+
+  // A single worker pulls boards off the shared index until the list is
+  // exhausted or the budget is blown. `size` workers run concurrently, so
+  // there are always up to `size` fetches in flight with no batch barrier.
+  async function worker(){
+    while(true){
+      if(overBudget()) return;
+      const i = next++;
+      if(i >= items.length) return;
+      const result = await fn(items[i]);
+      out.push(result);
+      covered++;
+    }
   }
+
+  const pool = Math.min(size, items.length);
+  const workers = [];
+  for(let w = 0; w < pool; w++) workers.push(worker());
+  await Promise.all(workers);
+
   out._boardsCovered = covered;
   out._boardsTotal = items.length;
   out._complete = covered >= items.length;
