@@ -842,7 +842,7 @@
        only the final result set is read out. -->
   <div class="results" id="results" role="region" aria-label="Job search results" aria-live="polite" aria-busy="false"></div>
 
-  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, SmartRecruiters, and The Muse. Roles link directly to the application page.</p>
+  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, SmartRecruiters, The Muse, and CareerOneStop. Roles link directly to the application page. CareerOneStop data (from the National Labor Exchange) is provided courtesy of the U.S. Department of Labor, Employment and Training Administration (DOLETA), and the Minnesota Department of Employment &amp; Economic Development (DEED).</p>
   <p class="note">Match scores, experience tiers, sponsorship badges, and defense/clearance flags are automated estimates read from public job postings — general information to guide your search, not legal, immigration, or career advice. Eligibility for any role depends on your specific situation and the employer's actual requirements; verify on the posting before ruling a job in or out.</p>
 
   <a class="coaching-prompt" href="/coaching.html">
@@ -1792,6 +1792,41 @@ async function fetchTheMuse(keyword, location){
   }
 }
 
+// Fetch National Labor Exchange roles via CareerOneStop (U.S. DOL) through our
+// Netlify function. The function keeps COS_USERID and COS_TOKEN server-side and
+// calls the v1 "List Jobs" API (api.careeronestop.org/v1/jobsearch). COS data
+// carries a mandatory attribution requirement (DOLETA + Minnesota DEED) — the
+// footer/note text on the page satisfies it. Returns [] on any failure so
+// CareerOneStop never breaks the rest of the search.
+async function fetchCareerOneStop(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('keyword', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/careeronestop?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    if(!(data && data.ok && Array.isArray(data.jobs))) return [];
+    return data.jobs
+      .filter(j => j && j.url)
+      .map(j => ({
+        title: j.title || 'Untitled role',
+        company: j.company || 'Employer',
+        board: j.board || '',
+        sector: j.sector || '',
+        location: j.location || '—',
+        url: j.url,
+        posted: j.posted || null,
+        salary: j.salary || '',
+        source: 'careeronestop',
+        id: (j.id != null ? j.id : ('cos-' + (j.url||''))),
+        ats: 'cos'
+      }));
+  } catch(e){
+    return [];
+  }
+}
+
 // Fetch Greenhouse-hosted roles through our Netlify function.
 // Keeps Greenhouse calls server-side and avoids dozens of browser requests.
 // The serverless function returns clean records today; the mapping below is
@@ -2436,6 +2471,7 @@ function renderJob(j, kw, loc){
             ${j.source === 'greenhouse' ? '<span class="tag gray">Greenhouse</span>' : ''}
             ${j.source === 'usajobs' ? '<span class="tag gray">USAJOBS</span>' : ''}
             ${j.source === 'themuse' ? '<span class="tag gray">The Muse</span>' : ''}
+            ${j.source === 'careeronestop' ? '<span class="tag gray">CareerOneStop (DOL)</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
           <div class="why"><strong>Why this job?</strong><div class="why-list">${why}</div></div>
@@ -2666,7 +2702,7 @@ async function search(){
       : directCompanies.filter(c => c.slug === company);
 
     let jobs = [];
-    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0 };
+    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0 };
     let okCos = 0, failCos = 0;
 
     // ---- (1) All six sources start NOW, in parallel ---------------------------
@@ -2688,6 +2724,7 @@ async function search(){
       apiSource('lever',          fetchLeverAPI),
       apiSource('smartrecruiters',fetchSmartRecruiters),
       apiSource('themuse',        fetchTheMuse),
+      apiSource('careeronestop',  fetchCareerOneStop),
     ];
 
     // ---- (2) Progressive render: paint each source as it lands ----------------
@@ -2732,7 +2769,7 @@ async function search(){
       paintProgressive();
     }));
 
-    statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'} and 7 job APIs…</span>`;
+    statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'} and 8 job APIs…</span>`;
 
     // Yield once before the sweep starts. The five APIs are usually much faster
     // than 18 employer boards, so this gives any that have already returned a
@@ -3075,6 +3112,7 @@ async function search(){
       { label: 'Lever',           key: 'lever' },
       { label: 'SmartRecruiters', key: 'smartrecruiters' },
       { label: 'The Muse',        key: 'themuse' },
+      { label: 'CareerOneStop',   key: 'careeronestop' },
     ];
     const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + ${API_SOURCES.map(s=>s.label).join(' + ')} searched`;
     const evalLine = `${totalFetched.toLocaleString()} job${totalFetched===1?'':'s'} evaluated · ${jobs.length.toLocaleString()} matched filters · ${hiddenByFilters.toLocaleString()} filtered out`;
@@ -3112,6 +3150,7 @@ async function search(){
       lever: sourceStats.lever,
       smartrecruiters: sourceStats.smartrecruiters,
       themuse: sourceStats.themuse,
+      careeronestop: sourceStats.careeronestop,
       adzunaResolved: sourceStats.adzunaResolved || 0,
       boardsOk: okCos, boardsFail: failCos,
       totalFetched, matched: jobs.length
