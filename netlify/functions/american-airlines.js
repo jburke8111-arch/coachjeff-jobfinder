@@ -35,10 +35,72 @@
 // as a dead link.
 
 const AA_ENDPOINT = 'https://jobs.aa.com/services/recruiting/v1/jobs';
+const AA_SEARCH_PAGE = 'https://jobs.aa.com/search/?q=analyst';
 
 // How many pages to sweep at most (each page is ~10-20 roles). Kept small
 // so a keyword with thousands of hits can't make the function run long.
 const MAX_PAGES = 3;
+
+const BROWSER_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
+  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+  'Chrome/120.0.0.0 Safari/537.36';
+
+// A fuller set of browser headers. AA sits behind Akamai bot protection;
+// a bare POST gets 403. These replicate what a real Chrome tab sends,
+// including the sec-fetch-* and sec-ch-ua hints Akamai looks for.
+function browserHeaders(extra) {
+  return Object.assign({
+    'User-Agent': BROWSER_UA,
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Origin': 'https://jobs.aa.com',
+    'Referer': 'https://jobs.aa.com/search/?q=analyst',
+    'sec-ch-ua': '"Chromium";v="120", "Not(A:Brand";v="24", "Google Chrome";v="120"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"macOS"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin'
+  }, extra || {});
+}
+
+// Step 1: hit the public search page to collect any Set-Cookie values
+// (Akamai's _abck / bm_sz session cookies). Returns a Cookie header string,
+// or '' if none came back. Failure here is non-fatal — we still try the POST.
+async function getSessionCookie() {
+  try {
+    const r = await fetch(AA_SEARCH_PAGE, {
+      method: 'GET',
+      headers: browserHeaders({
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'none',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1'
+      })
+    });
+    // node-fetch / undici expose combined Set-Cookie via getSetCookie() or raw.
+    let cookies = [];
+    if (typeof r.headers.getSetCookie === 'function') {
+      cookies = r.headers.getSetCookie();
+    } else {
+      const raw = r.headers.get('set-cookie');
+      if (raw) cookies = [raw];
+    }
+    // Keep just the name=value part of each cookie.
+    const jar = cookies
+      .map(c => String(c).split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+    console.log('[aa] session cookie chars:', jar.length);
+    return jar;
+  } catch (e) {
+    console.log('[aa] cookie step failed (non-fatal):', e && e.message);
+    return '';
+  }
+}
 
 exports.handler = async function (event) {
   const qs = event.queryStringParameters || {};
@@ -46,6 +108,9 @@ exports.handler = async function (event) {
   const location = (qs.location || '').trim();
 
   try {
+    // Two-step: grab a session cookie first, then send it with the POST.
+    const cookie = await getSessionCookie();
+
     let all = [];
     let loggedShape = false;
 
@@ -64,25 +129,21 @@ exports.handler = async function (event) {
         skills: []
       };
 
+      const postHeaders = browserHeaders({ 'Content-Type': 'application/json' });
+      if (cookie) postHeaders['Cookie'] = cookie;
+
       const resp = await fetch(AA_ENDPOINT, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          // Some SuccessFactors/Jobs2Web tenants reject requests that
-          // don't look browser-originated. These headers make the POST
-          // resemble the site's own call.
-          'Origin': 'https://jobs.aa.com',
-          'Referer': 'https://jobs.aa.com/search/',
-          'User-Agent':
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
-            'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-            'Chrome/120.0 Safari/537.36'
-        },
+        headers: postHeaders,
         body: JSON.stringify(body)
       });
 
       if (!resp.ok) {
+        // Log the status and a snippet of the body so the function log
+        // shows WHY (Akamai challenge page, plain 403, etc.).
+        let snippet = '';
+        try { snippet = (await resp.text()).slice(0, 200); } catch (e) {}
+        console.log('[aa] upstream ' + resp.status + ' body:', snippet);
         // First page failing is a real error; a later page failing just
         // ends the sweep with whatever we already gathered.
         if (page === 0) {
