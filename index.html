@@ -3126,7 +3126,17 @@ async function search(){
     // remained AFTER that stage, so the first big drop names the culprit.
     let diagLine = '';
     if(new URLSearchParams(location.search).get('diag') === '1'){
-      diagLine = 'Filter funnel: fetched ' + totalFetched
+      // Raw pull = sum of what every source returned before dedup; totalFetched
+      // is the unique count after dedup. The gap is cross-source overlap. Use
+      // the unique number as the defensible "postings surfaced" figure — run a
+      // few broad early-career searches and average it. Rendered via innerHTML,
+      // so the two lines are joined with <br>, not a newline.
+      const rawPull = API_SOURCES.reduce((n, s) => n + (sourceStats[s.key] || 0), 0)
+        + (sourceStats.direct || 0);
+      const overlap = Math.max(0, rawPull - totalFetched);
+      diagLine = 'Reach: ' + rawPull.toLocaleString() + ' raw across 8 sources → '
+        + totalFetched.toLocaleString() + ' unique (' + overlap.toLocaleString() + ' overlap)<br>'
+        + 'Filter funnel: fetched ' + totalFetched
         + ' → level ' + afterLevel
         + ' → keyword ' + afterKeyword
         + ' → location ' + afterLocation
