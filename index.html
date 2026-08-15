@@ -2595,6 +2595,42 @@ function locationTerms(input){
   return [q];
 }
 
+// Parse a location query into { city, stateAliases, terms }.
+// Handles three shapes:
+//   "texas"          -> { city:null, stateAliases:[tx,texas], terms:[...] }  (state search)
+//   "dallas, tx"     -> { city:"dallas", stateAliases:[tx,texas], terms:[...] }  (city+state)
+//   "dallas"         -> { city:"dallas", stateAliases:null, terms:["dallas"] }  (plain city)
+// The city+state case is the important one: the old locationTerms glued
+// "dallas tx" into a single token that only matched a job literally containing
+// "dallas tx", so "Dallas, Texas" / "Dallas" were rejected. Splitting the state
+// off and matching it via its aliases is what fixes the mass over-filtering.
+function parseLocationInput(input){
+  const q = normalizeLocationText(input);
+  if(!q) return { city:null, stateAliases:null, terms:[] };
+
+  // Whole input is a state name/abbreviation.
+  for(const [state, terms] of Object.entries(STATE_ALIASES)){
+    if(terms.includes(q) || state === q){
+      return { city:null, stateAliases:terms, terms:terms.slice() };
+    }
+  }
+
+  // Input ends with a state token/alias -> split into city + state.
+  const toks = q.split(' ');
+  for(let cut = toks.length - 1; cut >= 1; cut--){
+    const tail = toks.slice(cut).join(' ');
+    for(const [state, terms] of Object.entries(STATE_ALIASES)){
+      if(terms.includes(tail) || state === tail){
+        const city = toks.slice(0, cut).join(' ');
+        return { city, stateAliases:terms, terms:[city, ...terms] };
+      }
+    }
+  }
+
+  // Plain single term (lone city or free text).
+  return { city:q, stateAliases:null, terms:[q] };
+}
+
 // Cheap, synchronous subset of the real filter chain, used only for the
 // progressive preview paints while sources are still arriving. It applies the
 // same title/keyword/location/sector/work/clearance/US/degree gates and the same
@@ -2654,22 +2690,40 @@ function previewFilter(all, o){
 }
 
 function locationMatches(locText, input){
-  const q = normalizeLocationText(input);
-  if(!q) return true;
+  const parsed = parseLocationInput(input);
+  if(!parsed.terms.length) return true;
 
   const loc = normalizeLocationText(locText);
-  const terms = locationTerms(q);
+  const has = t => (t && t.length === 2)
+    ? new RegExp('(^|\\s)' + t + '(\\s|$)').test(loc)
+    : (t ? loc.includes(t) : false);
 
-  // Treat broad remote/US locations as potentially relevant unless user typed a specific city.
-  if(/\b(remote|united states|usa|us)\b/.test(loc) && terms.length === 1 && terms[0].length > 2 && !Object.values(STATE_ALIASES).some(arr => arr.includes(terms[0]))) {
-    return loc.includes(terms[0]);
+  // City + state typed (e.g. "dallas, tx" or "dallas texas"): require the CITY
+  // to appear. The state is corroboration, not a hard requirement — job boards
+  // constantly disagree on "TX" vs "Texas" vs omitting the state, and a bare
+  // city name is unambiguous enough. This is the fix for the bug where
+  // "dallas, tx" collapsed into one rigid "dallas tx" token and rejected
+  // "Dallas, Texas", "Dallas", etc. — killing almost every legitimate result.
+  if(parsed.city && parsed.stateAliases){
+    return loc.includes(parsed.city);
   }
 
-  return terms.some(term => {
-    const t = normalizeLocationText(term);
-    if(t.length === 2) return new RegExp('(^|\\s)' + t + '(\\s|$)').test(loc);
-    return loc.includes(t);
-  });
+  // State-only search (e.g. "texas"): match if any alias of that state appears.
+  if(!parsed.city && parsed.stateAliases){
+    // Broad remote/US postings are surfaced too, so a state search doesn't hide
+    // remote-US roles a student could take from that state.
+    if(/\b(remote|united states)\b/.test(loc)) return true;
+    return parsed.stateAliases.some(has);
+  }
+
+  // Plain single term (a lone city, or free text). Treat broad remote/US
+  // postings as potentially relevant unless the user typed a 2-letter state.
+  const term = parsed.city || parsed.terms[0];
+  if(/\b(remote|united states)\b/.test(loc) && term && term.length > 2
+     && !Object.values(STATE_ALIASES).some(arr => arr.includes(term))){
+    return loc.includes(term);
+  }
+  return has(term);
 }
 
 function isStateSearch(input){
