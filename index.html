@@ -3172,8 +3172,14 @@ async function search(){
       // server-resolvable id). GH jobs given a synthetic string id (a rare
       // fallback for malformed records) are excluded, since checkjobs needs the
       // real Greenhouse numeric id to fetch the description.
+      //
+      // Workday is included too: checkjobs reconstructs its CXS detail endpoint
+      // from the apply url (no id needed), so any workday job with a real url
+      // qualifies. This is what lets the experience tier badge appear on Workday
+      // roles — subject to the same scan cap as the rest, so the top-ranked
+      // matches get scanned and the overflow honestly shows "not verified".
       const fetchable = jobs.filter(j => j && j.id != null
-        && (j.ats === 'gh' || j.ats === 'lever')
+        && (j.ats === 'gh' || j.ats === 'lever' || j.ats === 'workday')
         && !(j.ats === 'gh' && typeof j.id === 'string' && j.id.startsWith('gh-')));
 
       // When the user ticks "Work Authorization Requirements", do a THOROUGH scan:
