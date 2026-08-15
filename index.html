@@ -769,6 +769,13 @@
             </span>
           </span>
           <span class="chk">
+            <input id="nointern" type="checkbox" checked>
+            <span class="chk-text">
+              <label for="nointern" class="inline">Exclude internships</label>
+              <span class="hint">On by default. Hides internships and co-ops so you see full-time roles only. Uncheck if you're looking for an internship.</span>
+            </span>
+          </span>
+          <span class="chk">
             <input id="showexperienced" type="checkbox">
             <span class="chk-text">
               <label for="showexperienced" class="inline">Show experienced jobs</label>
@@ -2621,6 +2628,7 @@ function previewFilter(all, o){
       if(o.level === 'entrylevel' && !ENTRYLVL_RX.test(t)) continue;
       if(o.level === 'early' && !(ANY_EARLY_RX.test(t) || REALISTIC_GRAD_RX.test(t))) continue;
     }
+    if(o.noIntern && o.level !== 'intern' && INTERN_RX.test(t)) continue;
     if((o.kw || selectedRoles.length) && !keywordMatchesAny(blob, o.kw)) continue;
     if(o.loc && !locationMatches(j.location, o.loc)) continue;
     if(o.sector !== 'any' && j.sector !== o.sector) continue;
@@ -2693,6 +2701,7 @@ async function search(){
   const hideClear = document.getElementById('noclear').checked;
   const usOnly = document.getElementById('usonly').checked;
   const degreeOnly = document.getElementById('degreeonly').checked;
+  const noIntern = document.getElementById('nointern') ? document.getElementById('nointern').checked : false;
   const showExperienced = document.getElementById('showexperienced') ? document.getElementById('showexperienced').checked : false;
   const showSuggest = document.getElementById('showsuggest') ? document.getElementById('showsuggest').checked : false;
 
@@ -2764,7 +2773,7 @@ async function search(){
         paintQueued = false;
         if(progressiveDone) return;
         try {
-          const preview = previewFilter(jobs, {kw, loc, level, work, sector, hideClear, usOnly, degreeOnly, showExperienced});
+          const preview = previewFilter(jobs, {kw, loc, level, work, sector, hideClear, usOnly, degreeOnly, showExperienced, noIntern});
           if(!preview.length) return;
           countEl.textContent = `${preview.length} matching job${preview.length===1?'':'s'} so far…`;
           // Flag these as provisional so renderJob shows "⏳ Still checking…"
@@ -2910,6 +2919,11 @@ async function search(){
       // and a student choosing "Internship" specifically doesn't want full-time
       // neutral roles mixed in.
       if(level === 'intern' && !INTERN_RX.test(t)) return false;
+      // "Exclude internships" (default on): drop intern/co-op titles so a
+      // graduated job seeker sees full-time roles only. Skipped when the user
+      // has deliberately set Level = Internships, since that explicit choice
+      // should win over the default.
+      if(noIntern && level !== 'intern' && INTERN_RX.test(t)) return false;
       // newgrad / entrylevel / early: no positive-title requirement. Kept unless
       // the senior gate above already cut them.
       afterLevel++;
@@ -3644,6 +3658,7 @@ function currentSearchState(){
     sort:document.getElementById('sort').value,
     usonly:document.getElementById('usonly').checked,
     degreeonly:document.getElementById('degreeonly').checked,
+    nointern:document.getElementById('nointern') ? document.getElementById('nointern').checked : true,
     showexperienced:document.getElementById('showexperienced') ? document.getElementById('showexperienced').checked : false,
     noclear:document.getElementById('noclear').checked,
     showsuggest:document.getElementById('showsuggest').checked,
@@ -4352,6 +4367,7 @@ document.getElementById('reset').addEventListener('click', ()=>{
   document.getElementById('sort').value = 'best';
   document.getElementById('usonly').checked = true;
   document.getElementById('degreeonly').checked = true;
+  if(document.getElementById('nointern')) document.getElementById('nointern').checked = true;
   if(document.getElementById('showexperienced')) document.getElementById('showexperienced').checked = false;
   document.getElementById('noclear').checked = false;
   document.getElementById('showsuggest').checked = false;
