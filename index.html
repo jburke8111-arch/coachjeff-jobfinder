@@ -3240,6 +3240,28 @@ async function search(){
             }
           });
 
+          // Hide the "Not an entry-level role" tier (6+ years, the top row of the
+          // Equivalency Guide) once the description scan has actually confirmed
+          // the requirement. The Guide is explicit that this tier is beyond what
+          // internships/projects/coursework can substitute — "the answer is no" —
+          // so, like the clearly non-degree/hourly 'drop' verdicts, these are
+          // removed rather than shown with a caution badge. The 3–5 year
+          // "Proceed with caution" tier is a genuine stretch and STAYS visible;
+          // only the 6+ wall is dropped. Uses experienceTier()'s own softening
+          // (a "preferred" ask counts one year less), so "7+ preferred" isn't
+          // treated as harshly as "6+ required". Respects the user's
+          // "show experienced roles" toggle: if they opted in, nothing is hidden.
+          if(!showExperienced){
+            const notEntryLevel = j => {
+              const y = Number(j.minYears || 0);
+              if(!y) return false;                                  // unscanned/none -> keep
+              const effective = j.yearsPreferred ? Math.max(1, y - 1) : y;
+              return effective >= 6;                                // matches the tier-out row (from: 6)
+            };
+            window._notEntryHidden = jobs.filter(notEntryLevel).length;
+            jobs = jobs.filter(j => !notEntryLevel(j));
+          }
+
           // How many qualified for verification but were cut by the server cap.
           // Surfaced below so an unverified role is distinguishable from a
           // verified one — otherwise the cap silently mislabels the overflow.
