@@ -246,6 +246,38 @@ async function fetchDescription(job){
       }
     }
 
+    // Workday individual job JSON. The apply URL looks like:
+    //   https://{tenant}.wd{N}.myworkdayjobs.com/{site}/job/{...path...}
+    // Its structured-JSON twin is the CXS detail endpoint:
+    //   GET https://{tenant}.wd{N}.myworkdayjobs.com/wday/cxs/{tenant}/{site}{externalPath}
+    //   Accept: application/json
+    // which returns jobPostingInfo.jobDescription (HTML). Without the Accept
+    // header the SAME url serves the careers-page HTML shell instead, so the
+    // header is what makes this trusted structured text rather than scraped
+    // markup. We reconstruct the CXS url by parsing tenant/site/path out of the
+    // apply url — the browser already sends job.url, so no extra payload field
+    // is needed. Trusted:true because jobDescription is structured API text, the
+    // same standard the gh/lever branches require before a number is parsed.
+    if(job.ats === 'workday' && url){
+      const m = url.match(/^https:\/\/([^.]+)\.(wd\d+)\.myworkdayjobs\.com\/([^\/]+)(\/job\/.+)$/i);
+      if(m){
+        const tenant = m[1], dc = m[2], site = m[3], path = m[4];
+        const cxs = `https://${tenant}.${dc}.myworkdayjobs.com/wday/cxs/${tenant}/${site}${path}`;
+        const r = await withTimeout(fetch(cxs, { headers: { 'Accept': 'application/json' } }), 7000);
+        if(r.ok){
+          const d = await r.json();
+          const info = (d && d.jobPostingInfo) || {};
+          const parts = [
+            info.jobDescription || '',
+            info.additionalLocations || '',
+            info.jobRequisitionLocation && info.jobRequisitionLocation.descriptor || ''
+          ];
+          const text = stripHtml(parts.join(' '));
+          if(text) return { text, trusted: true };
+        }
+      }
+    }
+
     // Fallback: fetch the public page and scan its raw text. Good enough for
     // the boolean drop/flag scans, NOT good enough to extract a number from.
     const r = await withTimeout(fetch(url), 7000);
