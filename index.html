@@ -856,7 +856,7 @@
        only the final result set is read out. -->
   <div class="results" id="results" role="region" aria-label="Job search results" aria-live="polite" aria-busy="false"></div>
 
-  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, SmartRecruiters, The Muse, and CareerOneStop. Roles link directly to the application page.</p>
+  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, SmartRecruiters, The Muse, CareerOneStop, and Workday-hosted employers. Roles link directly to the application page.</p>
   <div class="cos-attribution">
     <a href="https://www.careeronestop.org/" target="_blank" rel="noopener">
       <img src="https://www.careeronestop.org/tridionmultimedia/tcm24-26158_CareerOneStopLogo-linktous.gif"
@@ -1849,6 +1849,77 @@ async function fetchCareerOneStop(keyword, location){
   }
 }
 
+// ---- Workday-hosted employers -------------------------------------------
+// Workday powers the careers site of a huge share of large employers. Every
+// Workday tenant is backed by the same JSON endpoint, so ONE Netlify function
+// (/workday) serves them all — each employer is just a config row here with
+// its tenant, data-center number (wd), and site path. Coordinates are read
+// once off the employer's {tenant}.wd{N}.myworkdayjobs.com/{site} URL.
+//
+// To add an employer: confirm it's really Workday (many big employers use
+// Phenom/iCIMS/Taleo instead), grab the three coordinates from its careers
+// URL, test via /.netlify/functions/workday?tenant=..&wd=..&site=.. , then
+// add a row below. Location is NOT sent to Workday (its location facets are
+// opaque per-tenant); we pull by keyword and let the page's own location
+// filter narrow the merged results — same as the other API sources.
+const WORKDAY_EMPLOYERS = [
+  { name:'UT Austin',       tenant:'utaustin', wd:'1', site:'UTstaff',                sector:'education'  },
+  { name:'Cleveland Clinic',tenant:'ccf',      wd:'1', site:'ClevelandClinicCareers', sector:'healthcare' },
+  { name:'Cigna',           tenant:'cigna',    wd:'5', site:'cignacareers',           sector:'healthcare' },
+  // Toyota (Plano) — tenant:'toyota', wd:'5', site:'TMNA' — was in Workday
+  // maintenance when tested; re-verify the coordinates then uncomment:
+  // { name:'Toyota', tenant:'toyota', wd:'5', site:'TMNA', sector:'industrial' },
+];
+
+// Fetch one Workday employer through our /workday function. Returns [] on any
+// failure so a single dead/slow tenant never breaks the sweep.
+async function fetchWorkdayEmployer(emp, keyword){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('keyword', keyword);
+    params.set('tenant',  emp.tenant);
+    params.set('wd',      emp.wd);
+    params.set('site',    emp.site);
+    params.set('company', emp.name);
+    if(emp.sector) params.set('sector', emp.sector);
+    const resp = await fetch('/.netlify/functions/workday?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    if(!(data && data.ok && Array.isArray(data.jobs))) return [];
+    return data.jobs
+      .filter(j => j && j.url)
+      .map(j => ({
+        title:    j.title    || 'Untitled role',
+        company:  j.company  || emp.name,
+        board:    j.board    || emp.name,
+        sector:   j.sector   || emp.sector || '',
+        location: j.location || '—',
+        url:      j.url,
+        posted:   j.posted   || null,
+        salary:   j.salary   || '',
+        source:   'workday',
+        id:       (j.id != null ? j.id : ('wd-' + (j.url||''))),
+        ats:      'workday'
+      }));
+  } catch(e){
+    return [];
+  }
+}
+
+// Sweep all configured Workday employers in parallel and merge. Matches the
+// (keyword, location) signature of the other API sources so it slots into the
+// apiSource() array unchanged; location is applied later by the shared filter.
+async function fetchWorkday(keyword, location){
+  try {
+    const batches = await Promise.all(
+      WORKDAY_EMPLOYERS.map(emp => fetchWorkdayEmployer(emp, keyword))
+    );
+    return batches.flat();
+  } catch(e){
+    return [];
+  }
+}
+
 // Fetch Greenhouse-hosted roles through our Netlify function.
 // Keeps Greenhouse calls server-side and avoids dozens of browser requests.
 // The serverless function returns clean records today; the mapping below is
@@ -2494,6 +2565,7 @@ function renderJob(j, kw, loc){
             ${j.source === 'usajobs' ? '<span class="tag gray">USAJOBS</span>' : ''}
             ${j.source === 'themuse' ? '<span class="tag gray">The Muse</span>' : ''}
             ${j.source === 'careeronestop' ? '<span class="tag gray">CareerOneStop (DOL)</span>' : ''}
+            ${j.source === 'workday' ? '<span class="tag gray">Workday</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
           <div class="why"><strong>Why this job?</strong><div class="why-list">${why}</div></div>
@@ -2780,7 +2852,7 @@ async function search(){
       : directCompanies.filter(c => c.slug === company);
 
     let jobs = [];
-    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0 };
+    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, workday:0 };
     let okCos = 0, failCos = 0;
 
     // ---- (1) All six sources start NOW, in parallel ---------------------------
@@ -2803,6 +2875,7 @@ async function search(){
       apiSource('smartrecruiters',fetchSmartRecruiters),
       apiSource('themuse',        fetchTheMuse),
       apiSource('careeronestop',  fetchCareerOneStop),
+      apiSource('workday',        fetchWorkday),
     ];
 
     // ---- (2) Progressive render: paint each source as it lands ----------------
@@ -3196,6 +3269,7 @@ async function search(){
       { label: 'SmartRecruiters', key: 'smartrecruiters' },
       { label: 'The Muse',        key: 'themuse' },
       { label: 'CareerOneStop',   key: 'careeronestop' },
+      { label: 'Workday',         key: 'workday' },
     ];
     const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + ${API_SOURCES.map(s=>s.label).join(' + ')} searched`;
     const evalLine = `${totalFetched.toLocaleString()} job${totalFetched===1?'':'s'} evaluated · ${jobs.length.toLocaleString()} matched filters · ${hiddenByFilters.toLocaleString()} filtered out`;
@@ -3244,6 +3318,7 @@ async function search(){
       smartrecruiters: sourceStats.smartrecruiters,
       themuse: sourceStats.themuse,
       careeronestop: sourceStats.careeronestop,
+      workday: sourceStats.workday,
       adzunaResolved: sourceStats.adzunaResolved || 0,
       boardsOk: okCos, boardsFail: failCos,
       totalFetched, matched: jobs.length
