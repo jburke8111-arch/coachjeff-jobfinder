@@ -1,24 +1,30 @@
 // netlify/functions/careeronestop.js
 //
-// Serverless proxy for the CareerOneStop (U.S. DOL) "List Jobs" Web API v1,
+// Serverless proxy for the CareerOneStop (U.S. DOL) "List Jobs" Web API (v2),
 // which searches the National Labor Exchange (NLx) and recognizes the O*NET
 // taxonomy. Keeps the CareerOneStop credentials server-side and returns a clean
 // { ok, jobs[] } shape that index.html's fetchCareerOneStop() already expects.
 //
+// WHY v2: CareerOneStop only supports the v1 Jobs API for accounts enrolled
+// BEFORE Aug 27, 2024. Accounts registered after that date (Jeff's was Aug 2026)
+// are provisioned for v2 only — calling v1 with a v2 token returns 401
+// Unauthorized. That was the original bug. v2 is the same path shape as v1 with
+// "/v2/" and two extra query params (description snippet + metadata).
+//
 // ENV VARS (set in Netlify → Site settings → Environment variables):
 //   COS_USERID  — your CareerOneStop API "User ID" (from the confirmation email)
-//   COS_TOKEN   — your CareerOneStop API Bearer token (the long key)
+//   COS_TOKEN   — your CareerOneStop API "Token key" (the long Bearer token)
 // Register (free) at:
 //   https://www.careeronestop.org/Developers/WebAPI/registration.aspx
 //
 // ATTRIBUTION (required by the COS license): every page that displays this data
-// must acknowledge DOLETA and the Minnesota DEED. index.html's footer note does
-// this — keep that text if you keep this source.
+// must acknowledge DOLETA and the Minnesota DEED, AND display the CareerOneStop
+// logo. index.html's footer note covers the text; add the logo image too.
 //
-// v1 List Jobs endpoint (path params, all segments must be non-empty):
-//   https://api.careeronestop.org/v1/jobsearch/{userId}/{keyword}/{location}
+// v2 List Jobs endpoint (path params, all segments must be non-empty):
+//   https://api.careeronestop.org/v2/jobsearch/{userId}/{keyword}/{location}
 //        /{radius}/{sortColumns}/{sortOrder}/{startRecord}/{pageSize}/{days}
-//        ?showFilters={showFilters}
+//        ?showFilters={f}&enableJobDescriptionSnippet={s}&enableMetaData={m}
 //
 // Notes on tuning below:
 //   • location defaults to "US" (nationwide) when the client sends none.
@@ -26,8 +32,10 @@
 //   • sortColumns "accquisitiondate" / sortOrder "desc" = newest first.
 //   • days 30 keeps results fresh, matching the rest of the tool's freshness floor.
 //   • pageSize 50 balances coverage vs the 10s Netlify function budget.
+//   • enableJobDescriptionSnippet=true so COS rows carry a snippet like the
+//     other sources (v2-only capability).
 
-const API_BASE = 'https://api.careeronestop.org/v1/jobsearch';
+const API_BASE = 'https://api.careeronestop.org/v2/jobsearch';
 const TIMEOUT_MS = 8000;
 
 // Broad, generic sectors don't map cleanly from NLx feed data, so we leave
@@ -64,7 +72,7 @@ exports.handler = async (event) => {
   const kw  = (q.keyword  || '').trim();
   const loc = (q.location || '').trim();
 
-  // v1 requires every path segment; supply sane defaults.
+  // v2 requires every path segment; supply sane defaults.
   const keyword     = seg(kw,  'jobs');   // some keyword is required
   const location    = seg(loc, 'US');     // nationwide when the user gave none
   const radius      = seg(q.radius, loc ? '50' : '0'); // miles if a place is set, else nationwide
@@ -75,9 +83,11 @@ exports.handler = async (event) => {
   const days        = '30';               // freshness floor, matches the rest of the tool
   const showFilters = 'false';
 
+  // v2 query params: pull a short description snippet (so COS rows read like the
+  // other sources) and skip the heavier metadata block we don't use.
   const url = `${API_BASE}/${encodeURIComponent(userId)}/${keyword}/${location}`
     + `/${radius}/${sortColumns}/${sortOrder}/${startRecord}/${pageSize}/${days}`
-    + `?showFilters=${showFilters}`;
+    + `?showFilters=${showFilters}&enableJobDescriptionSnippet=true&enableMetaData=false`;
 
   try {
     const resp = await withTimeout(fetch(url, {
@@ -106,6 +116,7 @@ exports.handler = async (event) => {
         url:      j.URL,
         posted:   j.AccquisitionDate || j.AcquisitionDate || null, // COS misspells this key
         salary:   '',
+        snippet:  (j.DescriptionSnippet || '').trim(), // v2-only; harmless if absent
         id:       j.JvId || null,
         ats:      'cos'
       }));
