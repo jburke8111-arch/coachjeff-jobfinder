@@ -856,7 +856,7 @@
        only the final result set is read out. -->
   <div class="results" id="results" role="region" aria-label="Job search results" aria-live="polite" aria-busy="false"></div>
 
-  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, SmartRecruiters, The Muse, and CareerOneStop. Roles link directly to the application page.</p>
+  <p class="note">Listings come from employer career sites, USAJOBS, Adzuna, Ashby-hosted job boards, Greenhouse, SmartRecruiters, The Muse, CareerOneStop, and American Airlines. Roles link directly to the application page.</p>
   <div class="cos-attribution">
     <a href="https://www.careeronestop.org/" target="_blank" rel="noopener">
       <img src="https://www.careeronestop.org/tridionmultimedia/tcm24-26158_CareerOneStopLogo-linktous.gif"
@@ -1849,6 +1849,50 @@ async function fetchCareerOneStop(keyword, location){
   }
 }
 
+// Fetch American Airlines roles through our own Netlify function.
+//
+// AA's careers site (SuccessFactors/Jobs2Web behind a Phenom front end)
+// loads its job list via a POST to jobs.aa.com/services/recruiting/v1/jobs
+// that a browser page can't call cross-origin. The /american-airlines
+// function does that POST server-side and returns clean records, exactly
+// like fetchCareerOneStop / fetchUSAJobs / fetchLeverAPI.
+//
+// Returns [] on ANY failure so American Airlines can never break the rest
+// of the search. Records without a usable apply URL are already dropped
+// server-side, so every card here links somewhere real.
+//
+// AA is Fort Worth HQ and skews heavily toward exactly the DFW analyst /
+// operations / finance / corporate early-career roles this tool targets,
+// which is why it's worth a dedicated source rather than a Google link.
+async function fetchAmericanAirlines(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword)  params.set('keyword', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/american-airlines?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    if(!(data && data.ok && Array.isArray(data.jobs))) return [];
+    return data.jobs
+      .filter(j => j && j.url)
+      .map(j => ({
+        title:    j.title    || 'Untitled role',
+        company:  j.company  || 'American Airlines',
+        board:    j.board    || 'American Airlines',
+        sector:   j.sector   || 'industrial',
+        location: j.location || '—',
+        url:      j.url,
+        posted:   j.posted   || null,
+        salary:   j.salary   || '',
+        source:   'american-airlines',
+        id:       (j.id != null ? j.id : ('aa-' + (j.url||''))),
+        ats:      'aa'
+      }));
+  } catch(e){
+    return [];
+  }
+}
+
 // Fetch Greenhouse-hosted roles through our Netlify function.
 // Keeps Greenhouse calls server-side and avoids dozens of browser requests.
 // The serverless function returns clean records today; the mapping below is
@@ -2494,6 +2538,7 @@ function renderJob(j, kw, loc){
             ${j.source === 'usajobs' ? '<span class="tag gray">USAJOBS</span>' : ''}
             ${j.source === 'themuse' ? '<span class="tag gray">The Muse</span>' : ''}
             ${j.source === 'careeronestop' ? '<span class="tag gray">CareerOneStop (DOL)</span>' : ''}
+            ${j.source === 'american-airlines' ? '<span class="tag gray">American Airlines</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
           <div class="why"><strong>Why this job?</strong><div class="why-list">${why}</div></div>
@@ -2726,7 +2771,7 @@ async function search(){
       : directCompanies.filter(c => c.slug === company);
 
     let jobs = [];
-    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0 };
+    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, 'american-airlines':0 };
     let okCos = 0, failCos = 0;
 
     // ---- (1) All six sources start NOW, in parallel ---------------------------
@@ -2749,6 +2794,7 @@ async function search(){
       apiSource('smartrecruiters',fetchSmartRecruiters),
       apiSource('themuse',        fetchTheMuse),
       apiSource('careeronestop',  fetchCareerOneStop),
+      apiSource('american-airlines', fetchAmericanAirlines),
     ];
 
     // ---- (2) Progressive render: paint each source as it lands ----------------
@@ -3142,6 +3188,7 @@ async function search(){
       { label: 'SmartRecruiters', key: 'smartrecruiters' },
       { label: 'The Muse',        key: 'themuse' },
       { label: 'CareerOneStop',   key: 'careeronestop' },
+      { label: 'American Airlines', key: 'american-airlines' },
     ];
     const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + ${API_SOURCES.map(s=>s.label).join(' + ')} searched`;
     const evalLine = `${totalFetched.toLocaleString()} job${totalFetched===1?'':'s'} evaluated · ${jobs.length.toLocaleString()} matched filters · ${hiddenByFilters.toLocaleString()} filtered out`;
@@ -3190,6 +3237,7 @@ async function search(){
       smartrecruiters: sourceStats.smartrecruiters,
       themuse: sourceStats.themuse,
       careeronestop: sourceStats.careeronestop,
+      'american-airlines': sourceStats['american-airlines'],
       adzunaResolved: sourceStats.adzunaResolved || 0,
       boardsOk: okCos, boardsFail: failCos,
       totalFetched, matched: jobs.length
