@@ -128,7 +128,7 @@ exports.handler = async function (event) {
       if (!postings.length) break;
 
       all = all.concat(
-        postings.map(p => mapPosting(p, base, company, sector)).filter(Boolean)
+        postings.map(p => mapPosting(p, base, site, company, sector)).filter(Boolean)
       );
 
       // Reached the end of the board?
@@ -153,15 +153,21 @@ exports.handler = async function (event) {
 
 // ---- helpers ----------------------------------------------------------
 
-function mapPosting(p, base, company, sector) {
+function mapPosting(p, base, site, company, sector) {
   if (!p || typeof p !== 'object') return null;
 
-  // externalPath is relative, e.g. "/job/Plano-Texas/Analyst_10309904".
+  // externalPath is relative to the SITE, not the domain root — e.g.
+  // "/job/Plano-Texas/Analyst_10309904". A valid apply URL is therefore
+  // {base}/{site}{externalPath}:
+  //   https://toyota.wd5.myworkdayjobs.com/TMNA/job/Plano-Texas/Analyst_10309904
+  // Joining base+path directly (dropping the site segment) produces a URL
+  // Workday can't resolve, and it redirects to community.workday.com/invalid-url
+  // ("Page not found"). Inserting the site segment is what makes links work.
   const path = p.externalPath || p.externalUrl || '';
   if (!path) return null;
   const url = /^https?:\/\//i.test(path)
     ? path
-    : base + (path.startsWith('/') ? '' : '/') + path;
+    : base + '/' + site + (path.startsWith('/') ? '' : '/') + path;
 
   const title = p.title || p.jobPostingTitle || 'Untitled role';
 
