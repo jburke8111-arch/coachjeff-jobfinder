@@ -1166,7 +1166,7 @@ const MANUAL_COMPANIES = [
   {name:"Dell", slug:"dell", sector:"tech", priority:95, atsType:"oracle/direct", url:"https://enterpriseplatform.dell.com/hcmUI/CandidateExperience/en/sites/careers/jobs?mode=location", searchUrl:"https://enterpriseplatform.dell.com/hcmUI/CandidateExperience/en/sites/careers/jobs?keyword={q}&mode=location", note:"Dell Technologies · current Oracle HCM careers search. Strong fit for sales, analytics, program, and early-career business/tech tracks."},
   // IBM official Entry-Level careers search. IBM currently serves job details from careers.ibm.com;
   // keep this as a direct employer search until a server-side IBM/Next.js feed is added.
-  {name:"IBM", slug:"ibm", sector:"tech", priority:94, atsType:"ibm/direct", url:"https://www.ibm.com/careers/search?field_keyword_18%5B0%5D=Entry%20Level", searchUrl:"https://www.ibm.com/careers/search?field_keyword_18%5B0%5D=Entry%20Level", note:"IBM Entry-Level search · live IBM matches are pulled from available job-data sources when possible; this official IBM search is the authoritative fallback."},
+  {name:"IBM", slug:"ibm", sector:"tech", priority:94, atsType:"ibm/direct", url:"https://www.ibm.com/careers/search?field_keyword_18%5B0%5D=Entry%20Level", searchUrl:"https://www.ibm.com/careers/search?field_keyword_18%5B0%5D=Entry%20Level", note:"Search IBM's official Entry-Level careers site for additional current opportunities."},
   {name:"Oracle", slug:"oracle", sector:"tech", priority:88, atsType:"oracle", url:"https://careers.oracle.com", searchUrl:"https://careers.oracle.com/jobs/#en/sites/jobsearch/requisitions?keyword={q}", note:"Large employer with recurring new-grad and early-career tech/business roles."},
   {name:"Salesforce", slug:"salesforce", sector:"tech", priority:86, atsType:"custom", url:"https://careers.salesforce.com", searchUrl:"https://careers.salesforce.com/en/jobs/?search={q}", note:"Watch Futureforce/new-grad, BDR, customer success, and analyst tracks."},
   {name:"Vanguard", slug:"vanguard", sector:"finance", priority:90, atsType:"workday/custom", url:"https://careers.vanguard.com", searchUrl:"https://www.google.com/search?q=site%3Acareers.vanguard.com+{q}", note:"Good for client service, finance, operations, and rotational early-career tracks."},
@@ -3702,12 +3702,19 @@ async function search(){
 
       if(directHtml){
         const selectedName = selectedDirect.length === 1 ? (selectedDirect[0].name || selectedDirect[0].slug) : '';
-        const directHeading = company !== 'any' && selectedName
-          ? `${esc(selectedName)} jobs — direct employer search`
-          : `Priority employer search links${kw ? ` — each opens a search for “${esc(kw)}”` : ''}`;
-        const directNote = company !== 'any' && selectedName
-          ? `${esc(selectedName)} is a direct-search employer in Job Finder, not a live API source. The button below opens the employer's current careers system${kw ? ` with “${esc(kw)}” entered as the keyword` : ''}.`
-          : `${clinicalSearch ? '<strong>Most healthcare employers don\'t post on the boards this tool can search live</strong> — hospitals and health systems use Workday, iCIMS, or Taleo. So for clinical searches, these direct employer links are where the real volume is. ' : ''}These are not live job matches. They are targeted search links for high-value employers that use Workday, iCIMS, GovernmentJobs, USAJobs, Oracle HCM, or custom systems that static browser code cannot reliably query.`;
+        const isIBMDirect = company !== 'any' && selectedDirect.length === 1 && selectedDirect[0].slug === 'ibm';
+        const directHeading = isIBMDirect
+          ? `More IBM Opportunities`
+          : company !== 'any' && selectedName
+            ? `${esc(selectedName)} jobs — direct employer search`
+            : `Priority employer search links${kw ? ` — each opens a search for “${esc(kw)}”` : ''}`;
+        const directNote = isIBMDirect
+          ? (jobs.length > 0
+              ? `Job Finder found <strong>${jobs.length} verified IBM job${jobs.length === 1 ? '' : 's'}</strong> from its live job-data sources. IBM may have additional entry-level openings that aren't included in those sources. Use the button below to search IBM's official careers site for the complete current list.`
+              : `No IBM jobs were found through Job Finder's live job-data sources today. IBM may still have current entry-level openings that aren't available through third-party job feeds. Use the button below to search IBM's official careers site for the complete list of current opportunities.`)
+          : company !== 'any' && selectedName
+            ? `${esc(selectedName)} is a direct-search employer in Job Finder, not a live API source. The button below opens the employer's current careers system${kw ? ` with “${esc(kw)}” entered as the keyword` : ''}.`
+            : `${clinicalSearch ? '<strong>Most healthcare employers don\'t post on the boards this tool can search live</strong> — hospitals and health systems use Workday, iCIMS, or Taleo. So for clinical searches, these direct employer links are where the real volume is. ' : ''}These are not live job matches. They are targeted search links for high-value employers that use Workday, iCIMS, GovernmentJobs, USAJobs, Oracle HCM, or custom systems that static browser code cannot reliably query.`;
         html += `<section class="searchlinks">
           <div class="direct-heading">${directHeading}</div>
           <p class="searchlink-note">${directNote}</p>
