@@ -1164,6 +1164,9 @@ const MANUAL_COMPANIES = [
   // Keep Dell as a direct-search employer until a server-side Oracle HCM feed is added.
   // Oracle Candidate Experience accepts the keyword query parameter on the current careers site.
   {name:"Dell", slug:"dell", sector:"tech", priority:95, atsType:"oracle/direct", url:"https://enterpriseplatform.dell.com/hcmUI/CandidateExperience/en/sites/careers/jobs?mode=location", searchUrl:"https://enterpriseplatform.dell.com/hcmUI/CandidateExperience/en/sites/careers/jobs?keyword={q}&mode=location", note:"Dell Technologies · current Oracle HCM careers search. Strong fit for sales, analytics, program, and early-career business/tech tracks."},
+  // IBM official Entry-Level careers search. IBM currently serves job details from careers.ibm.com;
+  // keep this as a direct employer search until a server-side IBM/Next.js feed is added.
+  {name:"IBM", slug:"ibm", sector:"tech", priority:94, atsType:"ibm/direct", url:"https://www.ibm.com/careers/search?field_keyword_18%5B0%5D=Entry%20Level", searchUrl:"https://www.ibm.com/careers/search?field_keyword_18%5B0%5D=Entry%20Level", note:"IBM Entry-Level search · live IBM matches are pulled from available job-data sources when possible; this official IBM search is the authoritative fallback."},
   {name:"Oracle", slug:"oracle", sector:"tech", priority:88, atsType:"oracle", url:"https://careers.oracle.com", searchUrl:"https://careers.oracle.com/jobs/#en/sites/jobsearch/requisitions?keyword={q}", note:"Large employer with recurring new-grad and early-career tech/business roles."},
   {name:"Salesforce", slug:"salesforce", sector:"tech", priority:86, atsType:"custom", url:"https://careers.salesforce.com", searchUrl:"https://careers.salesforce.com/en/jobs/?search={q}", note:"Watch Futureforce/new-grad, BDR, customer success, and analyst tracks."},
   {name:"Vanguard", slug:"vanguard", sector:"finance", priority:90, atsType:"workday/custom", url:"https://careers.vanguard.com", searchUrl:"https://www.google.com/search?q=site%3Acareers.vanguard.com+{q}", note:"Good for client service, finance, operations, and rotational early-career tracks."},
@@ -1848,6 +1851,37 @@ async function fetchAdzuna(keyword, location){
     if(!resp.ok) return [];
     const data = await resp.json();
     return (data && data.ok && Array.isArray(data.jobs)) ? data.jobs : [];
+  } catch(e){
+    return [];
+  }
+}
+
+// IBM Phase 2 — live discovery through the Job Finder's existing licensed/public
+// job-data sources. IBM's own Avature SearchJobs endpoint is bot-protected, so we
+// do not scrape it. Instead, when IBM is explicitly selected, run an IBM-biased
+// Adzuna query and retain only jobs whose returned employer is actually IBM.
+// The official IBM Entry-Level search remains visible as the authoritative fallback.
+function isIBMEmployerName(name){
+  const n = normalizeForSearch(name || '');
+  return n === 'ibm'
+    || n.startsWith('ibm ')
+    || n.includes('international business machines');
+}
+
+async function fetchIBMViaAdzuna(keyword, location){
+  try {
+    const queries = [];
+    if(keyword) queries.push(keyword);
+    queries.push(keyword ? `IBM ${keyword}` : 'IBM');
+    const lists = await Promise.all(queries.map(q => fetchAdzuna(q, location)));
+    const merged = lists.flat().filter(j => isIBMEmployerName(j && j.company));
+    const seen = new Set();
+    return merged.filter(j => {
+      const key = ((j.url || '') + '|' + (j.title || '') + '|' + (j.location || '')).toLowerCase();
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   } catch(e){
     return [];
   }
@@ -2998,7 +3032,11 @@ async function search(){
     // to Oracle HCM, so its old Workday feed is intentionally gone. When a user
     // explicitly selects one of these direct-only employers, do NOT run the general
     // APIs and show unrelated companies; route the search to that employer instead.
-    const directOnlySelection = company !== 'any' && selectedDirect.length > 0 && pool.length === 0;
+    // IBM is a hybrid source: keep its official direct-search card, but also let
+    // our existing live data partners look for IBM postings. Other manual-only
+    // employers (notably Dell) keep the direct-only behavior.
+    const ibmLiveSelection = company === 'ibm';
+    const directOnlySelection = company !== 'any' && selectedDirect.length > 0 && pool.length === 0 && !ibmLiveSelection;
 
     let jobs = [];
     const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, workday:0 };
@@ -3015,7 +3053,15 @@ async function search(){
       .then(list => ({ key, jobs: Array.isArray(list) ? list : [] }))
       .catch(() => ({ key, jobs: [] }));
 
-    const apiPromises = directOnlySelection ? [] : [
+    const apiPromises = directOnlySelection ? [] : (ibmLiveSelection ? [
+      // IBM Phase 2: use sources that can contain jobs from many employers.
+      // Adzuna gets an IBM-biased query; Muse/CareerOneStop use the user's role
+      // keyword and are employer-filtered after merge. Do not waste requests on
+      // ATS sweeps (Ashby/Greenhouse/Lever/Workday) because IBM is on Avature.
+      apiSource('adzuna',         fetchIBMViaAdzuna),
+      apiSource('themuse',        fetchTheMuse),
+      apiSource('careeronestop',  fetchCareerOneStop),
+    ] : [
       apiSource('usajobs',        fetchUSAJobs),
       apiSource('adzuna',         fetchAdzuna),
       apiSource('ashby',          fetchAshby),
@@ -3025,7 +3071,7 @@ async function search(){
       apiSource('themuse',        fetchTheMuse),
       apiSource('careeronestop',  fetchCareerOneStop),
       apiSource('workday',        fetchWorkday),
-    ];
+    ]);
 
     // ---- (2) Progressive render: paint each source as it lands ----------------
     // Nothing used to appear until every source returned. Now each source paints
@@ -3161,6 +3207,14 @@ async function search(){
       seenJobKeys.add(key);
       return true;
     });
+
+    // A selected IBM search must never show look-alike jobs from other employers
+    // (for example roles that merely mention IBM technology). The returned company
+    // name is the gate. This keeps the Company filter honest while preserving the
+    // official IBM link below if live partner coverage is sparse or temporarily zero.
+    if(ibmLiveSelection){
+      jobs = jobs.filter(j => isIBMEmployerName(j && j.company));
+    }
 
     const totalFetched = jobs.length;
     let afterLevel = 0, afterKeyword = 0, afterLocation = 0, afterSector = 0, afterWork = 0, afterClear = 0, afterUS = 0, afterDegree = 0;
