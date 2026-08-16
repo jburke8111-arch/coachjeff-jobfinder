@@ -202,6 +202,7 @@
   .rf-chip[aria-pressed="true"] .rf-n{color:#c7d2e4}
   .rf-more-wrap{display:inline-flex;flex-wrap:wrap;gap:7px;align-items:center}
   .rf-more-chips{display:contents}
+  .rf-more-chips[hidden]{display:none}
   .rf-more-btn{font-size:12px;padding:5px 11px;border-radius:14px;border:1px dashed var(--line-strong);
     background:transparent;color:var(--mute);cursor:pointer;font-family:inherit;font-weight:500;
     line-height:1.2;width:auto;height:auto;letter-spacing:0}
@@ -1618,7 +1619,7 @@ function buildResultFilters(){
     const moreBlock = restHidden.length
       ? `<span class="rf-more-wrap" data-rf-more="${cat}">
            <span class="rf-more-chips" hidden>${moreChips}</span>
-           <button type="button" class="rf-more-btn" data-rf-more-btn="${cat}">+ ${restHidden.length} more</button>
+           <button type="button" class="rf-more-btn" data-rf-more-btn="${cat}" data-rf-expanded="0" data-rf-count="${restHidden.length}">+ ${restHidden.length} more</button>
          </span>`
       : '';
     return `
@@ -1712,13 +1713,23 @@ document.getElementById('resultFilter').addEventListener('click', (e) => {
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     return;
   }
-  // "+ N more" expander: reveal the hidden chips and remove the button.
+  // "+ N more" / "show less" toggle: reveal or re-hide the extra chips.
   const moreBtn = e.target.closest('[data-rf-more-btn]');
   if(moreBtn){
     const wrap = moreBtn.closest('.rf-more-wrap');
     const hidden = wrap && wrap.querySelector('.rf-more-chips');
-    if(hidden){ hidden.hidden = false; hidden.classList.add('rf-more-open'); }
-    moreBtn.remove();
+    if(hidden){
+      const isExpanded = moreBtn.getAttribute('data-rf-expanded') === '1';
+      if(isExpanded){
+        hidden.hidden = true;
+        moreBtn.setAttribute('data-rf-expanded','0');
+        moreBtn.textContent = '+ ' + moreBtn.getAttribute('data-rf-count') + ' more';
+      } else {
+        hidden.hidden = false;
+        moreBtn.setAttribute('data-rf-expanded','1');
+        moreBtn.textContent = '− show less';
+      }
+    }
     return;
   }
   const chip = e.target.closest('.rf-chip');
