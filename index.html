@@ -1160,7 +1160,10 @@ const COMPANIES = [
 ];
 
 const MANUAL_COMPANIES = [
-  {name:"Dell", slug:"dell", sector:"tech", priority:95, atsType:"custom", url:"https://jobs.dell.com", searchUrl:"https://jobs.dell.com/en/search-jobs/{q}/375/1", note:"Strong fit for sales, analytics, program, and early-career business/tech tracks."},
+  // Dell moved from its legacy jobs.dell.com / Workday setup to Oracle HCM in 2026.
+  // Keep Dell as a direct-search employer until a server-side Oracle HCM feed is added.
+  // Oracle Candidate Experience accepts the keyword query parameter on the current careers site.
+  {name:"Dell", slug:"dell", sector:"tech", priority:95, atsType:"oracle/direct", url:"https://enterpriseplatform.dell.com/hcmUI/CandidateExperience/en/sites/careers/jobs?mode=location", searchUrl:"https://enterpriseplatform.dell.com/hcmUI/CandidateExperience/en/sites/careers/jobs?keyword={q}&mode=location", note:"Dell Technologies · current Oracle HCM careers search. Strong fit for sales, analytics, program, and early-career business/tech tracks."},
   {name:"Oracle", slug:"oracle", sector:"tech", priority:88, atsType:"oracle", url:"https://careers.oracle.com", searchUrl:"https://careers.oracle.com/jobs/#en/sites/jobsearch/requisitions?keyword={q}", note:"Large employer with recurring new-grad and early-career tech/business roles."},
   {name:"Salesforce", slug:"salesforce", sector:"tech", priority:86, atsType:"custom", url:"https://careers.salesforce.com", searchUrl:"https://careers.salesforce.com/en/jobs/?search={q}", note:"Watch Futureforce/new-grad, BDR, customer success, and analyst tracks."},
   {name:"Vanguard", slug:"vanguard", sector:"finance", priority:90, atsType:"workday/custom", url:"https://careers.vanguard.com", searchUrl:"https://www.google.com/search?q=site%3Acareers.vanguard.com+{q}", note:"Good for client service, finance, operations, and rotational early-career tracks."},
@@ -2990,6 +2993,13 @@ async function search(){
       ? directCompanies
       : directCompanies.filter(c => c.slug === company);
 
+    // A company can appear in the dropdown even when it is a curated direct-search
+    // employer rather than a live API source. Dell is the important case: it moved
+    // to Oracle HCM, so its old Workday feed is intentionally gone. When a user
+    // explicitly selects one of these direct-only employers, do NOT run the general
+    // APIs and show unrelated companies; route the search to that employer instead.
+    const directOnlySelection = company !== 'any' && selectedDirect.length > 0 && pool.length === 0;
+
     let jobs = [];
     const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, workday:0 };
     let okCos = 0, failCos = 0;
@@ -3005,7 +3015,7 @@ async function search(){
       .then(list => ({ key, jobs: Array.isArray(list) ? list : [] }))
       .catch(() => ({ key, jobs: [] }));
 
-    const apiPromises = [
+    const apiPromises = directOnlySelection ? [] : [
       apiSource('usajobs',        fetchUSAJobs),
       apiSource('adzuna',         fetchAdzuna),
       apiSource('ashby',          fetchAshby),
@@ -3059,7 +3069,9 @@ async function search(){
       paintProgressive();
     }));
 
-    statusEl.innerHTML = `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'} and 8 job APIs…</span>`;
+    statusEl.innerHTML = directOnlySelection
+      ? `<span class="loading">Opening the selected employer's current careers search…</span>`
+      : `<span class="loading">Searching ${pool.length} direct employer job board${pool.length===1?'':'s'} and job APIs…</span>`;
 
     // Yield once before the sweep starts. The five APIs are usually much faster
     // than 18 employer boards, so this gives any that have already returned a
@@ -3095,7 +3107,7 @@ async function search(){
     // allSettled (not all) so a rejected promise can't abort the search — though
     // apiSource already catches, this is belt-and-braces.
     const pending = jobs.length;
-    if(pending === 0){
+    if(pending === 0 && !directOnlySelection){
       statusEl.innerHTML = `<span class="loading">Waiting on the job APIs…</span>`;
     }
     await Promise.allSettled(apiPromises);
@@ -3618,10 +3630,12 @@ async function search(){
       </div>`;
     }
 
-    html += renderCoachPicks(kw, sector);
+    // Coach Picks are useful for broad searches, but become distracting when the
+    // user explicitly chose one employer (for example Dell).
+    if(company === 'any') html += renderCoachPicks(kw, sector);
 
     const clinicalSearch = kw && HEALTHCARE_KEYWORD_RX.test(kw);
-    if((showSuggest || jobs.length === 0 || clinicalSearch) && selectedDirect.length){
+    if((showSuggest || jobs.length === 0 || clinicalSearch || company !== 'any') && selectedDirect.length){
       const directHtml = selectedDirect
         .filter(c => sector === 'any' || c.sector === sector)
         .map(c => Object.assign({}, c, {manualScore: manualEmployerScore(c, kw, sector)}))
@@ -3633,9 +3647,16 @@ async function search(){
           </a>`).join('');
 
       if(directHtml){
+        const selectedName = selectedDirect.length === 1 ? (selectedDirect[0].name || selectedDirect[0].slug) : '';
+        const directHeading = company !== 'any' && selectedName
+          ? `${esc(selectedName)} jobs — direct employer search`
+          : `Priority employer search links${kw ? ` — each opens a search for “${esc(kw)}”` : ''}`;
+        const directNote = company !== 'any' && selectedName
+          ? `${esc(selectedName)} is a direct-search employer in Job Finder, not a live API source. The button below opens the employer's current careers system${kw ? ` with “${esc(kw)}” entered as the keyword` : ''}.`
+          : `${clinicalSearch ? '<strong>Most healthcare employers don\'t post on the boards this tool can search live</strong> — hospitals and health systems use Workday, iCIMS, or Taleo. So for clinical searches, these direct employer links are where the real volume is. ' : ''}These are not live job matches. They are targeted search links for high-value employers that use Workday, iCIMS, GovernmentJobs, USAJobs, Oracle HCM, or custom systems that static browser code cannot reliably query.`;
         html += `<section class="searchlinks">
-          <div class="direct-heading">Priority employer search links${kw ? ` — each opens a search for “${esc(kw)}”` : ''}</div>
-          <p class="searchlink-note">${clinicalSearch ? '<strong>Most healthcare employers don\'t post on the boards this tool can search live</strong> — hospitals and health systems use Workday, iCIMS, or Taleo. So for clinical searches, these direct employer links are where the real volume is. ' : ''}These are not live job matches. They are targeted search links for high-value employers that use Workday, iCIMS, GovernmentJobs, USAJobs, or custom systems that static browser code cannot reliably query.</p>
+          <div class="direct-heading">${directHeading}</div>
+          <p class="searchlink-note">${directNote}</p>
           <div class="searchlink-grid">${directHtml}</div>
         </section>`;
       }
