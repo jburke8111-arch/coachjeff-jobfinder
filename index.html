@@ -187,10 +187,11 @@
   .rf-head .rf-ic{font-size:14px;color:var(--mute)}
   .rf-head .rf-title{font-size:13px;font-weight:700;color:var(--mute)}
   .rf-head .rf-shown{font-size:12.5px;color:var(--faint);margin-left:auto}
-  .rf-groups{display:flex;flex-wrap:wrap;gap:16px}
-  .rf-group{flex:1;min-width:210px}
-  .rf-glabel{font-size:12px;color:var(--faint);margin-bottom:6px}
-  .rf-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .rf-groups{display:flex;flex-wrap:wrap;gap:22px 28px}
+  .rf-group{flex:1;min-width:220px}
+  .rf-glabel{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--mute);margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+  .rf-chips{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
   .rf-chip{font-size:12px;padding:5px 11px;border-radius:14px;border:1px solid var(--line-strong);
     background:#fff;color:var(--navy);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;line-height:1.2;
     width:auto;height:auto;font-weight:500;letter-spacing:0}
@@ -199,6 +200,12 @@
   .rf-chip[aria-pressed="true"]{background:var(--navy-bar);color:#fff;border-color:var(--navy-bar)}
   .rf-chip[aria-pressed="true"]:hover{background:var(--navy-deep)}
   .rf-chip[aria-pressed="true"] .rf-n{color:#c7d2e4}
+  .rf-more-wrap{display:inline-flex;flex-wrap:wrap;gap:7px;align-items:center}
+  .rf-more-chips{display:contents}
+  .rf-more-btn{font-size:12px;padding:5px 11px;border-radius:14px;border:1px dashed var(--line-strong);
+    background:transparent;color:var(--mute);cursor:pointer;font-family:inherit;font-weight:500;
+    line-height:1.2;width:auto;height:auto;letter-spacing:0}
+  .rf-more-btn:hover{background:var(--paper);border-color:var(--mute);color:var(--navy)}
   .rf-clear{margin-top:11px}
   .rf-clear button{font-size:12px;padding:5px 12px;border:1px solid var(--line-strong);background:#fff;
     border-radius:7px;cursor:pointer;font-family:inherit;color:var(--navy);
@@ -1434,7 +1441,7 @@ const countEl = document.getElementById('count');
 // none, so the role group auto-hides.
 const RF = {
   allJobs: [], kw: '', loc: '', selectedRoles: [],
-  active: { loc: new Set(), role: new Set() },
+  active: { loc: new Set(), role: new Set(), sector: new Set(), exp: new Set() },
 
   // Map a free-text location to a coarse bucket for filtering. Full state names
   // and common abbreviations both map to the state name; anything remote-ish
@@ -1461,6 +1468,41 @@ const RF = {
     'or':'Oregon','pa':'Pennsylvania','ri':'Rhode Island','sc':'South Carolina','sd':'South Dakota','tn':'Tennessee',
     'tx':'Texas','ut':'Utah','vt':'Vermont','va':'Virginia','wa':'Washington','wv':'West Virginia','wi':'Wisconsin',
     'wy':'Wyoming','dc':'Washington, D.C.'
+  },
+
+  // Coarse sector label for filtering. Jobs carry a lowercase-ish sector tag
+  // (e.g. "tech", "healthcare & nursing jobs"); we title-case a short form and
+  // fold obvious variants together so the chip list stays small.
+  sectorBucket(sec){
+    let s = String(sec || '').toLowerCase().trim();
+    if(!s) return null;                       // untagged -> no sector chip
+    // Trim noisy suffixes some sources append.
+    s = s.replace(/\s*(jobs|roles)\s*$/,'').replace(/\s*&.*$/,'').trim();
+    const MAP = {
+      'tech':'Tech','technology':'Tech','it':'Tech','it-services':'Tech','software':'Tech','engineering':'Tech',
+      'healthcare':'Healthcare','health':'Healthcare','nursing':'Healthcare','medical':'Healthcare','pharma':'Healthcare',
+      'finance':'Finance','financial':'Finance','banking':'Finance','accounting':'Finance',
+      'insurance':'Insurance','consulting':'Consulting','education':'Education','retail':'Retail',
+      'consumer':'Consumer','marketing':'Marketing','sales':'Sales','staffing':'Staffing',
+      'industrial':'Industrial','manufacturing':'Industrial','government':'Government','legal':'Legal',
+      'media':'Media','hospitality':'Hospitality','logistics':'Logistics','nonprofit':'Nonprofit'
+    };
+    if(MAP[s]) return MAP[s];
+    // Unknown but present: title-case the first word so it's still usable.
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  },
+
+  // Experience bucket from the scanned minimum-years figure. Only jobs whose
+  // description was actually scanned carry j.minYears; unscanned jobs return
+  // null and simply don't appear under any experience chip (honest — we won't
+  // label a job we didn't read). The 6+ "not entry-level" tier is already
+  // hidden upstream, so only these two buckets can occur.
+  expBucket(j){
+    const y = Number(j && j.minYears || 0);
+    if(!(j && 'minYears' in j) || !y) return null;   // unscanned or 0 -> no chip
+    const eff = j.yearsPreferred ? Math.max(1, y - 1) : y;
+    if(eff <= 2) return 'Entry-level (0–2 yrs)';
+    return 'Stretch (3–5 yrs)';
   },
 
   locBucket(loc){
@@ -1498,13 +1540,21 @@ const RF = {
 
   filtered(jobs){
     const src = jobs || this.allJobs;
-    const fl = this.active.loc, fr = this.active.role;
-    if(!fl.size && !fr.size) return src;
+    const fl = this.active.loc, fr = this.active.role, fs = this.active.sector, fe = this.active.exp;
+    if(!fl.size && !fr.size && !fs.size && !fe.size) return src;
     return src.filter(j => {
       if(fl.size && !fl.has(this.locBucket(j.location))) return false;
       if(fr.size){
         const roles = this.jobRoles(j);
         if(!roles.some(r => fr.has(r))) return false;
+      }
+      if(fs.size){
+        const sb = this.sectorBucket(j.sector);
+        if(!sb || !fs.has(sb)) return false;
+      }
+      if(fe.size){
+        const eb = this.expBucket(j);
+        if(!eb || !fe.has(eb)) return false;
       }
       return true;
     });
@@ -1525,12 +1575,21 @@ function buildResultFilters(){
   if(RF.selectedRoles.length > 1){
     jobs.forEach(j => RF.jobRoles(j).forEach(r => { roleCounts[r] = (roleCounts[r]||0)+1; }));
   }
+  // Tally sector buckets.
+  const sectorCounts = {};
+  jobs.forEach(j => { const b = RF.sectorBucket(j.sector); if(b) sectorCounts[b] = (sectorCounts[b]||0)+1; });
+  // Tally experience buckets (scanned jobs only).
+  const expCounts = {};
+  jobs.forEach(j => { const b = RF.expBucket(j); if(b) expCounts[b] = (expCounts[b]||0)+1; });
 
   const locKeys = Object.keys(locCounts);
   const roleKeys = Object.keys(roleCounts);
+  const sectorKeys = Object.keys(sectorCounts);
+  const expKeys = Object.keys(expCounts);
 
-  // Nothing worth filtering: 0-1 locations and no multi-role split. Hide the bar.
-  if(jobs.length < 2 || (locKeys.length < 2 && roleKeys.length < 2)){
+  // Nothing worth filtering at all: hide the bar.
+  if(jobs.length < 2 ||
+     (locKeys.length < 2 && roleKeys.length < 2 && sectorKeys.length < 2 && expKeys.length < 2)){
     bar.style.display = 'none';
     bar.innerHTML = '';
     return;
@@ -1541,20 +1600,41 @@ function buildResultFilters(){
 
   const orderByCount = (obj) => Object.keys(obj).sort((a,b)=> obj[b]-obj[a] || a.localeCompare(b));
 
-  const locGroup = locKeys.length >= 2 ? `
-    <div class="rf-group">
-      <div class="rf-glabel">Location</div>
-      <div class="rf-chips">${orderByCount(locCounts).map(k => chipHtml('loc', k, locCounts[k], RF.active.loc.has(k))).join('')}</div>
-    </div>` : '';
+  // Render a group. Long groups (many chips, e.g. states) show the top N and
+  // tuck the rest behind a "+ N more" toggle so the panel stays scannable.
+  const TOP_N = 6;
+  const renderGroup = (cat, label, counts, activeSet) => {
+    const keys = orderByCount(counts);
+    if(keys.length < 2) return '';
+    const head = keys.slice(0, TOP_N);
+    const rest = keys.slice(TOP_N);
+    const headChips = head.map(k => chipHtml(cat, k, counts[k], activeSet.has(k))).join('');
+    // Any hidden chip that's currently active must stay visible, so pull active
+    // ones out of the "rest" into the always-shown row.
+    const restActive = rest.filter(k => activeSet.has(k));
+    const restHidden = rest.filter(k => !activeSet.has(k));
+    const activeChips = restActive.map(k => chipHtml(cat, k, counts[k], true)).join('');
+    const moreChips = restHidden.map(k => chipHtml(cat, k, counts[k], false)).join('');
+    const moreBlock = restHidden.length
+      ? `<span class="rf-more-wrap" data-rf-more="${cat}">
+           <span class="rf-more-chips" hidden>${moreChips}</span>
+           <button type="button" class="rf-more-btn" data-rf-more-btn="${cat}">+ ${restHidden.length} more</button>
+         </span>`
+      : '';
+    return `
+      <div class="rf-group">
+        <div class="rf-glabel">${label}</div>
+        <div class="rf-chips">${headChips}${activeChips}${moreBlock}</div>
+      </div>`;
+  };
 
-  const roleGroup = roleKeys.length >= 2 ? `
-    <div class="rf-group">
-      <div class="rf-glabel">Role</div>
-      <div class="rf-chips">${orderByCount(roleCounts).map(k => chipHtml('role', k, roleCounts[k], RF.active.role.has(k))).join('')}</div>
-    </div>` : '';
+  const locGroup    = renderGroup('loc',    'Location',   locCounts,    RF.active.loc);
+  const roleGroup   = renderGroup('role',   'Role',       roleCounts,   RF.active.role);
+  const sectorGroup = renderGroup('sector', 'Sector',     sectorCounts, RF.active.sector);
+  const expGroup    = renderGroup('exp',    'Experience', expCounts,    RF.active.exp);
 
   const shownN = RF.filtered(jobs).length;
-  const anyActive = RF.active.loc.size + RF.active.role.size;
+  const anyActive = RF.active.loc.size + RF.active.role.size + RF.active.sector.size + RF.active.exp.size;
 
   bar.innerHTML = `
     <button class="rf-toggle" aria-expanded="false">
@@ -1568,7 +1648,7 @@ function buildResultFilters(){
         <span class="rf-title">Filter these results</span>
         <span class="rf-shown">${shownN} of ${jobs.length} shown</span>
       </div>
-      <div class="rf-groups">${locGroup}${roleGroup}</div>
+      <div class="rf-groups">${locGroup}${roleGroup}${sectorGroup}${expGroup}</div>
       ${anyActive ? `<div class="rf-clear"><button data-rf-clear="1">✕ Clear filters</button></div>` : ''}
     </div>`;
   bar.style.display = 'block';
@@ -1632,6 +1712,15 @@ document.getElementById('resultFilter').addEventListener('click', (e) => {
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     return;
   }
+  // "+ N more" expander: reveal the hidden chips and remove the button.
+  const moreBtn = e.target.closest('[data-rf-more-btn]');
+  if(moreBtn){
+    const wrap = moreBtn.closest('.rf-more-wrap');
+    const hidden = wrap && wrap.querySelector('.rf-more-chips');
+    if(hidden){ hidden.hidden = false; hidden.classList.add('rf-more-open'); }
+    moreBtn.remove();
+    return;
+  }
   const chip = e.target.closest('.rf-chip');
   if(chip){
     const cat = chip.getAttribute('data-rf-cat');
@@ -1644,6 +1733,8 @@ document.getElementById('resultFilter').addEventListener('click', (e) => {
   if(e.target.closest('[data-rf-clear]')){
     RF.active.loc.clear();
     RF.active.role.clear();
+    RF.active.sector.clear();
+    RF.active.exp.clear();
     repaintFiltered();
     return;
   }
