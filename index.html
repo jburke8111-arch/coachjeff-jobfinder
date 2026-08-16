@@ -794,7 +794,7 @@
             <input id="noclear" type="checkbox">
             <span class="chk-text">
               <label for="noclear" class="inline">Check sponsorship eligibility</label>
-              <span class="hint">Scans each role's full description for visa/sponsorship and work-authorization language, badges every result 🟢/🔴/🟡, and removes roles that explicitly won't sponsor. Slower, but thorough — best for international students. Defense and export-controlled roles are flagged as often US-person or clearance gated and hidden while this is on — a likelihood, not a verdict; permanent residents may still qualify. This is general information, not legal or immigration advice — your eligibility depends on your specific status.</span>
+              <span class="hint">Scans each role's full description for visa/sponsorship and work-authorization language, badges every result 🟢/🔴/🟡, and removes roles that explicitly won't sponsor. Slower, but thorough — best for international students. Federal (USAJOBS) roles, which are usually U.S.-citizen only, plus defense and export-controlled roles, are flagged as often US-person or clearance gated and hidden while this is on — a likelihood, not a verdict; permanent residents may still qualify. This is general information, not legal or immigration advice — your eligibility depends on your specific status.</span>
               <span id="sponsorFilterWrap" class="sponsor-filter" style="display:none;">
                 <label for="sponsorFilter" class="inline">Show:</label>
                 <select id="sponsorFilter">
@@ -2412,6 +2412,16 @@ const ITAR_RX = /\b(itar|ear\b|export[- ]control|export controlled|security clea
 function likelyUSPersonGated(j){
   const sector = String(j.sector || '').toLowerCase();
   if(sector.includes('defense')) return true;
+  // Federal (USAJOBS) roles are, in practice, almost always restricted to U.S.
+  // citizens — "open to the public" in federal hiring means citizens/nationals,
+  // not visa holders, and "U.S. National" is a narrow legal category (American
+  // Samoa/Swains Island), NOT a path for F-1/OPT/H-1B candidates. A minority of
+  // federal jobs can hire non-citizens when no qualified citizen is available,
+  // so this stays a "likelihood, not a verdict" like the defense case below —
+  // green-card holders may still qualify. Treating these as gated keeps an
+  // international student (sponsorship filter on) from burning an application on
+  // a citizens-only federal role the posting labels only as "not specified".
+  if(j.source === 'usajobs' || j.ats === 'usajobs') return true;
   // Description text isn't returned to the client, so title language is the
   // only other signal available here. That catches roles that name the barrier
   // outright ("... - Active Clearance Required", "US Citizen"). Roles that hide
@@ -2657,7 +2667,9 @@ function renderJob(j, kw, loc){
             <span class="tag blue">${esc(freshnessText(j.posted))}</span>
             ${(()=>{ const v = verificationStatus(j); return `<span class="tag ${v.cls}" title="${esc(v.note)}">${esc(v.text)}</span>`; })()}
             ${sponsor ? `<span class="tag ${sponsor.cls}">${esc(sponsor.text)}</span>` : ''}
-            ${likelyUSPersonGated(j) ? '<span class="tag warn" title="Defense and export-controlled roles are usually limited to US persons (citizens or permanent residents) or require a security clearance. By law the posting often cannot say so — this is a likelihood, not a certainty. If you have permanent residence, you may still qualify.">⚠️ Defense role — often US-person / clearance gated</span>' : ''}
+            ${likelyUSPersonGated(j) ? ((j.source === 'usajobs' || j.ats === 'usajobs')
+              ? '<span class="tag warn" title="Federal (USAJOBS) roles are almost always limited to U.S. citizens — in federal hiring, &quot;open to the public&quot; means citizens/nationals, not visa holders, and &quot;U.S. National&quot; is a narrow legal category, not a path for visa candidates. A minority of federal roles can hire non-citizens, and permanent residents may qualify — this is a likelihood, not a certainty.">⚠️ Federal role — usually U.S. citizens only</span>'
+              : '<span class="tag warn" title="Defense and export-controlled roles are usually limited to US persons (citizens or permanent residents) or require a security clearance. By law the posting often cannot say so — this is a likelihood, not a certainty. If you have permanent residence, you may still qualify.">⚠️ Defense role — often US-person / clearance gated</span>') : ''}
             ${(!experienced && (j.score || 0) >= 8) ? '<span class="tag strong">high-priority lead</span>' : ''}
             ${(()=>{
               // Tier label replaces the raw years tag — it carries the number
@@ -3518,7 +3530,7 @@ async function search(){
       if(gatedHidden > 0){
         const dn = document.createElement('div');
         dn.className = 'sponsor-note';
-        dn.innerHTML = `<strong>${gatedHidden}</strong> defense / export-controlled role${gatedHidden===1?'':'s'} hidden — these are usually limited to US persons (citizens or permanent residents) or require a clearance, and the posting often can’t say so outright. If you have permanent residence, uncheck “Need visa sponsorship” to see them.`;
+        dn.innerHTML = `<strong>${gatedHidden}</strong> federal / defense / export-controlled role${gatedHidden===1?'':'s'} hidden — federal (USAJOBS) roles are usually limited to U.S. citizens, and defense/export-controlled roles to US persons (citizens or permanent residents) or those with a clearance. The posting often can’t say so outright. If you’re a citizen or permanent resident, uncheck “Need visa sponsorship” to see them.`;
         countEl.appendChild(dn);
       }
     }
