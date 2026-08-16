@@ -352,6 +352,9 @@
     width:17px;height:17px;accent-color:#b6701c}
   .sponsor-toggle-text{display:block;line-height:1.45}
   .sponsor-toggle-text b{color:#8a4a1a;font-size:15px}
+  .sponsor-pill{display:inline-block;margin-left:9px;font-size:10.5px;font-weight:600;
+    letter-spacing:.04em;text-transform:uppercase;color:#7a5a12;background:#f0dfba;
+    border:1px solid #d9bd7f;padding:2px 8px;border-radius:20px;vertical-align:middle}
   .sponsor-toggle-text .hint{display:block;margin-top:3px}
   .sponsor-toggle:focus-within{outline:2px solid #b6701c;outline-offset:2px}
   @media (max-width:640px){
@@ -704,8 +707,8 @@
         <label class="sponsor-toggle" for="sponsorTop">
           <input id="sponsorTop" type="checkbox">
           <span class="sponsor-toggle-text">
-            <b>Need visa sponsorship?</b>
-            <span class="hint">Scans each posting's full description, badges results 🟢/🔴/🟡, and hides employers who explicitly won't sponsor. Adds a few seconds.</span>
+            <b>Need visa sponsorship?</b><span class="sponsor-pill">Optional · for visa holders</span>
+            <span class="hint" style="text-transform:none;letter-spacing:0;font-size:12.5px;max-width:60ch"><b style="color:#5c4e34;font-weight:600;font-size:inherit">Check this if you're on a student or work visa.</b> Leave it unchecked if you're a U.S. citizen or permanent resident. Scans each posting for sponsorship language, badges results 🟢/🔴/🟡, and hides roles that won't sponsor — plus federal jobs, which are usually limited to U.S. citizens.</span>
           </span>
         </label>
       </div>
