@@ -2926,7 +2926,7 @@ async function search(){
   window._ghFailed = false;
   window._ghPartial = null;
   // Reset post-result filters and hide the bar; a new search rebuilds them.
-  if(typeof RF !== 'undefined'){ RF.active = { loc: new Set(), role: new Set() }; }
+  if(typeof RF !== 'undefined'){ RF.active = { loc: new Set(), role: new Set(), sector: new Set(), exp: new Set() }; }
   const _rfBar = document.getElementById('resultFilter');
   if(_rfBar){ _rfBar.style.display = 'none'; _rfBar.classList.remove('rf-open'); _rfBar.innerHTML = ''; }
   syncExperienceControls();
@@ -3531,7 +3531,7 @@ async function search(){
     RF.allJobs = jobs;
     RF.kw = kw;
     RF.loc = loc;
-    RF.active = { loc: new Set(), role: new Set() };
+    RF.active = { loc: new Set(), role: new Set(), sector: new Set(), exp: new Set() };
     RF.selectedRoles = (typeof selectedRoles !== 'undefined' && Array.isArray(selectedRoles)) ? selectedRoles.slice() : [];
     buildResultFilters();
 
