@@ -1868,19 +1868,29 @@ const WORKDAY_EMPLOYERS = [
   // Location is NOT sent to Workday; the page's own location filter narrows the
   // merged results, so an employer's HQ doesn't limit who sees its jobs.
   { name:'UT Austin',        tenant:'utaustin',     wd:'1',  site:'UTstaff',                 sector:'education'   },
-  { name:'Cleveland Clinic', tenant:'ccf',          wd:'1',  site:'ClevelandClinicCareers',  sector:'healthcare'  },
   { name:'Cigna',            tenant:'cigna',        wd:'5',  site:'cignacareers',            sector:'healthcare'  },
+  { name:'CVS Health',       tenant:'cvshealth',    wd:'1',  site:'CVS_Health_Careers',      sector:'healthcare'  },
+  { name:'Toyota',           tenant:'toyota',       wd:'503',site:'TMNA',                    sector:'industrial'  },
   { name:'Salesforce',       tenant:'salesforce',   wd:'12', site:'External_Career_Site',    sector:'tech'        },
   { name:'NVIDIA',           tenant:'nvidia',       wd:'5',  site:'NVIDIAExternalCareerSite',sector:'tech'        },
   { name:'Target',           tenant:'target',       wd:'5',  site:'targetcareers',           sector:'retail'      },
   { name:'Adobe',            tenant:'adobe',        wd:'5',  site:'external_experienced',    sector:'tech'        },
   { name:'Mastercard',       tenant:'mastercard',   wd:'1',  site:'CorporateCareers',        sector:'finance'     },
   { name:'Thermo Fisher',    tenant:'thermofisher', wd:'5',  site:'ThermoFisherCareers',     sector:'healthcare'  },
+  { name:'Capital One',      tenant:'capitalone',   wd:'12', site:'Capital_One',             sector:'finance'     },
+  { name:'Prudential',       tenant:'pru',          wd:'5',  site:'Careers',                 sector:'insurance'   },
+  { name:'Unilever',         tenant:'unilever',     wd:'3',  site:'Unilever_Experienced_Professionals', sector:'consumer' },
+  { name:'Booz Allen',       tenant:'bah',          wd:'1',  site:'BAH_Jobs',                sector:'consulting'  },
+  { name:'PwC',              tenant:'pwc',          wd:'3',  site:'Global_Experienced_Careers', sector:'consulting' },
   // Not Workday (verified): American Airlines, Baylor Scott & White, Comerica,
   // Texas Health, Charles Schwab, Intuit — these run Phenom/Taleo/iCIMS/custom
   // and can't use this function; they stay as their existing link-outs.
-  // Toyota (tenant:'toyota', wd:'5', site:'TMNA') kept 422-ing / in maintenance;
-  // re-verify its coordinates before adding.
+  // Dell also dropped: its myworkdayjobs tenant still responds but returns 0
+  // jobs — Dell migrated to Oracle HCM (enterpriseplatform.dell.com), so the
+  // stale wd1/External tenant is empty. Re-add only if it moves back to Workday.
+  // Toyota's correct data center is wd503 (not wd5, which 422'd) — added above.
+  // Cleveland Clinic (ccf/wd1/ClevelandClinicCareers) was swapped out for CVS
+  // Health for a more nationwide footprint; still valid Workday if wanted back.
 ];
 
 // Fetch one Workday employer through our /workday function. Returns [] on any
