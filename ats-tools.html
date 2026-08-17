@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>ATS Tools — Job Finder (internal)</title>
+<style>
+  :root{
+    --navy:#12203a; --navy-bar:#1c3257; --navy-deep:#0d1830;
+    --paper:#fbfaf7; --card:#fff;
+    --line:#e4e1d9; --line-strong:#cfd3da; --mute:#5d6470; --faint:#8a8f99;
+    --green-bg:#e7f3e9; --green-fg:#2f7d3b; --green-line:#bcdcc2;
+    --amber-bg:#faf1e2; --amber-fg:#8a5a12; --amber-line:#e2cf9f;
+    --red-bg:#f7e9e9; --red-fg:#8f2323; --red-line:#e2b8b8;
+    --gray-bg:#eef0f2; --gray-fg:#5d6470; --gray-line:#d8dce1;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--paper);color:var(--navy);line-height:1.5;font-size:15px}
+  .mono{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+  .brandbar{background:var(--navy-bar);color:#fff;padding:14px 24px;font-weight:600;letter-spacing:.02em;
+    display:flex;align-items:center;gap:10px}
+  .brandbar .tag{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+    background:rgba(255,255,255,.15);padding:2px 9px;border-radius:20px}
+  .wrap{max-width:920px;margin:0 auto;padding:26px 24px 60px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:var(--mute);margin:0 0 24px;font-size:15px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:22px}
+  .panel h2{font-size:16px;margin:0 0 14px;letter-spacing:.02em}
+  label{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  input,select{font-family:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line-strong);
+    background:#fff;border-radius:7px;color:var(--navy);width:100%}
+  input:focus,select:focus{outline:2px solid var(--navy-bar);outline-offset:1px}
+  .row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .row > div{flex:1;min-width:180px}
+  button{font-family:inherit;font-size:14px;font-weight:600;border:none;background:var(--navy);color:#fff;
+    border-radius:7px;cursor:pointer;padding:11px 20px;white-space:nowrap}
+  button:hover{background:var(--navy-deep)}
+  button.ghost{background:#fff;color:var(--navy);border:1px solid var(--line-strong)}
+  button.ghost:hover{background:var(--paper)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .verdict{margin-top:18px;border-radius:10px;padding:14px 16px;border:1px solid;display:none}
+  .verdict.show{display:block}
+  .verdict .vhead{font-weight:700;font-size:15px;display:flex;align-items:center;gap:9px;margin-bottom:4px}
+  .verdict .vbody{font-size:13.5px;line-height:1.55}
+  .verdict.green{background:var(--green-bg);border-color:var(--green-line);color:var(--green-fg)}
+  .verdict.amber{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber-fg)}
+  .verdict.red{background:var(--red-bg);border-color:var(--red-line);color:var(--red-fg)}
+  .verdict.gray{background:var(--gray-bg);border-color:var(--gray-line);color:var(--gray-fg)}
+  .verdict .vbody b{color:inherit}
+  .coords{margin-top:10px;font-size:13px}
+  .coords .mono{background:rgba(0,0,0,.05);padding:2px 6px;border-radius:4px}
+  .testblock{margin-top:18px;padding-top:18px;border-top:1px dashed var(--line-strong);display:none}
+  .testblock.show{display:block}
+  .results{margin-top:16px;display:none}
+  .results.show{display:block}
+  .rstat{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--mute);margin-bottom:12px}
+  .rstat b{color:var(--navy)}
+  .jobcard{border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-bottom:8px;font-size:13.5px}
+  .jobcard .jt{font-weight:600}
+  .jobcard .jm{color:var(--mute);font-size:12.5px;margin-top:2px}
+  .jobcard a{color:var(--navy-bar);text-decoration:none}
+  .jobcard a:hover{text-decoration:underline}
+  details{margin-top:12px}
+  summary{cursor:pointer;font-size:13px;color:var(--mute);font-weight:600}
+  pre{background:#0d1830;color:#d7e0f0;border-radius:8px;padding:14px;overflow:auto;font-size:12px;line-height:1.5;max-height:340px}
+  .err{color:var(--red-fg);font-size:13.5px;margin-top:10px}
+  .hint{font-size:12.5px;color:var(--faint);margin-top:6px;line-height:1.45}
+  table.ref{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  table.ref th,table.ref td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+  table.ref th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .dot.g{background:#2f7d3b}.dot.a{background:#c79338}.dot.r{background:#b84a4a}.dot.k{background:#9aa0a8}
+  .note{font-size:12.5px;color:var(--mute);background:var(--amber-bg);border:1px solid var(--amber-line);
+    border-radius:8px;padding:10px 13px;margin-bottom:22px}
+</style>
+</head>
+<body>
+<div class="brandbar">Job Finder <span class="tag">Internal · ATS Tools</span></div>
+<div class="wrap">
+  <h1>ATS Discovery &amp; Tester</h1>
+  <p class="sub">Paste a company's careers URL. This tells you which applicant-tracking system it uses, whether it's reachable, and — if it is — lets you test-fetch its jobs.</p>
+
+  <div class="note">Internal developer tool. Not linked from the main site. Detection is heuristic; the live test is the ground truth for anything marked reachable.</div>
+
+  <!-- ============ DISCOVERY ============ -->
+  <div class="panel">
+    <h2>1 · Detect the ATS</h2>
+    <div class="row">
+      <div>
+        <label for="url">Careers URL or apply link</label>
+        <input id="url" type="text" placeholder="https://careers.company.com  ·  or a myworkdayjobs.com link" autocomplete="off">
+      </div>
+      <button id="detectBtn">Detect</button>
+    </div>
+    <p class="hint">Tip: paste the deepest link you have — a specific job's URL or the "Apply" link reveals the ATS more reliably than a homepage. For custom career sites that hide the ATS, use the deep-probe below.</p>
+
+    <div id="verdict" class="verdict">
+      <div class="vhead"><span id="vicon"></span><span id="vtitle"></span></div>
+      <div class="vbody" id="vbody"></div>
+      <div class="coords" id="vcoords"></div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button class="ghost" id="probeBtn">Deep-probe (fetch the page &amp; follow the apply link)</button>
+    </div>
+    <p class="hint">Deep-probe runs server-side: it fetches the page and scans its source, CSP, and apply links for ATS fingerprints the URL alone doesn't show. Use it when "Detect" returns Unknown/custom.</p>
+  </div>
+
+  <!-- ============ TESTER ============ -->
+  <div class="panel" id="testPanel" style="opacity:.55">
+    <h2>2 · Test-fetch jobs <span style="font-weight:400;color:var(--faint);font-size:13px">(reachable ATSs only)</span></h2>
+    <div id="testGate" class="hint">Detect a reachable ATS above to enable testing.</div>
+    <div class="testblock" id="testblock">
+      <div class="row">
+        <div>
+          <label for="tkw">Keyword</label>
+          <input id="tkw" type="text" value="analyst" autocomplete="off">
+        </div>
+        <div>
+          <label for="tloc">Location (optional)</label>
+          <input id="tloc" type="text" placeholder="Dallas, TX" autocomplete="off">
+        </div>
+        <button id="testBtn">Test fetch</button>
+      </div>
+      <div class="results" id="results">
+        <div class="rstat" id="rstat"></div>
+        <div id="rjobs"></div>
+        <div class="err" id="rerr"></div>
+        <details>
+          <summary>Raw response</summary>
+          <pre class="mono" id="rraw"></pre>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ REFERENCE ============ -->
+  <div class="panel">
+    <h2>ATS reference</h2>
+    <p class="hint" style="margin-top:0">What each verdict means. 🟢 supported by a live connector · 🟡 detected but auth/partner-gated · 🔴 blocks server requests · ⚪ custom/unknown.</p>
+    <table class="ref">
+      <thead><tr><th>ATS</th><th>URL tell</th><th>Status</th></tr></thead>
+      <tbody id="refbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// ATS registry. `status`: green | amber | red | gray. `reachable` gates the
+// Tester. `connector` names the Netlify function to call (green only).
+// Detection is a URL/hostname substring match; the deep-probe adds page-source
+// and apply-link signals for the custom front-ends that hide their ATS.
+// ---------------------------------------------------------------------------
+const ATS = [
+  { key:'workday',        name:'Workday',        status:'green', reachable:true,  connector:'workday',
+    urlTells:['myworkdayjobs.com'], note:'Public keyless JSON. Fully supported.' },
+  { key:'greenhouse',     name:'Greenhouse',     status:'green', reachable:true,  connector:'greenhouse',
+    urlTells:['boards.greenhouse.io','job-boards.greenhouse.io','greenhouse.io'], note:'Public boards API. Supported.' },
+  { key:'lever',          name:'Lever',          status:'green', reachable:true,  connector:'lever',
+    urlTells:['jobs.lever.co','lever.co'], note:'Public postings API. Supported.' },
+  { key:'ashby',          name:'Ashby',          status:'green', reachable:true,  connector:'ashby',
+    urlTells:['jobs.ashbyhq.com','ashbyhq.com'], note:'Public API. Supported.' },
+  { key:'smartrecruiters',name:'SmartRecruiters',status:'green', reachable:true,  connector:'smartrecruiters',
+    urlTells:['smartrecruiters.com'], note:'Public postings API. Supported.' },
+  { key:'oracle',         name:'Oracle HCM Cloud',status:'amber', reachable:false, connector:null,
+    urlTells:['/hcmui/candidateexperience','oraclecloud.com','.oracle.com/hcm'], note:'Requires OAuth2 (client id + secret) per tenant; the good endpoints are partner-only. Dell sits here and returned nothing without credentials — not addable by a keyless tool.' },
+  { key:'icims',          name:'iCIMS',          status:'amber', reachable:false, connector:null,
+    urlTells:['.icims.com','icims.com'], note:'Partner-oriented API, not open. Charles Schwab sits here behind a custom front end.' },
+  { key:'phenom',         name:'Phenom People',  status:'red',   reachable:false, connector:null,
+    urlTells:['phenompeople.com'], note:'Sits behind Akamai bot protection; blocks datacenter (server) requests. American Airlines confirmed 403 even with cookies + full browser headers.' },
+  { key:'successfactors', name:'SuccessFactors', status:'red',   reachable:false, connector:null,
+    urlTells:['successfactors.com','sapsf.com','jobs2web.com'], note:'SAP platform, commonly behind Akamai. Blocks server requests. AA / Baylor Scott & White sit here.' },
+  { key:'taleo',          name:'Taleo',          status:'red',   reachable:false, connector:null,
+    urlTells:['taleo.net'], note:'Oracle legacy system, being sunset; inconsistent and usually blocked. Texas Health sits here.' },
+  { key:'brassring',      name:'BrassRing (IBM Kenexa)', status:'red', reachable:false, connector:null,
+    urlTells:['brassring.com','kenexa'], note:'IBM\u2019s own ATS. Custom, no clean public feed.' },
+];
+
+const ICON = { green:'\uD83D\uDFE2', amber:'\uD83D\uDFE1', red:'\uD83D\uDD34', gray:'\u26AA' };
+const DOTCLS = { green:'g', amber:'a', red:'r', gray:'k' };
+
+// ---- render the reference table ----
+(function(){
+  const tb = document.getElementById('refbody');
+  ATS.forEach(a => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${a.name}</td>`
+      + `<td class="mono" style="font-size:12px;color:var(--mute)">${a.urlTells[0]}</td>`
+      + `<td><span class="dot ${DOTCLS[a.status]}"></span>${a.status==='green'?'Reachable':a.status==='amber'?'Auth-gated':a.status==='red'?'Blocked':'Unknown'}</td>`;
+    tb.appendChild(tr);
+  });
+})();
+
+// ---- detection (URL-match tier, pure browser) ----
+let detected = null; // the matched ATS object
+let detectedCoords = null; // {tenant,wd,site} for workday
+
+function detectFromUrl(raw){
+  const s = (raw||'').toLowerCase().trim();
+  if(!s) return null;
+  for(const a of ATS){
+    if(a.urlTells.some(t => s.includes(t))) return a;
+  }
+  return null;
+}
+
+// Parse Workday coordinates from an apply/careers URL if present.
+function parseWorkday(raw){
+  const m = (raw||'').match(/https?:\/\/([^.]+)\.(wd\d+)\.myworkdayjobs\.com\/([^\/?#]+)/i);
+  if(!m) return null;
+  return { tenant:m[1], wd:m[2].replace(/^wd/i,''), site:m[3] };
+}
+
+function showVerdict(a, opts){
+  opts = opts || {};
+  const v = document.getElementById('verdict');
+  const clsMap = { green:'green', amber:'amber', red:'red', gray:'gray' };
+  v.className = 'verdict show ' + (a ? clsMap[a.status] : 'gray');
+  document.getElementById('vicon').textContent = a ? ICON[a.status] : ICON.gray;
+  document.getElementById('vtitle').textContent = a ? a.name : 'No known ATS detected';
+  document.getElementById('vbody').innerHTML = a
+    ? a.note + (opts.viaProbe ? ' <b>(found via deep-probe)</b>' : '')
+    : 'The URL doesn\u2019t match a known ATS. It may be a custom careers portal \u2014 try the deep-probe, which fetches the page and follows the apply link.';
+  const cd = document.getElementById('vcoords');
+  cd.innerHTML = '';
+  if(a && a.key==='workday' && detectedCoords){
+    cd.innerHTML = `Coordinates parsed: `
+      + `tenant <span class="mono">${detectedCoords.tenant}</span> · `
+      + `wd <span class="mono">${detectedCoords.wd}</span> · `
+      + `site <span class="mono">${detectedCoords.site}</span>`
+      + `<br><span class="hint">Config row: <span class="mono">{ name:'', tenant:'${detectedCoords.tenant}', wd:'${detectedCoords.wd}', site:'${detectedCoords.site}', sector:'' }</span></span>`;
+  }
+  // Enable/disable the tester.
+  gateTester(a && a.reachable ? a : null);
+}
+
+function gateTester(a){
+  const panel = document.getElementById('testPanel');
+  const gate = document.getElementById('testGate');
+  const block = document.getElementById('testblock');
+  if(a){
+    panel.style.opacity = '1';
+    gate.style.display = 'none';
+    block.classList.add('show');
+  } else {
+    panel.style.opacity = '.55';
+    gate.style.display = 'block';
+    block.classList.remove('show');
+    document.getElementById('results').classList.remove('show');
+  }
+}
+
+document.getElementById('detectBtn').addEventListener('click', () => {
+  const raw = document.getElementById('url').value;
+  detectedCoords = parseWorkday(raw);
+  detected = detectFromUrl(raw);
+  showVerdict(detected, {});
+});
+document.getElementById('url').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('detectBtn').click();
+});
+
+// ---- deep-probe (server-side page fetch) ----
+document.getElementById('probeBtn').addEventListener('click', async () => {
+  const raw = document.getElementById('url').value.trim();
+  if(!raw){ return; }
+  const btn = document.getElementById('probeBtn');
+  btn.disabled = true; btn.textContent = 'Probing\u2026';
+  try {
+    const r = await fetch('/.netlify/functions/ats-detect?url=' + encodeURIComponent(raw));
+    const d = await r.json();
+    // The function returns { key } of the detected ATS, or null.
+    if(d && d.key){
+      const a = ATS.find(x => x.key === d.key) || null;
+      // If the probe found a workday apply link, try to parse coords from it.
+      if(a && a.key === 'workday' && d.sampleUrl){ detectedCoords = parseWorkday(d.sampleUrl); }
+      detected = a;
+      showVerdict(a, { viaProbe:true });
+    } else {
+      detected = null;
+      showVerdict(null, { viaProbe:true });
+    }
+  } catch(e){
+    detected = null;
+    showVerdict(null, { viaProbe:true });
+  } finally {
+    btn.disabled = false; btn.textContent = 'Deep-probe (fetch the page & follow the apply link)';
+  }
+});
+
+// ---- tester (calls the reachable connector's Netlify function) ----
+document.getElementById('testBtn').addEventListener('click', async () => {
+  if(!detected || !detected.reachable) return;
+  const btn = document.getElementById('testBtn');
+  const kw = document.getElementById('tkw').value.trim();
+  const loc = document.getElementById('tloc').value.trim();
+  const res = document.getElementById('results');
+  const rstat = document.getElementById('rstat');
+  const rjobs = document.getElementById('rjobs');
+  const rerr = document.getElementById('rerr');
+  const rraw = document.getElementById('rraw');
+  btn.disabled = true; btn.textContent = 'Testing\u2026';
+  rerr.textContent = ''; rjobs.innerHTML = ''; rstat.innerHTML = ''; rraw.textContent = '';
+  res.classList.add('show');
+
+  // Build the connector call. Workday needs coordinates; the others take
+  // keyword/location directly (they resolve their own board lists server-side).
+  let endpoint = '/.netlify/functions/' + detected.connector + '?keyword=' + encodeURIComponent(kw);
+  if(loc) endpoint += '&location=' + encodeURIComponent(loc);
+  if(detected.key === 'workday'){
+    if(!detectedCoords){
+      rerr.textContent = 'Workday needs tenant/wd/site. Paste a full myworkdayjobs.com URL and Detect again.';
+      btn.disabled = false; btn.textContent = 'Test fetch'; return;
+    }
+    endpoint += '&tenant=' + encodeURIComponent(detectedCoords.tenant)
+             +  '&wd=' + encodeURIComponent(detectedCoords.wd)
+             +  '&site=' + encodeURIComponent(detectedCoords.site)
+             +  '&company=' + encodeURIComponent(detectedCoords.tenant);
+  }
+
+  const t0 = performance.now();
+  try {
+    const r = await fetch(endpoint);
+    const ms = Math.round(performance.now() - t0);
+    const text = await r.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch(e){}
+    rraw.textContent = text.slice(0, 20000);
+
+    const jobs = (data && Array.isArray(data.jobs)) ? data.jobs : [];
+    rstat.innerHTML =
+      `<span>Status <b>${r.status}</b></span>`
+      + `<span>Time <b>${ms} ms</b></span>`
+      + `<span>Returned <b>${jobs.length}</b></span>`
+      + (data && typeof data.total==='number' ? `<span>Total <b>${data.total}</b></span>` : '')
+      + `<span>Endpoint <b class="mono" style="font-size:11px">${detected.connector}</b></span>`;
+
+    if(data && data.ok === false){
+      rerr.textContent = 'Connector reported: ' + (data.error || 'ok:false');
+    }
+    jobs.slice(0, 15).forEach(j => {
+      const card = document.createElement('div');
+      card.className = 'jobcard';
+      const exp = (j.minYears ? ' · ' + j.minYears + '+ yrs' : '');
+      card.innerHTML = `<div class="jt">${escapeHtml(j.title||'(no title)')}</div>`
+        + `<div class="jm">${escapeHtml(j.company||'')} · ${escapeHtml(j.location||'\u2014')}${exp}`
+        + (j.url ? ` · <a href="${escapeAttr(j.url)}" target="_blank" rel="noopener">open</a>` : '') + `</div>`;
+      rjobs.appendChild(card);
+    });
+    if(jobs.length > 15){
+      const more = document.createElement('div');
+      more.className = 'hint';
+      more.textContent = '+ ' + (jobs.length - 15) + ' more (see raw response)';
+      rjobs.appendChild(more);
+    }
+    if(!jobs.length && !(data && data.ok === false)){
+      rerr.textContent = 'Reachable, but returned 0 jobs for this keyword/location. Try a broader keyword or clear the location.';
+    }
+  } catch(e){
+    rerr.textContent = 'Request failed: ' + (e && e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Test fetch';
+  }
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>
