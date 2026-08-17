@@ -21,8 +21,7 @@ Three, read once off the employer's careers URL:
 Config row shape (in `WORKDAY_EMPLOYERS`):
 `{ name:'Toyota', tenant:'toyota', wd:'503', site:'TMNA', sector:'industrial' }`
 
-## Gotchas (hard-won)
-- **Apply URL needs the `/{site}/` segment.** The list returns a relative
+## Gotchas (hard-won)- **Apply URL needs the `/{site}/` segment.** The list returns a relative
   `externalPath` like `/job/Plano-Texas/Analyst_10332696`. The real apply URL is
   `{base}/{site}{externalPath}`. Joining `{base}{externalPath}` (dropping the
   site) 404s to `community.workday.com/invalid-url`. *(This was a real bug we
@@ -42,6 +41,21 @@ Config row shape (in `WORKDAY_EMPLOYERS`):
   Don't send location to Workday; pull by keyword and filter client-side.
 - **No real posted date in the list** — only a relative "Posted 5 Days Ago".
   We leave `posted` null rather than make a per-job call for it.
+- **One board, many front-end pages.** Employers with fancy category or audience
+  URLs almost always run a SINGLE underlying Workday board — the branded pages
+  are just filtered views. Don't add one entry per page. Examples:
+  - `careers.adobe.com/us/en/c/research-jobs`, `/engineering-and-product-jobs`,
+    `/university` all funnel into ONE board: `adobe.wd5.../external_experienced`.
+    A `q=graduate` keyword filter surfaces new-grad roles from the same board —
+    so the single Adobe config entry already covers experienced AND new-grad AND
+    every category. The "experienced" in the site name is a catch-all, not a
+    filter. (Verified Aug 2026.)
+  - Rule of thumb: when a company has many separate-looking careers pages, ask
+    "what's the one Workday tenant underneath?" — your single config entry plus
+    a keyword search reaches all of it. Only add a SECOND entry if new-grad roles
+    genuinely live on a DIFFERENT site path (rare — Unilever's
+    `Unilever_Experienced_Professionals` is one to re-check if new-grad coverage
+    matters there).
 
 ## Employers confirmed working (as of Aug 2026) — 15
 UT Austin, Cigna, CVS Health, Toyota, Salesforce, NVIDIA, Target, Adobe,
