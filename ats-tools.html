@@ -74,6 +74,16 @@
   .dot.g{background:#2f7d3b}.dot.a{background:#c79338}.dot.r{background:#b84a4a}.dot.k{background:#9aa0a8}
   .note{font-size:12.5px;color:var(--mute);background:var(--amber-bg);border:1px solid var(--amber-line);
     border-radius:8px;padding:10px 13px;margin-bottom:22px}
+  #logTable td{vertical-align:top}
+  #logTable .lwhen{color:var(--faint);font-size:12px;white-space:nowrap}
+  #logTable .lurl{font-size:12.5px;word-break:break-all;max-width:280px}
+  #logTable .lurl .lname{font-weight:600;display:block}
+  #logTable .lresult{font-size:12.5px;white-space:nowrap}
+  #logTable .lcopy{font-size:11px;padding:4px 9px;background:#fff;color:var(--navy);
+    border:1px solid var(--line-strong);border-radius:6px;cursor:pointer;font-weight:600}
+  #logTable .lcopy:hover{background:var(--paper)}
+  #logTable .ldel{font-size:14px;color:var(--faint);background:none;border:none;cursor:pointer;padding:2px 6px}
+  #logTable .ldel:hover{color:var(--red-fg)}
 </style>
 </head>
 <body>
@@ -134,6 +144,22 @@
         </details>
       </div>
     </div>
+  </div>
+
+  <!-- ============ TEST HISTORY ============ -->
+  <div class="panel">
+    <h2>Test history <span style="font-weight:400;color:var(--faint);font-size:13px">(saved in this browser)</span></h2>
+    <p class="hint" style="margin-top:0">Every Detect and Test is logged here automatically so you don't re-check the same company. Lives in this browser only — use <b>Export</b> to save findings into your knowledge-base files (GitHub) or to share them.</p>
+    <div class="row" style="margin:12px 0 4px">
+      <button class="ghost" id="exportLog">⬇ Export as markdown</button>
+      <button class="ghost" id="clearLog">Clear all</button>
+      <span id="logCount" class="hint" style="align-self:center"></span>
+    </div>
+    <div id="logEmpty" class="hint" style="margin-top:10px">No tests logged yet.</div>
+    <table class="ref" id="logTable" style="display:none">
+      <thead><tr><th>When</th><th>Company / URL</th><th>ATS</th><th>Result</th><th></th></tr></thead>
+      <tbody id="logBody"></tbody>
+    </table>
   </div>
 
   <!-- ============ REFERENCE ============ -->
@@ -258,6 +284,16 @@ document.getElementById('detectBtn').addEventListener('click', () => {
   detectedCoords = parseWorkday(raw);
   detected = detectFromUrl(raw);
   showVerdict(detected, {});
+  if(raw.trim()){
+    logEntry({
+      url: raw.trim(),
+      atsKey: detected ? detected.key : null,
+      atsName: detected ? detected.name : 'Unknown',
+      status: detected ? detected.status : 'unknown',
+      coords: (detected && detected.key==='workday') ? detectedCoords : null,
+      tested: false
+    });
+  }
 });
 document.getElementById('url').addEventListener('keydown', e => {
   if(e.key === 'Enter') document.getElementById('detectBtn').click();
@@ -279,9 +315,18 @@ document.getElementById('probeBtn').addEventListener('click', async () => {
       if(a && a.key === 'workday' && d.sampleUrl){ detectedCoords = parseWorkday(d.sampleUrl); }
       detected = a;
       showVerdict(a, { viaProbe:true });
+      logEntry({
+        url: raw,
+        atsKey: a ? a.key : d.key,
+        atsName: a ? a.name : d.key,
+        status: a ? a.status : 'unknown',
+        coords: (a && a.key==='workday') ? detectedCoords : null,
+        tested: false, viaProbe: true
+      });
     } else {
       detected = null;
       showVerdict(null, { viaProbe:true });
+      logEntry({ url: raw, atsKey:null, atsName:'Unknown', status:'unknown', tested:false, viaProbe:true });
     }
   } catch(e){
     detected = null;
@@ -359,12 +404,156 @@ document.getElementById('testBtn').addEventListener('click', async () => {
     if(!jobs.length && !(data && data.ok === false)){
       rerr.textContent = 'Reachable, but returned 0 jobs for this keyword/location. Try a broader keyword or clear the location.';
     }
+    // Record the test in the history log.
+    logEntry({
+      url: document.getElementById('url').value.trim() || endpoint,
+      atsKey: detected.key,
+      atsName: detected.name,
+      status: detected.status,
+      coords: (detected.key==='workday') ? detectedCoords : null,
+      tested: true,
+      jobs: jobs.length,
+      httpStatus: r.status,
+      testError: (data && data.ok === false) ? (data.error || 'ok:false') : ''
+    });
   } catch(e){
     rerr.textContent = 'Request failed: ' + (e && e.message);
+    logEntry({
+      url: document.getElementById('url').value.trim() || endpoint,
+      atsKey: detected.key, atsName: detected.name, status: detected.status,
+      coords: (detected.key==='workday') ? detectedCoords : null,
+      tested: true, testError: (e && e.message) || 'request failed'
+    });
   } finally {
     btn.disabled = false; btn.textContent = 'Test fetch';
   }
 });
+
+// ---------------------------------------------------------------------------
+// TEST HISTORY — persistent log in localStorage. Auto-records every Detect and
+// Test so you don't re-check the same company. Lives in this browser only;
+// Export writes markdown you can paste into the knowledge-base files (GitHub).
+// ---------------------------------------------------------------------------
+const LOG_KEY = 'ats_test_log_v1';
+const LOG_MAX = 200; // keep the most recent N
+
+function loadLog(){
+  try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+function saveLog(arr){
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(arr.slice(0, LOG_MAX))); }
+  catch(e){ /* storage full or blocked — log stays in-memory for this session */ }
+}
+
+// Add or update an entry. Keyed by url so re-testing the same URL updates its
+// row (with a fresh timestamp) instead of piling duplicates.
+function logEntry(entry){
+  const arr = loadLog();
+  const i = arr.findIndex(e => e.url === entry.url);
+  const merged = Object.assign({}, (i >= 0 ? arr[i] : {}), entry, { ts: Date.now() });
+  if(i >= 0) arr.splice(i, 1);
+  arr.unshift(merged);
+  saveLog(arr);
+  renderLog();
+}
+
+const STATUS_ICON = { green:'\uD83D\uDFE2', amber:'\uD83D\uDFE1', red:'\uD83D\uDD34', gray:'\u26AA', unknown:'\u26AA' };
+
+function renderLog(){
+  const arr = loadLog();
+  const body = document.getElementById('logBody');
+  const tbl = document.getElementById('logTable');
+  const empty = document.getElementById('logEmpty');
+  const count = document.getElementById('logCount');
+  count.textContent = arr.length ? arr.length + ' logged' : '';
+  if(!arr.length){ tbl.style.display='none'; empty.style.display='block'; return; }
+  tbl.style.display=''; empty.style.display='none';
+  body.innerHTML = '';
+  arr.forEach((e, idx) => {
+    const tr = document.createElement('tr');
+    const when = new Date(e.ts);
+    const whenStr = when.toLocaleDateString(undefined,{month:'short',day:'numeric'})
+      + ' ' + when.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+    const atsName = e.atsName || (e.atsKey ? e.atsKey : 'Unknown');
+    const icon = STATUS_ICON[e.status || 'unknown'] || '\u26AA';
+    let result = '';
+    if(e.tested){
+      result = (e.jobs != null ? e.jobs + ' jobs' : '') + (e.httpStatus ? ' · ' + e.httpStatus : '');
+      if(e.testError) result = '⚠ ' + e.testError;
+    } else {
+      result = e.status === 'green' ? 'reachable (not tested)'
+             : e.status === 'amber' ? 'auth-gated'
+             : e.status === 'red' ? 'blocked'
+             : 'unknown';
+    }
+    const canCopy = e.atsKey === 'workday' && e.coords;
+    tr.innerHTML =
+      `<td class="lwhen">${whenStr}</td>`
+      + `<td class="lurl"><span class="lname">${escapeHtml(e.name || hostOf(e.url))}</span>${escapeHtml(e.url)}</td>`
+      + `<td>${icon} ${escapeHtml(atsName)}</td>`
+      + `<td class="lresult">${escapeHtml(result)}</td>`
+      + `<td style="white-space:nowrap">`
+        + (canCopy ? `<button class="lcopy" data-copy="${idx}">copy row</button> ` : '')
+        + `<button class="ldel" data-del="${idx}" title="Remove">\u2715</button>`
+      + `</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function hostOf(u){ try { return new URL(u).host; } catch(e){ return u; } }
+
+// Row actions (copy config row / delete).
+document.getElementById('logBody').addEventListener('click', (ev) => {
+  const copyBtn = ev.target.closest('[data-copy]');
+  if(copyBtn){
+    const arr = loadLog();
+    const e = arr[+copyBtn.getAttribute('data-copy')];
+    if(e && e.coords){
+      const row = `{ name:'${e.name||''}', tenant:'${e.coords.tenant}', wd:'${e.coords.wd}', site:'${e.coords.site}', sector:'' },`;
+      navigator.clipboard && navigator.clipboard.writeText(row);
+      copyBtn.textContent = 'copied ✓';
+      setTimeout(()=>{ copyBtn.textContent = 'copy row'; }, 1400);
+    }
+    return;
+  }
+  const delBtn = ev.target.closest('[data-del]');
+  if(delBtn){
+    const arr = loadLog();
+    arr.splice(+delBtn.getAttribute('data-del'), 1);
+    saveLog(arr); renderLog();
+  }
+});
+
+// Export the whole log as markdown (paste into docs/ats/ or share).
+document.getElementById('exportLog').addEventListener('click', () => {
+  const arr = loadLog();
+  if(!arr.length) return;
+  let md = '# ATS test log\n\n_Exported ' + new Date().toLocaleString() + '_\n\n';
+  md += '| When | Company / URL | ATS | Status | Result |\n|---|---|---|---|---|\n';
+  arr.forEach(e => {
+    const when = new Date(e.ts).toLocaleDateString();
+    const atsName = e.atsName || e.atsKey || 'Unknown';
+    const result = e.tested ? ((e.jobs!=null?e.jobs+' jobs':'') + (e.testError?(' ⚠ '+e.testError):'')) : '—';
+    const coords = (e.atsKey==='workday' && e.coords) ? ` (tenant:${e.coords.tenant}, wd:${e.coords.wd}, site:${e.coords.site})` : '';
+    md += `| ${when} | ${(e.name||hostOf(e.url))}${coords}<br>${e.url} | ${atsName} | ${e.status||'unknown'} | ${result} |\n`;
+  });
+  const blob = new Blob([md], {type:'text/markdown'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ats-test-log.md';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById('clearLog').addEventListener('click', () => {
+  if(confirm('Clear the entire test log? This cannot be undone.')){
+    saveLog([]); renderLog();
+  }
+});
+
+// Paint the log on load.
+renderLog();
 
 function escapeHtml(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
