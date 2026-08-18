@@ -131,6 +131,17 @@
     font-size:16px;line-height:1;padding:7px 12px 7px 4px;cursor:pointer}
   .role-chip .role-chip-del:hover{color:#fff}
   .role-chips-cap{font-size:12px;font-weight:700;color:var(--amber-deep);margin-left:2px;white-space:nowrap}
+  /* Location chips — same shape as role chips but navy fill so the two chip
+     rows read as different things at a glance (roles = amber, places = navy). */
+  .loc-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;min-height:0;align-items:center}
+  .loc-chips:empty{margin-top:0}
+  .loc-chip{display:inline-flex;align-items:center;gap:4px;padding:0;overflow:hidden;
+    border-radius:999px;background:var(--navy-bar);color:#fff;font-size:13px;font-weight:600}
+  .loc-chip .loc-chip-label{padding:7px 2px 7px 14px;white-space:nowrap}
+  .loc-chip .loc-chip-del{border:none;background:transparent;color:rgba(255,255,255,.75);
+    font-size:16px;line-height:1;padding:7px 12px 7px 6px;cursor:pointer}
+  .loc-chip .loc-chip-del:hover{color:#fff}
+  .loc-chips-hint{font-size:12px;color:var(--faint)}
   .label-optional{font-weight:400;color:var(--faint);font-size:12px;text-transform:none;letter-spacing:0}
   .profile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
   .profile-grid .field{gap:4px}
@@ -682,11 +693,18 @@
          get their own band rather than living inside the keyword row, where
          they read as belonging only to the keyword path. -->
     <div class="band">
-      <p class="go-lede"><b>Then choose where — and search.</b> Enter a city, state, or "Remote." Leave blank to search the U.S.</p>
+      <p class="go-lede"><b>Then choose where — and search.</b> Enter a city, state, or "Remote," then press <b>Enter</b> to add it. Add up to 3 — results match <b>any</b> of them. Leave blank to search the U.S.</p>
       <div class="grid2 grid2-end action-row">
         <div class="field action-loc">
-          <label for="loc">Location <span class="label-optional">(optional)</span></label>
-          <input id="loc" type="text" placeholder="e.g. Dallas, TX · Texas · Remote" value="">
+          <label for="locInput">Location <span class="label-optional">(optional · add up to 3)</span></label>
+          <input id="locInput" type="text" placeholder="e.g. Dallas, TX — then press Enter" value="" autocomplete="off">
+          <div id="locChips" class="loc-chips" aria-live="polite"></div>
+          <!-- The real value the search pipeline reads. Chips are the visible UI;
+               they sync down into this hidden field as a " ; "-joined string, so
+               every downstream reader (search, save/restore, examples, reset)
+               keeps using #loc exactly as before. This field is the single
+               source of truth; #locChips is a view of it. -->
+          <input id="loc" type="hidden" value="">
         </div>
         <div class="hero-actions">
           <button id="go">Search</button>
@@ -2941,7 +2959,39 @@ function previewFilter(all, o){
   return out;
 }
 
+// MULTI-LOCATION (Aug 2026): `input` may now be a single location string OR
+// several locations the user chose as chips. Several locations are passed as a
+// comma-joined string ("denver, co · dallas, tx" is stored comma-separated) or
+// as an array. Semantics are OR: a job matches if it matches ANY chosen
+// location — the model that fits a new grad open to a few metros at once.
+//
+// This wrapper is the ONLY place multi-location is interpreted. Every existing
+// call site (main filter, previewFilter, RF filter, scoreJob) passes its `loc`
+// straight through unchanged and gets correct OR behavior for free. The single
+// matcher below is the original function, renamed — its logic is untouched.
 function locationMatches(locText, input){
+  const list = splitLocations(input);
+  if(list.length <= 1) return locationMatchesOne(locText, list[0] || input);
+  return list.some(one => locationMatchesOne(locText, one));
+}
+
+// Split a multi-location value into an array of single-location strings.
+// Accepts an array (used directly) or a string. For strings we split on commas
+// ONLY when the value looks like several locations — a lone "Dallas, TX" must
+// stay whole, so we split on a comma only when a segment on its own parses as a
+// complete location (a bare state, or a "city + state"). Chips join with " ; "
+// as an unambiguous separator to sidestep the city/state comma entirely.
+function splitLocations(input){
+  if(Array.isArray(input)) return input.map(s => (s||'').trim()).filter(Boolean);
+  const raw = (input || '').trim();
+  if(!raw) return [];
+  if(raw.includes(';')){
+    return raw.split(';').map(s => s.trim()).filter(Boolean);
+  }
+  return [raw];
+}
+
+function locationMatchesOne(locText, input){
   const parsed = parseLocationInput(input);
   if(!parsed.terms.length) return true;
 
