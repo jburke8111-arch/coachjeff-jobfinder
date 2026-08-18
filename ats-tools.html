@@ -47,6 +47,9 @@
   #batchTable .burl .bname{font-weight:600;color:var(--navy);display:block;font-size:12.5px}
   .vnext{margin-top:10px;padding-top:9px;border-top:1px solid rgba(0,0,0,.09);font-size:13px;line-height:1.55}
   .vnext b{color:inherit}
+  #batchTable tr.rowseen td{opacity:.5}
+  #batchTable .bseen{color:var(--mute);font-weight:600;font-size:11.5px}
+  #batchTable .bnew{color:var(--green-fg);font-weight:700;font-size:11.5px}
   .row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
   .row > div{flex:1;min-width:180px}
   button{font-family:inherit;font-size:14px;font-weight:600;border:none;background:var(--navy);color:#fff;
@@ -165,7 +168,7 @@
         <span id="batchSummary" class="hint" style="align-self:center"></span>
       </div>
       <table class="ref" id="batchTable">
-        <thead><tr><th>Verdict</th><th>Company / URL</th><th>ATS</th><th>Slug / config</th></tr></thead>
+        <thead><tr><th>Verdict</th><th>Company / URL</th><th>ATS</th><th>Checked?</th><th>Slug / config</th></tr></thead>
         <tbody id="batchBody"></tbody>
       </table>
     </div>
@@ -542,11 +545,30 @@ document.getElementById('batchBtn').addEventListener('click', () => {
   const seen = new Set();
   const urls = lines.filter(u => { const k=u.toLowerCase(); if(seen.has(k)) return false; seen.add(k); return true; });
 
+  // Snapshot the log BEFORE this batch writes to it, so we can tell which
+  // companies were already checked in a prior session. Key by a company
+  // identity (host + first path segment) so different companies on a shared
+  // ATS host — e.g. greenhouse.io/stripe vs greenhouse.io/notion — don't
+  // collide, while the same company via a slightly different URL still matches.
+  function companyKey(u){
+    try {
+      const url = new URL((u||'').startsWith('http') ? u : 'https://' + u);
+      const seg = url.pathname.split('/').filter(Boolean)[0] || '';
+      return (url.host + '/' + seg).toLowerCase();
+    } catch(e){ return (u||'').toLowerCase(); }
+  }
+  const priorByKey = {};
+  loadLog().forEach(e => {
+    const k = companyKey(e.url);
+    if(k && !priorByKey[k]) priorByKey[k] = e; // most-recent wins (log is newest-first)
+  });
+
   lastBatch = urls.map(raw => {
     const coords = parseWorkday(raw);
     const ats = detectFromUrl(raw);
     const status = ats ? ats.status : 'unknown';
     const slug = extractSlug(raw, ats);
+    const prior = priorByKey[companyKey(raw)] || null;
     logEntry({
       url: raw,
       atsKey: ats ? ats.key : null,
@@ -555,7 +577,7 @@ document.getElementById('batchBtn').addEventListener('click', () => {
       coords: (ats && ats.key==='workday') ? coords : null,
       tested: false, batch: true
     });
-    return { raw, ats, status, slug };
+    return { raw, ats, status, slug, prior };
   });
 
   // sort by verdict so addable greens sit on top
@@ -572,8 +594,11 @@ function renderBatch(){
   body.innerHTML = '';
 
   const counts = { green:0, amber:0, red:0, unknown:0 };
-  lastBatch.forEach(r => { counts[r.status] = (counts[r.status]||0)+1; });
-  summary.textContent = `${lastBatch.length} checked · ${counts.green} green · ${counts.amber} amber · ${counts.red} red · ${counts.unknown} unknown`;
+  let seenCount = 0;
+  lastBatch.forEach(r => { counts[r.status] = (counts[r.status]||0)+1; if(r.prior) seenCount++; });
+  const newCount = lastBatch.length - seenCount;
+  summary.textContent = `${lastBatch.length} checked · ${newCount} new · ${seenCount} seen before`
+    + ` · ${counts.green} green · ${counts.amber} amber · ${counts.red} red · ${counts.unknown} unknown`;
 
   lastBatch.forEach((r, idx) => {
     const a = r.ats;
@@ -585,11 +610,20 @@ function renderBatch(){
     } else if(a && a.status==='green'){
       slugCell = '<span class="hint">reachable \u2014 no clean slug in URL; paste a deeper link</span>';
     }
+    // "already checked?" — dim the whole row if seen in a prior session
+    let seenCell = '<span class="bnew">new</span>';
+    if(r.prior){
+      const when = new Date(r.prior.ts).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+      const pv = r.prior.status || 'unknown';
+      seenCell = `<span class="bseen">\u2713 ${when} · ${escapeHtml(pv)}</span>`;
+    }
     const tr = document.createElement('tr');
+    if(r.prior) tr.className = 'rowseen';
     tr.innerHTML =
       `<td style="white-space:nowrap">${icon} ${r.status}</td>`
       + `<td class="burl"><span class="bname">${escapeHtml(hostOf(r.raw))}</span>${escapeHtml(r.raw)}</td>`
       + `<td style="white-space:nowrap">${escapeHtml(atsName)}</td>`
+      + `<td style="white-space:nowrap">${seenCell}</td>`
       + `<td>${slugCell}</td>`;
     body.appendChild(tr);
   });
