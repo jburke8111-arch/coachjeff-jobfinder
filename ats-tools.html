@@ -29,9 +29,24 @@
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:22px}
   .panel h2{font-size:16px;margin:0 0 14px;letter-spacing:.02em}
   label{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
-  input,select{font-family:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line-strong);
+  input,select,textarea{font-family:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line-strong);
     background:#fff;border-radius:7px;color:var(--navy);width:100%}
-  input:focus,select:focus{outline:2px solid var(--navy-bar);outline-offset:1px}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--navy-bar);outline-offset:1px}
+  textarea{resize:vertical;line-height:1.5;min-height:96px}
+  textarea.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+  .panel.flow{background:#f4f6f9;border-color:var(--line-strong)}
+  .flowsteps{margin:0;padding-left:20px;font-size:13.5px;line-height:1.7;color:var(--navy)}
+  .flowsteps li{margin-bottom:3px}
+  .flowsteps .mono{background:rgba(0,0,0,.05);padding:1px 5px;border-radius:4px;font-size:12px}
+  .batchwrap{margin-top:16px}
+  #batchTable td{vertical-align:top;font-size:12.5px}
+  #batchTable .bslug{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  #batchTable .bslug button{font-size:10.5px;padding:2px 7px;margin-left:6px;background:#fff;color:var(--navy);
+    border:1px solid var(--line-strong);border-radius:5px;font-weight:600;vertical-align:middle}
+  #batchTable .burl{word-break:break-all;max-width:300px;font-size:12px;color:var(--mute)}
+  #batchTable .burl .bname{font-weight:600;color:var(--navy);display:block;font-size:12.5px}
+  .vnext{margin-top:10px;padding-top:9px;border-top:1px solid rgba(0,0,0,.09);font-size:13px;line-height:1.55}
+  .vnext b{color:inherit}
   .row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
   .row > div{flex:1;min-width:180px}
   button{font-family:inherit;font-size:14px;font-weight:600;border:none;background:var(--navy);color:#fff;
@@ -94,6 +109,20 @@
 
   <div class="note">Internal developer tool. Not linked from the main site. Detection is heuristic; the live test is the ground truth for anything marked reachable.</div>
 
+  <!-- ============ WORKFLOW ============ -->
+  <div class="panel flow">
+    <h2>The workflow</h2>
+    <p class="hint" style="margin-top:0;margin-bottom:12px">What to do once a company is detected. The goal is to get a working <b>slug</b> into a connector so the Job Finder searches that employer.</p>
+    <ol class="flowsteps">
+      <li><b>Detect</b> — paste a careers / apply URL (one, or many in Batch). Green = a connector can reach it.</li>
+      <li><b>Confirm</b> — for a green result, run <b>Test-fetch</b> to prove the board actually returns jobs. Detection alone isn't proof.</li>
+      <li><b>Copy the slug</b> — grab the paste-ready slug (or Workday config row) from the result or the batch table.</li>
+      <li><b>Add it</b> — paste the slug into that connector's board list (<span class="mono">greenhouse.js</span>, <span class="mono">lever.js</span>, <span class="mono">ashby.js</span>, <span class="mono">smartrecruiters.js</span>) or the Workday config.</li>
+      <li><b>Ship</b> — commit &amp; push; Netlify auto-deploys. The employer is now live in the Job Finder.</li>
+    </ol>
+    <p class="hint" style="margin-bottom:0">Amber = needs credentials (skip for this keyless setup). Red = blocks server requests (skip). Unknown = try the deep-probe, else it's a custom portal — set aside.</p>
+  </div>
+
   <!-- ============ DISCOVERY ============ -->
   <div class="panel">
     <h2>1 · Detect the ATS</h2>
@@ -116,6 +145,30 @@
       <button class="ghost" id="probeBtn">Deep-probe (fetch the page &amp; follow the apply link)</button>
     </div>
     <p class="hint">Deep-probe runs server-side: it fetches the page and scans its source, CSP, and apply links for ATS fingerprints the URL alone doesn't show. Use it when "Detect" returns Unknown/custom.</p>
+  </div>
+
+  <!-- ============ BATCH ============ -->
+  <div class="panel">
+    <h2>Batch detect <span style="font-weight:400;color:var(--faint);font-size:13px">(paste many, one URL per line)</span></h2>
+    <label for="batchInput">Careers / apply URLs</label>
+    <textarea id="batchInput" rows="5" placeholder="https://boards.greenhouse.io/stripe&#10;https://jobs.lever.co/spotify&#10;https://acme.wd1.myworkdayjobs.com/careers&#10;… one per line"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button id="batchBtn">Detect all</button>
+      <button class="ghost" id="batchClear">Clear</button>
+      <span id="batchCount" class="hint" style="align-self:center"></span>
+    </div>
+    <p class="hint">URL-tier detection only (instant, no server calls) — for the unknowns it flags, use the single-URL deep-probe above. Detection isn't proof the board returns jobs; test-fetch the greens that matter.</p>
+
+    <div id="batchResults" class="batchwrap" style="display:none">
+      <div class="row" style="margin:4px 0 12px">
+        <button class="ghost" id="copySlugs">⧉ Copy all green slugs</button>
+        <span id="batchSummary" class="hint" style="align-self:center"></span>
+      </div>
+      <table class="ref" id="batchTable">
+        <thead><tr><th>Verdict</th><th>Company / URL</th><th>ATS</th><th>Slug / config</th></tr></thead>
+        <tbody id="batchBody"></tbody>
+      </table>
+    </div>
   </div>
 
   <!-- ============ TESTER ============ -->
@@ -240,6 +293,44 @@ function parseWorkday(raw){
   return { tenant:m[1], wd:m[2].replace(/^wd/i,''), site:m[3] };
 }
 
+// Extract the paste-ready slug for the reachable ATSs. The slug is the board
+// identifier a connector needs: the path segment after the ATS host. Returns
+// '' when there's nothing cleanly extractable (e.g. workday uses coords, or a
+// bare host with no company path).
+function extractSlug(raw, ats){
+  if(!ats) return '';
+  const s = (raw||'').trim();
+  if(ats.key === 'workday'){
+    const c = parseWorkday(s);
+    return c ? `{ name:'', tenant:'${c.tenant}', wd:'${c.wd}', site:'${c.site}', sector:'' },` : '';
+  }
+  // host/<slug>[/...]. Grab the first path segment after the known host.
+  try {
+    const u = new URL(s.startsWith('http') ? s : 'https://' + s);
+    const parts = u.pathname.split('/').filter(Boolean);
+    if(ats.key === 'smartrecruiters') return parts[0] || '';         // smartrecruiters.com/<Company>
+    if(ats.key === 'greenhouse')      return parts[0] || '';         // boards.greenhouse.io/<slug>
+    if(ats.key === 'lever')           return parts[0] || '';         // jobs.lever.co/<slug>
+    if(ats.key === 'ashby')           return parts[0] || '';         // jobs.ashbyhq.com/<slug>
+    return parts[0] || '';
+  } catch(e){ return ''; }
+}
+
+// Verdict-aware "what to do next", keyed off status. Returns HTML.
+function nextStepFor(a, slug){
+  if(!a) return '<b>&rarr; Next:</b> No known ATS. Try the deep-probe; if still unknown it\u2019s a custom portal \u2014 set aside.';
+  if(a.status === 'green'){
+    if(a.key === 'workday'){
+      return '<b>&rarr; Next:</b> Test-fetch to confirm it returns jobs, then copy the config row (below) into the Workday config and push.';
+    }
+    const slugTxt = slug ? ` Slug: <span class="mono">${escapeHtml(slug)}</span>.` : '';
+    return `<b>&rarr; Next:</b> Test-fetch to confirm jobs, then add the slug to <span class="mono">${a.connector}.js</span>\u2019s board list, commit &amp; push (Netlify auto-deploys).${slugTxt}`;
+  }
+  if(a.status === 'amber') return '<b>&rarr; Next:</b> Auth-gated \u2014 needs credentials/partner access, not addable by this keyless setup. Log it and skip.';
+  if(a.status === 'red')   return '<b>&rarr; Next:</b> Blocks server requests (bot protection). Not addable \u2014 don\u2019t spend time here.';
+  return '<b>&rarr; Next:</b> Try the deep-probe.';
+}
+
 function showVerdict(a, opts){
   opts = opts || {};
   const v = document.getElementById('verdict');
@@ -259,6 +350,12 @@ function showVerdict(a, opts){
       + `site <span class="mono">${detectedCoords.site}</span>`
       + `<br><span class="hint">Config row: <span class="mono">{ name:'', tenant:'${detectedCoords.tenant}', wd:'${detectedCoords.wd}', site:'${detectedCoords.site}', sector:'' }</span></span>`;
   }
+  // "What next?" line, keyed off the verdict.
+  const slug = a ? extractSlug(document.getElementById('url').value, a) : '';
+  const nx = document.createElement('div');
+  nx.className = 'vnext';
+  nx.innerHTML = nextStepFor(a, slug);
+  cd.appendChild(nx);
   // Enable/disable the tester.
   gateTester(a && a.reachable ? a : null);
 }
@@ -427,6 +524,120 @@ document.getElementById('testBtn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false; btn.textContent = 'Test fetch';
   }
+});
+
+// ---------------------------------------------------------------------------
+// BATCH DETECT — paste many URLs, run each through the same URL-tier detection
+// (detectFromUrl + parseWorkday) and slug extraction, group by verdict, and
+// emit paste-ready slugs. Reuses logEntry() so batch rows land in the history
+// too. URL-tier only — no per-URL server calls — so it stays fast and free.
+// ---------------------------------------------------------------------------
+const VERDICT_RANK = { green:0, amber:1, red:2, unknown:3 };
+let lastBatch = [];
+
+document.getElementById('batchBtn').addEventListener('click', () => {
+  const lines = document.getElementById('batchInput').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  // de-dup within the paste, preserve order
+  const seen = new Set();
+  const urls = lines.filter(u => { const k=u.toLowerCase(); if(seen.has(k)) return false; seen.add(k); return true; });
+
+  lastBatch = urls.map(raw => {
+    const coords = parseWorkday(raw);
+    const ats = detectFromUrl(raw);
+    const status = ats ? ats.status : 'unknown';
+    const slug = extractSlug(raw, ats);
+    logEntry({
+      url: raw,
+      atsKey: ats ? ats.key : null,
+      atsName: ats ? ats.name : 'Unknown',
+      status: status,
+      coords: (ats && ats.key==='workday') ? coords : null,
+      tested: false, batch: true
+    });
+    return { raw, ats, status, slug };
+  });
+
+  // sort by verdict so addable greens sit on top
+  lastBatch.sort((a,b) => (VERDICT_RANK[a.status]??9) - (VERDICT_RANK[b.status]??9));
+  renderBatch();
+});
+
+function renderBatch(){
+  const wrap = document.getElementById('batchResults');
+  const body = document.getElementById('batchBody');
+  const summary = document.getElementById('batchSummary');
+  if(!lastBatch.length){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  body.innerHTML = '';
+
+  const counts = { green:0, amber:0, red:0, unknown:0 };
+  lastBatch.forEach(r => { counts[r.status] = (counts[r.status]||0)+1; });
+  summary.textContent = `${lastBatch.length} checked · ${counts.green} green · ${counts.amber} amber · ${counts.red} red · ${counts.unknown} unknown`;
+
+  lastBatch.forEach((r, idx) => {
+    const a = r.ats;
+    const icon = STATUS_ICON[r.status] || '\u26AA';
+    const atsName = a ? a.name : 'Unknown';
+    let slugCell = '<span class="hint">\u2014</span>';
+    if(r.slug){
+      slugCell = `<span class="bslug">${escapeHtml(r.slug)}<button data-bcopy="${idx}">copy</button></span>`;
+    } else if(a && a.status==='green'){
+      slugCell = '<span class="hint">reachable \u2014 no clean slug in URL; paste a deeper link</span>';
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td style="white-space:nowrap">${icon} ${r.status}</td>`
+      + `<td class="burl"><span class="bname">${escapeHtml(hostOf(r.raw))}</span>${escapeHtml(r.raw)}</td>`
+      + `<td style="white-space:nowrap">${escapeHtml(atsName)}</td>`
+      + `<td>${slugCell}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+// copy a single slug/config from the batch table
+document.getElementById('batchBody').addEventListener('click', (ev) => {
+  const btn = ev.target.closest('[data-bcopy]');
+  if(!btn) return;
+  const r = lastBatch[+btn.getAttribute('data-bcopy')];
+  if(r && r.slug && navigator.clipboard){
+    navigator.clipboard.writeText(r.slug);
+    btn.textContent = 'copied ✓';
+    setTimeout(()=>{ btn.textContent='copy'; }, 1300);
+  }
+});
+
+// copy every green slug at once, grouped by connector, paste-ready
+document.getElementById('copySlugs').addEventListener('click', () => {
+  const greens = lastBatch.filter(r => r.ats && r.ats.status==='green' && r.slug);
+  if(!greens.length) return;
+  // workday rows are full config lines; the others are bare slugs quoted for an array
+  const byConn = {};
+  greens.forEach(r => {
+    const k = r.ats.connector;
+    (byConn[k] = byConn[k] || []).push(r.ats.key==='workday' ? r.slug : `'${r.slug}'`);
+  });
+  let out = '';
+  Object.keys(byConn).forEach(k => {
+    out += `// ${k}.js\n` + (k==='workday' ? byConn[k].join('\n') : byConn[k].join(', ')) + '\n\n';
+  });
+  const btn = document.getElementById('copySlugs');
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(out.trim());
+    btn.textContent = '⧉ Copied ' + greens.length + ' slugs ✓';
+    setTimeout(()=>{ btn.textContent='⧉ Copy all green slugs'; }, 1600);
+  }
+});
+
+document.getElementById('batchClear').addEventListener('click', () => {
+  document.getElementById('batchInput').value = '';
+  lastBatch = [];
+  document.getElementById('batchResults').style.display='none';
+});
+
+document.getElementById('batchInput').addEventListener('input', () => {
+  const n = document.getElementById('batchInput').value.split('\n').map(s=>s.trim()).filter(Boolean).length;
+  document.getElementById('batchCount').textContent = n ? n + ' URL' + (n===1?'':'s') : '';
 });
 
 // ---------------------------------------------------------------------------
