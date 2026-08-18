@@ -2314,6 +2314,18 @@ function expandedKeywordMatches(blob, kw){
 const MAX_ROLES = 3;
 let selectedRoles = [];
 
+// selectedLocations holds up to 3 chosen places (cities, states, or "Remote").
+// Matching is OR across them (see locationMatches). Chips are the visible UI;
+// this array is mirrored into the hidden #loc field as a " ; "-joined string by
+// syncLocField(), so the whole search pipeline keeps reading #loc unchanged.
+const MAX_LOCATIONS = 3;
+let selectedLocations = [];
+
+function syncLocField(){
+  const el = document.getElementById('loc');
+  if(el) el.value = selectedLocations.join(' ; ');
+}
+
 // Return the list of active query terms: the typed keyword (if any) plus every
 // selected role, de-duplicated. This is the OR set.
 function activeQueryTerms(kw){
@@ -3047,6 +3059,8 @@ async function search(){
   const _rfBar = document.getElementById('resultFilter');
   if(_rfBar){ _rfBar.style.display = 'none'; _rfBar.classList.remove('rf-open'); _rfBar.innerHTML = ''; }
   syncExperienceControls();
+  // If the user typed a place but didn't press Enter, don't silently drop it.
+  if(typeof window._commitPendingLocation === 'function') window._commitPendingLocation();
   const kw = document.getElementById('kw').value.trim().toLowerCase();
   const loc = document.getElementById('loc').value.trim().toLowerCase();
   const level = document.getElementById('lvl').value;
@@ -3103,7 +3117,30 @@ async function search(){
     // slowest single source rather than the sum. Each promise resolves to a
     // {key, jobs} record and swallows its own errors, so one dead source can
     // never take down the search.
-    const apiSource = (key, fn) => fn(kw, loc)
+    // MULTI-LOCATION boundary (Aug 2026).
+    // `loc` may now carry several " ; "-joined places. Two kinds of source
+    // handle location differently, so they get different slices of it:
+    //
+    //  • Server-param sources (Adzuna, USAJobs, CareerOneStop) put location IN
+    //    the API request. Passing a joined multi-city string there matches
+    //    nothing, and looping each city would be N× the calls per source —
+    //    straight into the 10s Netlify budget and Adzuna's 3-page fan-out. So
+    //    these get the FIRST chosen location only (locPrimary). The other
+    //    cities are still fully searched by the client-side sources below.
+    //
+    //  • Client-filter sources (Greenhouse, Ashby, Lever, SmartRecruiters,
+    //    Workday, The Muse) pull postings and narrow locally through the now
+    //    OR-aware locationMatches(). They cost nothing extra per city, so they
+    //    get the full multi-location value and cover every chosen place.
+    //
+    // Net effect: every source honors at least the primary city; the board
+    // network honors all of them; no source makes extra API calls. If a search
+    // truly needs all cities from the server-param sources too, that's the
+    // separate Camp-B fan-out follow-up — deliberately not built here.
+    const _locList = splitLocations(loc);
+    const locPrimary = _locList.length ? _locList[0] : loc;
+    const SERVER_PARAM_SOURCES = new Set(['adzuna','usajobs','careeronestop']);
+    const apiSource = (key, fn) => fn(kw, SERVER_PARAM_SOURCES.has(key) ? locPrimary : loc)
       .then(list => ({ key, jobs: Array.isArray(list) ? list : [] }))
       .catch(() => ({ key, jobs: [] }));
 
@@ -4109,6 +4146,9 @@ function applySearchState(st){
   // Restore picked roles (cap at MAX_ROLES defensively) and redraw chips.
   selectedRoles = Array.isArray(st.roles) ? st.roles.slice(0, MAX_ROLES) : [];
   if(typeof window.renderRoleChips === 'function') window.renderRoleChips();
+  // A restored search may carry one or several " ; "-joined locations in #loc —
+  // rebuild the location chips from whatever landed there.
+  if(typeof window.rebuildLocChipsFromField === 'function') window.rebuildLocChipsFromField();
   syncExperienceControls();
   syncSponsorFilter();   // a restored search may carry noclear:true — mirror it up top
 }
@@ -4707,6 +4747,99 @@ function initMajorSearch(){
   window.renderRoleChips();
 }
 
+// ---- Location chips -------------------------------------------------------
+// Mirrors the role-chip pattern: a text box where the user types a place and
+// presses Enter (or comma) to add a chip, up to MAX_LOCATIONS. The chips OR
+// together. Kept as its own setup block so it doesn't entangle with the
+// major/role dropdown wiring above.
+function setupLocationChips(){
+  const input = document.getElementById('locInput');
+  const box   = document.getElementById('locChips');
+  if(!input || !box) return;
+
+  const atCap = () => selectedLocations.length >= MAX_LOCATIONS;
+
+  function setPlaceholder(){
+    input.placeholder = atCap()
+      ? '3 of 3 added — remove one to change'
+      : (selectedLocations.length ? 'Add another place — then press Enter'
+                                  : 'e.g. Dallas, TX — then press Enter');
+    input.disabled = atCap();
+  }
+
+  window.renderLocChips = function renderLocChips(){
+    if(selectedLocations.length === 0){
+      box.innerHTML = '';
+    } else {
+      const chips = selectedLocations.map((l,i)=>
+        `<span class="loc-chip"><span class="loc-chip-label">${esc(l)}</span>`+
+        `<button type="button" class="loc-chip-del" data-i="${i}" aria-label="Remove ${esc(l)}">×</button></span>`
+      ).join('');
+      const orNote = selectedLocations.length >= 2
+        ? `<span class="loc-chips-hint">Showing jobs in ${selectedLocations.length === 2 ? 'either' : 'any'} location.</span>`
+        : '';
+      box.innerHTML = chips + orNote;
+    }
+    box.querySelectorAll('.loc-chip-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const i = parseInt(btn.dataset.i, 10);
+        if(!isNaN(i)){
+          selectedLocations.splice(i,1);
+          syncLocField();
+          renderLocChips();
+          setPlaceholder();
+          markResultsStale();
+        }
+      });
+    });
+    setPlaceholder();
+  };
+
+  function addLocation(raw){
+    const t = (raw || '').trim().replace(/[;]+$/,'').trim();
+    if(!t || atCap()) return;
+    // De-dupe case-insensitively.
+    if(selectedLocations.some(l => l.toLowerCase() === t.toLowerCase())) return;
+    selectedLocations.push(t);
+    syncLocField();
+    renderLocChips();
+    input.value = '';
+    // NO auto-search — same rule as roles: adding a place BUILDS the query,
+    // Search RUNS it.
+    markResultsStale();
+  }
+
+  input.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' || e.key === ','){
+      e.preventDefault();
+      addLocation(input.value);
+    } else if(e.key === 'Backspace' && input.value === '' && selectedLocations.length){
+      // Empty box + Backspace removes the last chip, like a tag editor.
+      selectedLocations.pop();
+      syncLocField();
+      renderLocChips();
+      markResultsStale();
+    }
+  });
+  // Adding on blur would surprise people mid-typing; commit only on Enter/comma.
+  // But if they typed a place and hit Search without pressing Enter, don't lose
+  // it — commit any pending text just before a search runs (wired below).
+  window._commitPendingLocation = ()=>{ if(input.value.trim()) addLocation(input.value); };
+
+  // Keep chips in sync when #loc is set programmatically (examples, restore,
+  // reset). Those paths write #loc directly; this rebuilds the chip array and
+  // redraws from whatever landed there.
+  window.rebuildLocChipsFromField = function(){
+    const v = (document.getElementById('loc').value || '').trim();
+    selectedLocations = v ? v.split(';').map(s=>s.trim()).filter(Boolean).slice(0, MAX_LOCATIONS) : [];
+    input.value = '';
+    renderLocChips();
+  };
+
+  renderLocChips();
+}
+setupLocationChips();
+
 document.querySelectorAll('.quick').forEach(btn=>btn.addEventListener('click',()=>{
   runKeywordSearch(btn.dataset.kw || '');
 }));
@@ -4785,6 +4918,7 @@ if(tryExampleBtn){
       titleSel.dispatchEvent(new Event('change'));
     }
     document.getElementById('loc').value = 'Texas';
+    if(typeof window.rebuildLocChipsFromField === 'function') window.rebuildLocChipsFromField();
     if(typeof window.renderRoleChips === 'function') window.renderRoleChips();
     search();
   });
@@ -4792,6 +4926,7 @@ if(tryExampleBtn){
 document.getElementById('reset').addEventListener('click', ()=>{
   document.getElementById('kw').value = '';
   document.getElementById('loc').value = '';
+  if(typeof window.rebuildLocChipsFromField === 'function') window.rebuildLocChipsFromField();
   document.getElementById('lvl').value = 'early';
   document.getElementById('work').value = 'any';
   document.getElementById('sector').value = 'any';
