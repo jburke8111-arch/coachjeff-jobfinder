@@ -2252,7 +2252,22 @@ const ROLE_EXPANSIONS = {
   "qa engineer": ["qa engineer","quality assurance engineer","test engineer","sdet","automation engineer","quality engineer","qa analyst"],
   "data scientist": ["data scientist","machine learning engineer","applied scientist","ml scientist","research scientist","quantitative analyst","ai scientist"],
   "research engineer": ["research engineer","research scientist","applied scientist","machine learning engineer","ml engineer","ai researcher"],
-  "hpc engineer": ["hpc engineer","high performance computing engineer","performance engineer","gpu engineer","cuda engineer","scientific computing engineer","parallel computing engineer","computational scientist"]
+  "hpc engineer": ["hpc engineer","high performance computing engineer","performance engineer","gpu engineer","cuda engineer","scientific computing engineer","parallel computing engineer","computational scientist"],
+  // Physical / process engineering families. Without these, every non-software
+  // "* engineer" title fell through to the software-engineer catch-all in
+  // getRoleExpansionTerms and returned only software jobs. Each family cross-maps
+  // to the adjacent titles a new-grad in that discipline would realistically hold.
+  "chemical engineer": ["chemical engineer","process engineer","process development engineer","manufacturing engineer","production engineer","validation engineer","quality engineer","plant engineer","refinery engineer","chemical process engineer"],
+  "process engineer": ["process engineer","chemical engineer","manufacturing engineer","production engineer","process development engineer","continuous improvement engineer","validation engineer","plant engineer","industrial engineer"],
+  "mechanical engineer": ["mechanical engineer","design engineer","manufacturing engineer","project engineer","product development engineer","mechanical design engineer","hvac engineer","test engineer","quality engineer"],
+  "manufacturing engineer": ["manufacturing engineer","process engineer","production engineer","industrial engineer","quality engineer","mechanical engineer","continuous improvement engineer","tooling engineer"],
+  "industrial engineer": ["industrial engineer","manufacturing engineer","process engineer","process improvement analyst","operations analyst","continuous improvement engineer","supply chain analyst","production engineer"],
+  "civil engineer": ["civil engineer","structural engineer","project engineer","construction engineer","transportation engineer","field engineer","geotechnical engineer","site engineer","construction coordinator"],
+  "quality engineer": ["quality engineer","quality assurance engineer","validation engineer","supplier quality engineer","manufacturing engineer","process engineer","reliability engineer","qa engineer"],
+  "validation engineer": ["validation engineer","quality engineer","process engineer","manufacturing engineer","cqv engineer","commissioning engineer","compliance engineer"],
+  "biomedical engineer": ["biomedical engineer","biomedical engineering","validation engineer","quality engineer","clinical research coordinator","product development engineer","r&d engineer","medical device engineer"],
+  "electrical engineer": ["electrical engineer","electronics engineer","hardware engineer","controls engineer","power engineer","design engineer","test engineer","rf engineer","electrical design engineer"],
+  "project engineer": ["project engineer","field engineer","construction engineer","mechanical engineer","civil engineer","design engineer","site engineer"]
 };
 
 function getRoleExpansionTerms(kw){
@@ -2277,7 +2292,24 @@ function getRoleExpansionTerms(kw){
   if(q.includes("frontend") || q.includes("front end") || q.includes("front-end")) return ROLE_EXPANSIONS["frontend engineer"];
   if(q.includes("qa") || q.includes("quality assurance") || q.includes("test engineer") || q.includes("sdet")) return ROLE_EXPANSIONS["qa engineer"];
   if(q.includes("research") && (q.includes("engineer") || q.includes("scientist"))) return ROLE_EXPANSIONS["research engineer"];
-  if(q.includes("software") || (q.includes("engineer") && !q.includes("data")) || q.includes("developer")) return ROLE_EXPANSIONS["software engineer"];
+  // Physical / process engineering routing. These MUST come before the software
+  // catch-all below — otherwise any "* engineer" title without "data" was swept
+  // into the software-engineer family and a chemical engineer saw only SWE jobs.
+  if(q.includes("chemical")) return ROLE_EXPANSIONS["chemical engineer"];
+  if(q.includes("process") && q.includes("engineer")) return ROLE_EXPANSIONS["process engineer"];
+  if(q.includes("mechanical")) return ROLE_EXPANSIONS["mechanical engineer"];
+  if(q.includes("manufacturing")) return ROLE_EXPANSIONS["manufacturing engineer"];
+  if(q.includes("industrial")) return ROLE_EXPANSIONS["industrial engineer"];
+  if(q.includes("civil") || q.includes("structural") || q.includes("geotechnical")) return ROLE_EXPANSIONS["civil engineer"];
+  if(q.includes("validation") || q.includes("cqv") || q.includes("commissioning")) return ROLE_EXPANSIONS["validation engineer"];
+  if(q.includes("quality") && (q.includes("engineer") || q.includes("assurance"))) return ROLE_EXPANSIONS["quality engineer"];
+  if(q.includes("biomedical") || q.includes("biomed")) return ROLE_EXPANSIONS["biomedical engineer"];
+  if(q.includes("electrical") || q.includes("electronics") || (q.includes("controls") && q.includes("engineer"))) return ROLE_EXPANSIONS["electrical engineer"];
+  if(q.includes("project engineer") || q.includes("field engineer") || q.includes("construction")) return ROLE_EXPANSIONS["project engineer"];
+  // Software catch-all — now only claims titles with an explicit software signal.
+  // A bare "* engineer" no longer defaults here; it falls through to a literal
+  // match on its own terms rather than being rewritten into software roles.
+  if(q.includes("software") || q.includes("developer") || /\bsde\b/.test(q)) return ROLE_EXPANSIONS["software engineer"];
   return [q];
 }
 
