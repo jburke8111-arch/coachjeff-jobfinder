@@ -22,6 +22,17 @@
 <meta name="twitter:title" content="Coach Jeff's Job Finder — Early-Career Jobs for New Grads">
 <meta name="twitter:description" content="Search internships and entry-level roles across employer career sites and major job-data sources, filtered for new graduates.">
 <meta name="author" content="Jeff Burke — Experience Career System">
+<!-- PWA: makes the Job Finder installable to a phone/desktop home screen and
+     available offline. manifest.webmanifest + sw.js + icon files must be
+     deployed to the site root alongside this file. All additive — if any are
+     missing, the site works exactly as before (install prompt just won't show). -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1c3257">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Job Finder">
+<link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
@@ -111,6 +122,11 @@
   .chip.saved .chip-del{border:none;background:transparent;color:var(--faint);font-size:16px;line-height:1;
     padding:7px 10px 7px 4px;cursor:pointer;font-weight:700;width:auto;height:auto}
   .chip.saved .chip-del:hover{color:#c0392b}
+  .chip.saved .chip-bell{border:none;background:transparent;font-size:13px;line-height:1;
+    padding:7px 2px;cursor:pointer;opacity:.5;filter:grayscale(1);width:auto;height:auto;
+    transition:opacity .12s ease, filter .12s ease}
+  .chip.saved .chip-bell:hover{opacity:.9;filter:grayscale(.3)}
+  .chip.saved .chip-bell.on{opacity:1;filter:none}
   .chip.clear-all{cursor:pointer;color:var(--faint);border-style:dashed}
   .chip.clear-all:hover{color:#c0392b;border-color:#c0392b}
   .chip:hover{border-color:var(--amber);background:#fff;color:var(--amber-deep)}
@@ -4149,6 +4165,17 @@ window.addEventListener('DOMContentLoaded', () => {
   if (s && (s.textContent.includes('Ready') || s.textContent.includes('script loaded'))) s.textContent = '';
 });
 
+// PWA service worker — registered after load so it never delays first paint or
+// blocks search. Wrapped so that if sw.js is absent or registration fails, the
+// page behaves exactly as it did before (no offline cache, no install prompt),
+// with no visible error. The SW only caches the app shell; it never touches the
+// /.netlify/functions/* job API calls, which must always hit the network.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
 function currentSearchState(){
   return {
     kw:document.getElementById('kw').value,
@@ -4200,16 +4227,34 @@ function renderSavedSearches(){
     return;
   }
   if(bar) bar.style.display = '';
-  box.innerHTML = saves.map((s,i)=>
-    `<span class="chip saved" data-i="${i}"><span class="chip-run" data-i="${i}">${esc(s.name)}</span><button class="chip-del" data-i="${i}" title="Delete this saved search" aria-label="Delete saved search">×</button></span>`
-  ).join('') + (saves.length > 1 ? `<button class="chip clear-all" id="clearAllSaved" title="Delete all saved searches">Clear all</button>` : '');
+  box.innerHTML = saves.map((s,i)=>{
+    const on = (typeof isAlertOn === 'function') && isAlertOn(s.name);
+    const bellTitle = on ? 'Alerts on — click to turn off' : 'Alert me when new roles match this search';
+    return `<span class="chip saved" data-i="${i}"><span class="chip-run" data-i="${i}">${esc(s.name)}</span>` +
+      `<button class="chip-bell${on?' on':''}" data-i="${i}" title="${bellTitle}" aria-label="${bellTitle}" aria-pressed="${on?'true':'false'}">${on?'\u{1F514}':'\u{1F515}'}</button>` +
+      `<button class="chip-del" data-i="${i}" title="Delete this saved search" aria-label="Delete saved search">×</button></span>`;
+  }).join('') + (saves.length > 1 ? `<button class="chip clear-all" id="clearAllSaved" title="Delete all saved searches">Clear all</button>` : '');
 
-  // Run a saved search
-  box.querySelectorAll('.chip-run').forEach(el=>el.addEventListener('click',()=>{
+  // Run a saved search (then check its alert, if one is set)
+  box.querySelectorAll('.chip-run').forEach(el=>el.addEventListener('click',async ()=>{
     const s = savedSearches()[Number(el.dataset.i)];
     if(!s) return;
     applySearchState(s.state);
-    search();
+    try { await search(); } catch(e){}
+    if(typeof window._checkAlertAfterRun === 'function') window._checkAlertAfterRun(s.name);
+  }));
+
+  // Toggle the alert bell for a saved search
+  box.querySelectorAll('.chip-bell').forEach(btn=>btn.addEventListener('click',async (e)=>{
+    e.stopPropagation();
+    const s = savedSearches()[Number(btn.dataset.i)];
+    if(!s) return;
+    if(isAlertOn(s.name)){
+      disableAlert(s.name);
+    } else {
+      await enableAlert(s.name);
+    }
+    renderSavedSearches();
   }));
   // Delete one saved search
   box.querySelectorAll('.chip-del').forEach(btn=>btn.addEventListener('click',(e)=>{
@@ -4877,6 +4922,94 @@ document.querySelectorAll('.quick').forEach(btn=>btn.addEventListener('click',()
   runKeywordSearch(btn.dataset.kw || '');
 }));
 initMajorSearch();
+/* ---- Browser job alerts (opt-in, no login, no server) --------------------
+ * Rides on the existing saved searches. A user can turn on a bell for any
+ * saved search; the app then remembers which job IDs that search has already
+ * shown (baseline in localStorage). The next time that saved search is run —
+ * by clicking its chip — any IDs not in the baseline are "new since last
+ * check", and the app fires a native browser notification naming how many new
+ * early-career roles appeared, then updates the baseline.
+ *
+ * Entirely client-side: notifications only fire while the user is on the page
+ * running that search. There is no background polling, no email, and nothing
+ * leaves the browser — consistent with the tool's no-login model. If the
+ * Notification API is unavailable or permission is denied, the bell simply
+ * does nothing and the saved search behaves normally.
+ */
+const ALERTS_KEY = 'coachJeffSearchAlerts';   // { [searchName]: [seen job ids] }
+
+function alertsStore(){
+  try { return JSON.parse(localStorage.getItem(ALERTS_KEY) || '{}') || {}; }
+  catch(e){ return {}; }
+}
+function writeAlertsStore(o){
+  try { localStorage.setItem(ALERTS_KEY, JSON.stringify(o)); } catch(e){}
+}
+function isAlertOn(name){ return Object.prototype.hasOwnProperty.call(alertsStore(), name); }
+
+// Turn an alert on: request permission, then baseline against whatever is on
+// screen now (so the user is only notified about roles that appear AFTER they
+// subscribe, never spammed with the current page on the first run).
+async function enableAlert(name){
+  if(!('Notification' in window)){
+    alert('This browser doesn\u2019t support notifications, so alerts can\u2019t be turned on here. Your saved search still works normally.');
+    return false;
+  }
+  let perm = Notification.permission;
+  if(perm === 'default'){
+    try { perm = await Notification.requestPermission(); } catch(e){ perm = 'denied'; }
+  }
+  if(perm !== 'granted'){
+    alert('Notifications are blocked for this site, so alerts can\u2019t fire. You can allow them in your browser\u2019s site settings, then try again.');
+    return false;
+  }
+  const store = alertsStore();
+  store[name] = currentResultJobIds();   // baseline = current results
+  writeAlertsStore(store);
+  return true;
+}
+function disableAlert(name){
+  const store = alertsStore();
+  if(Object.prototype.hasOwnProperty.call(store, name)){
+    delete store[name];
+    writeAlertsStore(store);
+  }
+}
+
+// IDs of the jobs currently rendered. Uses the same _jobsById map the rest of
+// the app populates, so it needs no new plumbing in the search pipeline.
+function currentResultJobIds(){
+  try { return Object.keys(window._jobsById || {}); }
+  catch(e){ return []; }
+}
+
+// Called after a saved search finishes running. If that search has an alert
+// on, diff the current results against the stored baseline and notify on any
+// genuinely new IDs, then refresh the baseline.
+function checkAlertAfterRun(name){
+  if(!name || !isAlertOn(name)) return;
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  const store = alertsStore();
+  const seen = new Set(Array.isArray(store[name]) ? store[name] : []);
+  const now = currentResultJobIds();
+  const fresh = now.filter(id => !seen.has(id));
+  // Update baseline to the full current set regardless, so removed roles don't
+  // linger and the next diff is against what the user just saw.
+  store[name] = now;
+  writeAlertsStore(store);
+  if(fresh.length > 0){
+    try {
+      const n = new Notification('New early-career roles', {
+        body: `${fresh.length} new role${fresh.length===1?'':'s'} for "${name}".`,
+        icon: '/icon-192.png',
+        tag: 'jobfinder-' + name          // collapses repeats for the same search
+      });
+      n.onclick = () => { window.focus(); n.close(); };
+    } catch(e){}
+  }
+}
+window._checkAlertAfterRun = checkAlertAfterRun;
+
 document.getElementById('saveSearch').addEventListener('click',()=>{
   const st = currentSearchState();
   const roleLabel = (st.roles && st.roles.length) ? st.roles.join(' / ') : '';

@@ -1,0 +1,39 @@
+{
+  "name": "Coach Jeff's Job Finder",
+  "short_name": "Job Finder",
+  "description": "Free job finder for new graduates and early-career job seekers. Search internships and entry-level roles across employer career sites and major job-data sources — no signup.",
+  "start_url": "/?src=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fbfaf7",
+  "theme_color": "#1c3257",
+  "categories": ["business", "productivity", "education"],
+  "lang": "en-US",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
