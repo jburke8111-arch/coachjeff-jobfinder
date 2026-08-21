@@ -116,6 +116,7 @@
   .quickbar,.savedbar,.profilebar,.coach-picks{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
   .quickbar-title,.savedbar-title,.profilebar-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
   .quickchips,.savedchips{display:flex;flex-wrap:wrap;gap:8px}
+  .savedbar-help{margin:-4px 0 11px;max-width:70ch}
   .chip{width:auto;height:auto;padding:7px 10px;border-radius:999px;background:#fff;color:var(--navy);border:1px solid var(--line-strong);font-size:13px;font-weight:600}
   .chip.saved{display:inline-flex;align-items:center;gap:6px;padding:0;overflow:hidden;cursor:default}
   .chip.saved .chip-run{padding:7px 4px 7px 12px;cursor:pointer}
@@ -351,6 +352,18 @@
 
   /* --- Always-visible saved-jobs cue near the top --- */
   .savedjobs-cue-wrap{margin:2px 0 4px}
+  .install-banner{display:flex;align-items:center;justify-content:space-between;gap:14px;
+    flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-left:3px solid var(--amber);
+    border-radius:10px;padding:12px 16px;margin-bottom:14px}
+  .install-banner .ib-text{font-size:13.5px;color:var(--navy);line-height:1.4}
+  .install-banner .ib-text b{color:var(--amber-deep)}
+  .install-banner .ib-actions{display:flex;gap:8px;flex:none}
+  .install-banner .ib-install{background:var(--navy);color:#fff;border:none;border-radius:7px;
+    padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
+  .install-banner .ib-install:hover{background:var(--navy-deep)}
+  .install-banner .ib-dismiss{background:transparent;color:var(--mute);border:none;
+    padding:8px 8px;font-size:13px;cursor:pointer}
+  .install-banner .ib-dismiss:hover{color:var(--navy)}
   .savedjobs-cue{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;
     padding:6px 13px;border-radius:999px;border:1px solid var(--line-strong);background:#fff;
     color:var(--navy);cursor:pointer;transition:all .12s;line-height:1.2}
@@ -751,6 +764,7 @@
 
   <div class="savedbar" id="savedBar" style="display:none;">
     <div class="savedbar-title">Saved searches</div>
+    <div class="savedbar-help hint">Click a saved search to run it again. Click the bell (<span aria-hidden="true">&#x1F515;</span>) on a search to get a notification when new roles appear — you'll be notified the next time you run it. Saved on this device only.</div>
     <div id="savedSearches" class="savedchips"></div>
   </div>
 
@@ -758,6 +772,18 @@
     <button class="savedjobs-cue" id="savedJobsCue" type="button" title="Jump to your saved jobs">
       <span class="sjc-star">★</span> Saved jobs <span class="sjc-count" id="savedJobsCueCount">(0)</span>
     </button>
+  </div>
+
+  <!-- Install-to-home-screen banner. Hidden by default; only revealed by JS
+       when the browser fires beforeinstallprompt (i.e. the app is actually
+       installable and not already installed). Dismissal is remembered so it
+       never nags. -->
+  <div class="install-banner" id="installBanner" style="display:none;">
+    <span class="ib-text"><b>Add Job Finder to your home screen</b> for one-tap access — no app store, works offline.</span>
+    <span class="ib-actions">
+      <button type="button" class="ib-install" id="installBtn">Add</button>
+      <button type="button" class="ib-dismiss" id="installDismiss" aria-label="Dismiss">Not now</button>
+    </span>
   </div>
 
   <details class="advancedbar">
@@ -4176,6 +4202,52 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Install-to-home-screen banner. The browser fires 'beforeinstallprompt' only
+// when the PWA is installable (valid manifest + SW, not already installed).
+// We capture that event, show our own banner (unless the user dismissed it
+// before), and trigger the native install dialog from the Add button. If the
+// event never fires — unsupported browser, already installed, iOS Safari — the
+// banner simply never appears, so nothing looks broken.
+(function(){
+  var DISMISS_KEY = 'coachJeffInstallDismissed';
+  var deferred = null;
+  var banner = document.getElementById('installBanner');
+  if(!banner) return;
+
+  function dismissed(){
+    try { return localStorage.getItem(DISMISS_KEY) === '1'; } catch(e){ return false; }
+  }
+  function hide(){ banner.style.display = 'none'; }
+
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();        // stop Chrome's mini-infobar; we show our own
+    deferred = e;
+    if(!dismissed()) banner.style.display = '';
+  });
+
+  var addBtn = document.getElementById('installBtn');
+  if(addBtn) addBtn.addEventListener('click', async function(){
+    hide();
+    if(!deferred) return;
+    deferred.prompt();
+    try { await deferred.userChoice; } catch(e){}
+    deferred = null;           // a prompt can only be used once
+  });
+
+  var dismissBtn = document.getElementById('installDismiss');
+  if(dismissBtn) dismissBtn.addEventListener('click', function(){
+    hide();
+    try { localStorage.setItem(DISMISS_KEY, '1'); } catch(e){}
+  });
+
+  // If the app gets installed (via our button or the browser's own UI), make
+  // sure the banner is gone and stays gone.
+  window.addEventListener('appinstalled', function(){
+    hide();
+    try { localStorage.setItem(DISMISS_KEY, '1'); } catch(e){}
+  });
+})();
+
 function currentSearchState(){
   return {
     kw:document.getElementById('kw').value,
@@ -4229,7 +4301,7 @@ function renderSavedSearches(){
   if(bar) bar.style.display = '';
   box.innerHTML = saves.map((s,i)=>{
     const on = (typeof isAlertOn === 'function') && isAlertOn(s.name);
-    const bellTitle = on ? 'Alerts on — click to turn off' : 'Alert me when new roles match this search';
+    const bellTitle = on ? 'Alerts on — you\u2019ll be notified of new roles when you re-run this search. Click to turn off.' : 'Turn on alerts — get a notification when new roles appear the next time you run this search.';
     return `<span class="chip saved" data-i="${i}"><span class="chip-run" data-i="${i}">${esc(s.name)}</span>` +
       `<button class="chip-bell${on?' on':''}" data-i="${i}" title="${bellTitle}" aria-label="${bellTitle}" aria-pressed="${on?'true':'false'}">${on?'\u{1F514}':'\u{1F515}'}</button>` +
       `<button class="chip-del" data-i="${i}" title="Delete this saved search" aria-label="Delete saved search">×</button></span>`;
@@ -4251,8 +4323,10 @@ function renderSavedSearches(){
     if(!s) return;
     if(isAlertOn(s.name)){
       disableAlert(s.name);
+      showSavedBarNote(`Alerts off for "${s.name}".`);
     } else {
-      await enableAlert(s.name);
+      const ok = await enableAlert(s.name);
+      if(ok) showSavedBarNote(`Alerts on for "${s.name}". You'll get a notification when new roles appear the next time you run this search.`);
     }
     renderSavedSearches();
   }));
@@ -5009,6 +5083,27 @@ function checkAlertAfterRun(name){
   }
 }
 window._checkAlertAfterRun = checkAlertAfterRun;
+
+// Brief, self-clearing confirmation shown under the Saved searches title when a
+// user turns an alert on or off, so the click has visible feedback.
+function showSavedBarNote(msg){
+  const bar = document.getElementById('savedBar');
+  if(!bar) return;
+  let note = document.getElementById('savedBarNote');
+  if(!note){
+    note = document.createElement('div');
+    note.id = 'savedBarNote';
+    note.className = 'hint';
+    note.style.cssText = 'margin:-4px 0 11px;color:#1f7a4d;font-weight:600';
+    const help = bar.querySelector('.savedbar-help');
+    if(help && help.parentNode) help.parentNode.insertBefore(note, help.nextSibling);
+    else bar.appendChild(note);
+  }
+  note.textContent = msg;
+  note.style.display = '';
+  clearTimeout(window._savedBarNoteT);
+  window._savedBarNoteT = setTimeout(()=>{ if(note) note.style.display = 'none'; }, 6000);
+}
 
 document.getElementById('saveSearch').addEventListener('click',()=>{
   const st = currentSearchState();
