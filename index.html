@@ -164,7 +164,7 @@
   .profile-grid .field{gap:4px}
   @media(max-width:760px){.profile-grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:440px){.profile-grid{grid-template-columns:1fr}}
-  .match-badge{display:inline-flex;align-items:center;justify-content:center;min-width:70px;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;color:#fff;background:var(--navy)}
+  .match-badge{display:inline-flex;align-items:center;justify-content:center;min-width:70px;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;color:#fff;background:var(--navy);flex-shrink:0;white-space:nowrap}
   .match-badge.good{background:#1f7a4d}.match-badge.mid{background:#b6701c}.match-badge.low{background:#6b7280}
   .job-meta-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
   .why{margin-top:10px;background:#fbfaf7;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:12.5px;color:var(--mute)}
@@ -435,15 +435,15 @@
 
   .empty,.loading{padding:52px 0;text-align:center;color:var(--mute)}
   .loading{font-size:13.5px}
-  .note{font-size:13px;color:var(--faint);border-top:1px solid var(--line);
-    padding:20px 0 44px;max-width:62ch;line-height:1.5;text-wrap:pretty}
+  .note{font-size:15px;color:var(--faint);border-top:1px solid var(--line);
+    padding:20px 0 44px;line-height:1.55;text-wrap:pretty}
   /* CareerOneStop attribution logo — license requires the COS logo on any page
      displaying their Web API data. Hotlinked from CareerOneStop per their
      official "link to us" HTML (their preferred method; 122x62 native). */
   .cos-attribution{display:flex;align-items:center;gap:14px;margin:4px 0 20px;
-    max-width:62ch;flex-wrap:wrap}
+    flex-wrap:wrap}
   .cos-attribution img{width:122px;height:62px;display:block;flex:none}
-  .cos-attribution .cos-cred{font-size:12px;color:var(--faint);line-height:1.45;flex:1;min-width:220px}
+  .cos-attribution .cos-cred{font-size:14px;color:var(--faint);line-height:1.5;flex:1;min-width:220px}
   .src-fail{color:var(--amber-deep);font-weight:600}
 @media(max-width:560px){.job-top{flex-direction:column;gap:2px}.co{white-space:normal}}
 
@@ -936,7 +936,7 @@
     </a>
     <span class="cos-cred">CareerOneStop job data (from the National Labor Exchange) is provided courtesy of the U.S. Department of Labor, Employment and Training Administration (DOLETA), and the Minnesota Department of Employment &amp; Economic Development (DEED).</span>
   </div>
-  <p class="note">Match scores, experience tiers, sponsorship badges, and defense/clearance flags are automated estimates read from public job postings — general information to guide your search, not legal, immigration, or career advice. Eligibility for any role depends on your specific situation and the employer's actual requirements; verify on the posting before ruling a job in or out.</p>
+  <p class="note"><strong>What the match % means:</strong> it reflects how well a role's title, location, and entry-level signals fit your search — plus anything you set in "Improve My Matches." It's a search-relevance estimate, not a resume-to-posting (ATS) score, so scores run within a set band and won't hit 100%. Match scores, experience tiers, sponsorship badges, and defense/clearance flags are automated estimates read from public job postings — general information to guide your search, not legal, immigration, or career advice. Eligibility for any role depends on your specific situation and the employer's actual requirements; verify on the posting before ruling a job in or out.</p>
   <p class="note"><strong>Sponsorship note:</strong> H-1B and sponsorship signals are indicators only, not confirmation — always verify sponsorship directly with the employer. This is not immigration or legal advice.</p>
 
   <a class="coaching-prompt" href="/coaching.html">
@@ -944,10 +944,10 @@
     <span class="cp-go">Free Coaching →</span>
   </a>
 
-  <div style="max-width:620px;margin:8px auto 0;padding-top:24px;border-top:1px solid #e2e8f0;">
-    <div style="max-width:620px;margin:0 auto 32px;padding:18px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <div style="margin:8px 0 0;padding-top:24px;border-top:1px solid #e2e8f0;">
+    <div style="margin:0 0 32px;padding:18px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
       <div style="font-weight:600;font-size:15px;color:#1e293b;margin-bottom:4px;">Quick feedback on the Job Finder?</div>
-      <div style="font-size:13.5px;color:#64748b;margin-bottom:14px;">Tell me what worked or what you'd change — I read every note.</div>
+      <div style="font-size:15px;color:#64748b;margin-bottom:14px;">Tell me what worked or what you'd change — I read every note.</div>
       <form name="jobfinder-feedback" method="POST" action="/thanks.html" data-netlify="true" netlify-honeypot="bot-field" id="jf-fb-form">
         <input type="hidden" name="form-name" value="jobfinder-feedback" />
         <input type="hidden" name="tool" value="job-finder" />
@@ -2820,6 +2820,7 @@ function renderJob(j, kw, loc){
         <div class="job" data-jobid="${esc(id)}">
           <div class="job-top">
             <a class="title" href="${j.url}" target="_blank" rel="noopener">${esc(j.title)}</a>
+            ${(()=>{ const p = matchPercent(j.score); return `<span class="match-badge ${matchClass(p)}" title="Search-relevance estimate based on title, location, and entry-level fit — not a resume-to-posting ATS score.">${p}% match</span>`; })()}
           </div>
           <div class="loc">${esc(j.company)} · ${esc(j.location)}${j.sector ? ` · ${esc(j.sector)}` : ''}</div>
           <div class="job-meta-row">
@@ -2892,22 +2893,154 @@ function renderJob(j, kw, loc){
           </div>
         </div>`;
 }
-function coachPickCompanies(kw){
+// COACH JEFF PICKS — curated off-pipeline employers.
+//
+// These are large national employers whose early-career postings the Job Finder
+// does NOT already surface (they run on Oracle/iCIMS/SuccessFactors/Avature or
+// custom systems, not the Greenhouse/Ashby/Lever/Workday feeds the tool crawls,
+// and none are in MANUAL_COMPANIES/WORKDAY_EMPLOYERS/COMPANIES). Each links to
+// the employer's own students / early-career landing page — a place to browse,
+// not a keyword search — so the section is genuinely additive to live results.
+//
+// Organized by sector. renderCoachPicks() picks the bucket from the search
+// keyword; when nothing matches, it falls back to CROSS_SECTOR ("Broad
+// early-career employers"). All URLs verified live at time of authoring.
+const COACH_PICKS_BY_SECTOR = {
+  pharma: {
+    label: 'Pharma & Life Sciences',
+    picks: [
+      {name:'Johnson & Johnson', url:'https://www.careers.jnj.com/en/early-career-programs/', note:'Early-career programs across business, data, finance, ops, engineering, and marketing.'},
+      {name:'Merck', url:'https://jobs.merck.com/us/en/student-opportunities', note:'Future Talent Program internships and co-ops across R&D, manufacturing, and commercial.'},
+      {name:'Pfizer', url:'https://www.pfizer.com/en/about/careers/early-careers', note:'Pfizer Futures internships plus analytics, finance, strategy, and marketing tracks.'},
+      {name:'Eli Lilly', url:'https://careers.lilly.com/us/en/overview', note:'Student internships and full-time early-career roles across the business.'},
+      {name:'AbbVie', url:'https://www.abbvie.com/join-us/student-and-new-graduates.html', note:'Internships, co-ops, and development programs for students and new grads.'},
+      {name:'Amgen', url:'https://careers.amgen.com/en/students-graduates', note:'Graduate opportunities across functions and geographies in biotech.'}
+    ]
+  },
+  consulting: {
+    label: 'Consulting & Professional Services',
+    picks: [
+      {name:'Deloitte', url:'https://www.deloitte.com/us/en/careers/student-careers.html', note:'Internships and entry-level consulting, audit, tax, and tech across every major.'},
+      {name:'EY', url:'https://www.ey.com/en_us/careers/students-and-entry-level-professionals', note:'Internships and early-career programs across assurance, consulting, tax, and strategy.'},
+      {name:'KPMG', url:'https://www.kpmguscareers.com/early-career/', note:'Undergraduate internships and early-career programs with national training.'}
+    ]
+  },
+  aerospace: {
+    label: 'Aerospace & Defense',
+    picks: [
+      {name:'Boeing', url:'https://jobs.boeing.com/early-careers', note:'Early-career roles across engineering, business, IT, and operations.'},
+      {name:'RTX (Raytheon)', url:'https://careers.rtx.com/global/en', note:'Aerospace and defense early-career roles across Raytheon, Collins, and Pratt & Whitney.'},
+      {name:'General Dynamics', url:'https://gdmissionsystems.com/careers/students-and-recent-graduates', note:'Students and recent graduates in engineering, business, and mission systems.'},
+      {name:'L3Harris', url:'https://careers.l3harris.com/en/new-grads-and-interns', note:'New-grad and intern rotational and mentoring programs across engineering and business.'}
+    ]
+  },
+  energy: {
+    label: 'Energy & Industrial',
+    picks: [
+      {name:'ExxonMobil', url:'https://corporate.exxonmobil.com/careers', note:'Internships and early-career roles across engineering, business, and operations.'},
+      {name:'Chevron', url:'https://careers.chevron.com/early-career', note:'Early-career development programs across technical and business functions.'},
+      {name:'GE Aerospace', url:'https://careers.geaerospace.com/global/en/us-students-new-grads', note:'US students and new grads — engineering plus business/finance/ops leadership programs.'},
+      {name:'GE Vernova', url:'https://careers.gevernova.com/early-careers', note:'Internships, co-ops, and entry-level energy roles feeding development programs.'}
+    ]
+  },
+  finance: {
+    label: 'Banking & Insurance',
+    picks: [
+      {name:'JPMorgan Chase', url:'https://careers.jpmorgan.com/us/en/students/programs', note:'Analyst programs spanning finance, tech, operations, and business.'},
+      {name:'Goldman Sachs', url:'https://www.goldmansachs.com/careers/students', note:'Student programs across investment banking, finance, and wealth management.'},
+      {name:'Bank of America', url:'https://careers.bankofamerica.com/en-us/students', note:'Internships and analyst/associate roles across the firm.'},
+      {name:'Wells Fargo', url:'https://www.wellsfargojobs.com/en/early-careers/', note:'Internship and development programs for undergraduates and post-graduates.'},
+      {name:'Liberty Mutual', url:'https://jobs.libertymutualgroup.com/careers/campus/', note:'Campus internships and development programs across 30+ entry points.'},
+      {name:'Progressive', url:'https://careers.progressive.com/en/pages/students-graduates/', note:'Internships and recent-grad jobs across teams enterprise-wide.'}
+    ]
+  },
+  telecom: {
+    label: 'Telecom & Communications',
+    picks: [
+      {name:'Verizon', url:'https://mycareer.verizon.com/life-at-verizon/early-in-career/', note:'Internships and leadership development across corporate, tech, and cyber.'},
+      {name:'T-Mobile', url:'https://careers.t-mobile.com/meet-our-teams/students-and-grads', note:'Student and new-grad roles across corporate, tech, and operations.'}
+    ]
+  },
+  transportation: {
+    label: 'Transportation & Logistics',
+    picks: [
+      {name:'FedEx', url:'https://careers.fedex.com/career-areas/student-programs/', note:'Student internships across HR, IT, marketing, engineering, operations, and transportation.'},
+      {name:'UPS', url:'https://www.jobs-ups.com/us/en/opportunities-for-students', note:'Internships and co-ops across IT, sales, engineering, and operations.'},
+      {name:'Delta Air Lines', url:'https://www.delta.com/us/en/careers/students-and-early-careers', note:'Student programs with exposure across divisions toward entry-level roles.'},
+      {name:'United Airlines', url:'https://careers.united.com/us/en/students', note:'Student and early-career roles across revenue, finance, ops, and tech.'},
+      {name:'Southwest Airlines', url:'https://careers.southwestair.com/us/en/programs', note:'Dallas HQ. College internships and direct college-hire programs across the business.'}
+    ]
+  },
+  automotive: {
+    label: 'Automotive & Manufacturing',
+    picks: [
+      {name:'Ford', url:'https://www.careers.ford.com/en/programs/students-and-graduates.html', note:'Summer internships plus the Ford College Graduate rotational program.'},
+      {name:'General Motors', url:'https://search-careers.gm.com/en/early-careers/', note:'Internships and early-career rotational programs across technical and non-technical fields.'},
+      {name:'John Deere', url:'https://www.deere.com/en-us/our-company/careers/students-and-recent-graduates', note:'Student and recent-graduate roles across engineering, business, and operations.'},
+      {name:'3M', url:'https://www.3m.com/3M/en_US/careers-us/', note:'Internships plus Optimized Operations, Frontline Sales, and Strategy & Marketing programs.'}
+    ]
+  },
+  consumer: {
+    label: 'Consumer / Retail / CPG',
+    picks: [
+      {name:'Walmart', url:'https://careers.walmart.com/us/en/home', note:'Corporate tracks in analytics, merchandising, supply chain, tech, and finance.'},
+      {name:'Procter & Gamble', url:'https://www.pgcareers.com', note:'Internships and full-time roles for students across brands and functions.'},
+      {name:'Coca-Cola', url:'https://www.coca-colacompany.com/careers/early-careers', note:'Early-career internships spanning brands, markets, and partners.'},
+      {name:'Nike', url:'https://careers.nike.com/career-areas', note:'Internships across retail, corporate, tech, and design.'}
+    ]
+  },
+  healthcare: {
+    label: 'Healthcare Systems',
+    picks: [
+      {name:'Ascension', url:'https://jobs.ascension.org/us/en/students-graduates', note:'Internships, externships, nurse residency, and administrative fellowship.'},
+      {name:'Intermountain Health', url:'https://intermountainhealthcare.org/careers/student-programs', note:'Student programs across nursing, tech, business, and allied health.'},
+      {name:'Sutter Health', url:'https://jobs.sutterhealth.org/us/en/home', note:'Roles across health info, patient services, HR, finance, IT, and research.'},
+      {name:'Trinity Health', url:'https://jobs.trinity-health.org', note:'Early-career roles across one of the largest faith-based health systems.'},
+      {name:'Providence', url:'https://providence.jobs', note:'Student placements, internships, and new-grad clinical and non-clinical roles.'}
+    ]
+  }
+};
+
+// Fallback shown when the search keyword matches no sector above. Broad,
+// recognizable, cross-functional employers — a safe default for any major.
+const COACH_PICKS_CROSS_SECTOR = {
+  label: 'Broad early-career employers',
+  picks: [
+    {name:'American Express', url:'https://www.americanexpress.com/en-us/careers/student-programs/global-students-page.html', note:'Student programs across finance, tech, analytics, marketing, and operations.'},
+    {name:'Sherwin-Williams', url:'https://careers.sherwin-williams.com/students-graduates', note:'Management & sales training plus tracks in ops, finance, supply chain, and HR.'},
+    {name:'Cintas', url:'https://careers.cintas.com/content/Campus-Recruitment/', note:'Management trainee program and internships across sales, service, and corporate.'},
+    {name:'Enterprise Mobility', url:'https://www.enterprisemobility.com/en/careers/career-opportunities/management-trainee-jobs.html', note:'The classic all-majors management trainee — sales, marketing, finance, and ops.'},
+    {name:'Aldi', url:'https://careers.aldi.us/district', note:'District Manager program with a paid training track open to any major.'},
+    {name:'OpenAI', url:'https://openai.com/careers/emerging-talent/', note:'Emerging Talent — internships, residency, and full-time roles for 0–3 years experience.'}
+  ]
+};
+
+// Map a search keyword to a COACH_PICKS_BY_SECTOR key. Order matters: the first
+// matching pattern wins, so more specific sectors are tested before broad ones.
+function coachPickSector(kw){
   const q = (kw || '').toLowerCase();
-  if(/sales|business development|sdr|client|customer/.test(q)) return ['Dell','ADP','Gartner','Vanguard','USAA'];
-  if(/data|analyst|analytics|business analyst/.test(q)) return ['Dell','American Airlines','Texas Instruments','UT Austin','Texas State Jobs'];
-  if(/health|public health|clinical|nurse|medical/.test(q)) return ['Parkland Health','UT Southwestern','Baylor Scott & White','Texas Health Resources','HCA Healthcare'];
-  if(/finance|accounting/.test(q)) return ['Vanguard','Charles Schwab','USAA','Comerica Bank','ADP'];
-  return ['Dell','Vanguard','Gartner','USAA','Texas State Jobs'];
+  if(!q) return null;
+  if(/pharma|biotech|life scien|drug|clinical trial|pharmacolog/.test(q)) return 'pharma';
+  if(/nurse|nursing|clinical|patient|medical|health|hospital|public health/.test(q)) return 'healthcare';
+  if(/consult|advisory|audit|assurance|\btax\b/.test(q)) return 'consulting';
+  if(/aerospace|defense|defence|aviation eng|clearance|missile|satellite/.test(q)) return 'aerospace';
+  if(/energy|oil|gas|petroleum|utility|utilities|power|turbine|renewable/.test(q)) return 'energy';
+  if(/finance|financ|account|bank|invest|insurance|actuar|underwrit|wealth/.test(q)) return 'finance';
+  if(/telecom|wireless|network eng|communications/.test(q)) return 'telecom';
+  if(/logistics|supply chain|transportation|airline|pilot|cargo|freight|aviation/.test(q)) return 'transportation';
+  if(/automotive|manufactur|mechanical|industrial eng|assembly|plant/.test(q)) return 'automotive';
+  if(/retail|consumer|cpg|merchandis|brand|marketing|ecommerce|e-commerce/.test(q)) return 'consumer';
+  return null;
 }
-function renderCoachPicks(kw, sector){
-  const names = coachPickCompanies(kw);
-  const cards = names.map(name => MANUAL_COMPANIES.find(c => (c.name||'').toLowerCase() === name.toLowerCase()))
-    .filter(Boolean)
-    .filter(c => sector === 'any' || c.sector === sector)
-    .map(c => `<a class="searchlink-card" href="${buildSearchUrl(c, kw)}" target="_blank" rel="noopener"><div class="searchlink-title">${esc(c.name)} <span class="searchlink-arrow">→</span></div><div class="searchlink-meta">Coach Jeff pick · ${esc(c.note || '')}</div></a>`).join('');
-  if(!cards) return '';
-  return `<section class="searchlinks coach-picks"><div class="direct-heading">Coach Jeff Picks${kw ? ` for “${esc(kw)}”` : ''}</div><p class="searchlink-note">High-value employer targets to check alongside live matches. These links open employer searches directly.</p><div class="searchlink-grid">${cards}</div></section>`;
+
+function renderCoachPicks(kw){
+  const key = coachPickSector(kw);
+  const bucket = key ? COACH_PICKS_BY_SECTOR[key] : COACH_PICKS_CROSS_SECTOR;
+  if(!bucket || !bucket.picks || !bucket.picks.length) return '';
+  const cards = bucket.picks.map(c =>
+    `<a class="searchlink-card" href="${c.url}" target="_blank" rel="noopener"><div class="searchlink-title">${esc(c.name)} <span class="searchlink-arrow">→</span></div><div class="searchlink-meta">Coach Jeff pick · ${esc(c.note || '')}</div></a>`
+  ).join('');
+  return `<section class="searchlinks coach-picks"><div class="direct-heading">Coach Jeff Picks · ${esc(bucket.label)}</div><p class="searchlink-note">Large national employers the live search above doesn't cover — these open each employer's own early-career page to browse directly.</p><div class="searchlink-grid">${cards}</div></section>`;
 }
 
 function buildSearchUrl(c, kw){
@@ -3873,7 +4006,7 @@ async function search(){
 
     // Coach Picks are useful for broad searches, but become distracting when the
     // user explicitly chose one employer (for example Dell).
-    if(company === 'any') html += renderCoachPicks(kw, sector);
+    if(company === 'any') html += renderCoachPicks(kw);
 
     const clinicalSearch = kw && HEALTHCARE_KEYWORD_RX.test(kw);
     if((showSuggest || jobs.length === 0 || clinicalSearch || company !== 'any') && selectedDirect.length){
