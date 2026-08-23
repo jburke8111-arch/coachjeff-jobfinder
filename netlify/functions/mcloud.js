@@ -34,6 +34,32 @@ const BOOST = "addtnl_categories:0.5,description:0.5,parent_category:0.5,primary
 const SENIOR_TITLE = /\b(senior|sr\.?|staff|principal|lead|manager|director|vp|vice president|head of|chief|architect|expert|ii{2,}|iv|v\b)\b/i;
 const EARLY_TITLE  = /\b(intern|internship|new grad|new-grad|graduate|entry[- ]?level|junior|jr\.?|associate|trainee|apprentice|early career|campus|university|residency|resident|fellow)\b/i;
 
+// Sub-baccalaureate roles: this tool serves (soon-to-be) college graduates, so
+// roles whose CREDENTIAL is a vocational certificate / license below a bachelor's
+// are excluded outright. Two signals: (a) the title names such a role, or (b) the
+// description states a sub-degree credential as the requirement. Note "associate"
+// is intentionally NOT here (it's ambiguous: associate-degree vs associate-level
+// job title) — we handle associate DEGREE only via description wording below.
+const SUBDEGREE_TITLE = /\b(lvn|licensed vocational nurse|lpn|licensed practical nurse|cna|certified nursing assistant|nurse aide|nursing assistant|patient care (tech|technician|assistant)|pct\b|medical assistant|\bma\b|phlebotom(y|ist)|\bemt\b|paramedic|surgical tech(nologist|nician)?|surg tech|sterile processing|monitor tech|telemetry tech|pharmacy tech(nician)?|dental assistant|home health aide|\bhha\b|caregiver|orderly|dietary aide|environmental services|housekeep|food service|scrub tech)\b/i;
+
+// Description wording that indicates the REQUIRED education tops out below a degree.
+const SUBDEGREE_REQ = /\b(high school diploma|hs diploma|ged|vocational (certificate|program|school|diploma)|certificate program|certified (nurse|nursing|medical)|licensed vocational|licensed practical|state certification required|completion of an? (accredited )?(certificate|vocational|diploma) program)\b/i;
+
+// A degree requirement that should PROTECT a role from sub-degree exclusion
+// (so we don't drop, say, "Nurse Practitioner" that merely mentions supervising CNAs).
+const DEGREE_REQ = /\b(bachelor'?s?|baccalaureate|\bbsn\b|\bbs\b|\bba\b|master'?s?|\bmsn\b|\bmba\b|\bmph\b|doctora|\bphd\b|\bmd\b|4-year degree|four-year degree|undergraduate degree)\b/i;
+
+function isSubDegreeRole(job) {
+  const title = (job.title || "").toString();
+  const desc  = (job.description || "").toString();
+  // Title match is decisive for the classic sub-degree job names.
+  if (SUBDEGREE_TITLE.test(title)) return true;
+  // Otherwise, only exclude on description wording if it names a sub-degree
+  // requirement AND does not also call for a bachelor's+ degree.
+  if (SUBDEGREE_REQ.test(desc) && !DEGREE_REQ.test(desc)) return true;
+  return false;
+}
+
 function passesExperience(job, levelMode) {
   if (!levelMode || levelMode === "all") return true;
   const title = (job.title || "").toString();
@@ -47,6 +73,7 @@ function passesExperience(job, levelMode) {
 
   if (wantsEarly) {
     // Hard excludes
+    if (isSubDegreeRole(job)) return false;   // sub-baccalaureate credential roles
     if (SENIOR_TITLE.test(title)) return false;
     if (yrs != null && yrs >= 4) return false;
     if (/\b(senior|staff|principal|lead|director|manager|executive)\b/.test(lvl)) return false;
