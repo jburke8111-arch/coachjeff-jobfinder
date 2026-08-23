@@ -114,10 +114,26 @@ async function fetchPage(job) {
   return { jobs, totalHits: json.totalHits ?? jobs.length };
 }
 
+// Strip Microsoft-Word / rich HTML down to readable plain text.
+function cleanDescription(html) {
+  if (!html) return "";
+  return String(html)
+    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, "\n")   // block ends -> newline
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\u2022 ")               // list items -> bullet
+    .replace(/<[^>]+>/g, "")                          // drop all remaining tags
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"').replace(/&#39;|&rsquo;|&lsquo;/gi, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/^\s+|\s+$/g, "");
+}
+
 function normalize(j, employerName) {
   const city = j.primary_city, st = j.primary_state;
-  const loc = j.primary_location || [city, st].filter(Boolean).join(", ") ||
-              j.primary_country || "";
+  // NOTE: primary_location is a [lng,lat] geo pair, NOT a display string — don't use it.
+  const loc = [city, st].filter(Boolean).join(", ") || j.primary_country || "";
   return {
     id: `mcloud_${j.id}`,
     source: "mcloud",
@@ -127,7 +143,7 @@ function normalize(j, employerName) {
     location: loc,
     city: city || "", state: st || "",
     url: j.url || j.seo_url || j.fndly_url || "",
-    description: j.description || "",
+    description: cleanDescription(j.description),
     salary: j.salary || "",
     employmentType: j.employment_type || j.job_type || "",
     schedule: j.schedule || j.shift || "",
