@@ -1,6 +1,5 @@
-// netlify/functions/thr-test.js
-// Throwaway diagnostic: can we reach the Texas Health / CareerBuilder jobs API
-// from a Netlify Function? Hit /.netlify/functions/thr-test  (add ?kw=nurse to change keyword)
+// netlify/functions/thr-test.js  (v2 — inspects queryResult nesting)
+// Hit /.netlify/functions/thr-test  (?kw=nurse to change keyword)
 exports.handler = async (event) => {
   const kw = (event.queryStringParameters && event.queryStringParameters.kw) || "nurse";
 
@@ -12,46 +11,57 @@ exports.handler = async (event) => {
   params.set("Organization", "2277");
   params.set("offset", "1");
   params.set("useBooleanKeywordSearch", "true");
-  // deliberately NO callback param -> expect raw JSON instead of JSONP
 
   const url = `https://jobsapi-internal.m-cloud.io/api/job?${params.toString()}`;
+  const out = { url };
 
-  const out = { url, ok: false };
+  // Walk an object and find the first array of objects, reporting its path.
+  function findJobArray(obj, path = "") {
+    if (Array.isArray(obj)) {
+      if (obj.length && typeof obj[0] === "object" && obj[0] !== null) return { path, arr: obj };
+      return null;
+    }
+    if (obj && typeof obj === "object") {
+      for (const k of Object.keys(obj)) {
+        const hit = findJobArray(obj[k], path ? `${path}.${k}` : k);
+        if (hit) return hit;
+      }
+    }
+    return null;
+  }
+
   try {
     const res = await fetch(url, {
       headers: {
         "Accept": "application/json",
-        // Some CDN-fronted APIs are picky without a UA / referer; include realistic ones.
         "User-Agent": "Mozilla/5.0 (compatible; CoachJeffJobFinder/1.0)",
         "Referer": "https://jobs.texashealth.org/listjobs/"
       }
     });
     out.status = res.status;
-    out.contentType = res.headers.get("content-type");
-    const text = await res.text();
-    out.bodyLength = text.length;
+    const json = await res.json();
+    out.totalHits = json.totalHits ?? null;
+    out.topLevelKeys = Object.keys(json);
 
-    let json = null;
-    try { json = JSON.parse(text); }
-    catch {
-      const m = text.match(/^[^(]*\((.*)\)\s*;?\s*$/s);
-      if (m) { try { json = JSON.parse(m[1]); out.wasJsonp = true; } catch {} }
+    // Show what's directly inside queryResult
+    if (json.queryResult && typeof json.queryResult === "object") {
+      out.queryResultKeys = Object.keys(json.queryResult);
     }
 
-    if (json) {
-      const jobs = json.Jobs || json.jobs || json.results || json.data || [];
-      out.ok = Array.isArray(jobs) && jobs.length > 0;
-      out.totalHits = json.TotalHits ?? json.totalHits ?? json.Total ?? json.total ?? null;
-      out.jobsThisPage = Array.isArray(jobs) ? jobs.length : null;
-      out.topLevelKeys = Object.keys(json);
-      out.firstJobKeys = jobs[0] ? Object.keys(jobs[0]) : null;
-      out.sample = (Array.isArray(jobs) ? jobs.slice(0,3) : []).map(j => ({
-        title: j.Title||j.title||j.JobTitle,
-        location: j.Location||j.location||j.City,
-        url: j.Url||j.url||j.ApplyUrl||j.JobUrl
+    const hit = findJobArray(json);
+    if (hit) {
+      out.jobArrayPath = hit.path;
+      out.jobsThisPage = hit.arr.length;
+      out.firstJobKeys = Object.keys(hit.arr[0]);
+      out.sample = hit.arr.slice(0, 3).map(j => ({
+        title: j.Title||j.title||j.JobTitle||j.name,
+        location: j.Location||j.location||j.City||j.city,
+        url: j.Url||j.url||j.ApplyUrl||j.JobUrl||j.jobUrl,
+        date: j.PostedDate||j.postedDate||j.Date||j.date
       }));
+      out.ok = hit.arr.length > 0;
     } else {
-      out.bodySnippet = text.slice(0, 600);
+      out.note = "No array of objects found anywhere in response.";
     }
   } catch (e) {
     out.fetchError = e.message;
