@@ -1286,6 +1286,17 @@ const ANY_EARLY_RX = /\b(intern|internship|co[- ]?op|new ?grad|new graduate|univ
 // Senior signals that disqualify a role from early-career buckets.
 const SENIOR_RX = /\b(senior|sr\.?|staff|principal|lead|director|supervisor|architect|head of|chief|vp|vice president|executive|mid[- ]?level|experienced|\bii\b|iii|iv|\bv\b|level [2-9]|l[2-9]|10\+|[3-9]\+ years|years of experience)\b/i;
 
+// Advanced-practice / advanced-certification healthcare roles. These require a
+// graduate degree PLUS specialty licensure/certification (and usually years of
+// RN experience), so a new grad cannot hold them — they belong in "all levels,"
+// not early-career buckets. Kept separate from SENIOR_RX for clarity. Matches
+// credential tokens and advanced-practice phrases; deliberately does NOT match
+// bare "RN", "registered nurse", or "nurse" (those can be genuine new-grad roles).
+// RNFA = RN First Assistant; APRN/NP/CRNA/CNS/CNM = advanced practice nursing;
+// PA/PA-C = physician assistant. "First assist" and "advanced practice" catch
+// the spelled-out variants.
+const ADVANCED_CRED_RX = /\b(nurse practitioner|advanced practice|advanced practice provider|\bapp\b|\baprn\b|\bnp\b|\bcrna\b|\bcnm\b|\bcns\b|\brnfa\b|first assist(ant)?|\bpa-?c\b|physician assistant|nurse anesthetist|nurse midwife|clinical nurse specialist|certified registered nurse)\b/i;
+
 // "Manager" is senior EXCEPT for genuine new-grad manager titles (APM etc.).
 // Checked separately so we don't nuke "Associate Product Manager".
 const MANAGER_SENIOR_RX = /\bmanager\b/i;
@@ -1298,6 +1309,10 @@ function isSeniorTitle(title){
   const t = title || '';
   if(SENIOR_RX.test(t)) return true;
   if(MANAGER_SENIOR_RX.test(t) && !MANAGER_EXEMPT_RX.test(t)) return true;
+  // Advanced-practice / advanced-cert healthcare roles are beyond new-grad reach
+  // (grad degree + specialty licensure), so gate them like senior roles: hidden
+  // under early-career filters, shown only when the user picks "all levels."
+  if(ADVANCED_CRED_RX.test(t)) return true;
   return false;
 }
 
