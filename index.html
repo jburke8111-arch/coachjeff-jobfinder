@@ -1297,6 +1297,28 @@ const SENIOR_RX = /\b(senior|sr\.?|staff|principal|lead|director|supervisor|arch
 // the spelled-out variants.
 const ADVANCED_CRED_RX = /\b(nurse practitioner|advanced practice|advanced practice provider|\bapp\b|\baprn\b|\bnp\b|\bcrna\b|\bcnm\b|\bcns\b|\brnfa\b|first assist(ant)?|\bpa-?c\b|physician assistant|nurse anesthetist|nurse midwife|clinical nurse specialist|certified registered nurse)\b/i;
 
+// SUB-DEGREE roles: this tool serves (soon-to-be) college graduates, so roles
+// whose credential tops out BELOW a bachelor's — a vocational certificate or
+// sub-degree license — are dropped entirely, from every source, at all levels.
+// Two signals: (a) the title names such a role, or (b) the description states a
+// sub-degree credential as the requirement without also asking for a degree.
+// "associate" is intentionally absent (ambiguous: associate DEGREE vs associate
+// job title); associate/ADN nursing is protected via DEGREE_REQ below.
+const SUBDEGREE_TITLE_RX = /\b(lvn|licensed vocational nurse|lpn|licensed practical nurse|cna|certified nursing assistant|nurse aide|nursing assistant|patient care (tech|technician|assistant)|\bpct\b|medical assistant|certified medical assistant|\bcma\b|clinical medical assistant|phlebotom(y|ist)|pharmacy tech(nician)?|pharmacy clerk|\bemt\b|emergency medical technician|paramedic|medical lab(oratory)? tech(nician)?|\bmlt\b|radiologic technologist|x-?ray tech(nologist|nician)?|mri tech(nologist|nician)?|\bct tech(nologist|nician)?|surgical tech(nologist|nician)?|surg tech|scrub tech|sterile processing|central sterile|dialysis tech(nician)?|ekg tech(nician)?|cardiovascular tech(nologist|nician)?|occupational therapy assistant|\bcota\b|physical therapist assistant|physical therapy assistant|\bpta\b|dental assistant|ophthalmic tech(nician)?|optometric tech(nician)?|medical records (specialist|tech(nician)?)|health information tech(nician)?|medical coding specialist|medical coder|medical billing specialist|patient access (rep|representative)|patient registration (rep|representative)|patient services (rep|representative)|unit secretary|health unit coordinator|medical receptionist|medical scheduler|care coordinator|home health aide|\bhha\b|personal care aide|behavioral health tech(nician)?|psychiatric tech(nician)?|mental health tech(nician)?|rehab(ilitation)? tech(nician)?|hospital supply tech(nician)?|nurse extern|monitor tech|telemetry tech|caregiver|orderly|dietary aide|environmental services|housekeep)\b/i;
+const SUBDEGREE_REQ_RX = /\b(high school diploma|hs diploma|ged|vocational (certificate|program|school|diploma)|certificate program|certified (nurse|nursing|medical)|licensed vocational|licensed practical|completion of an? (accredited )?(certificate|vocational|diploma) program)\b/i;
+const DEGREE_REQ_RX = /\b(bachelor'?s?|baccalaureate|\bbsn\b|\bbs\b|\bba\b|master'?s?|\bmsn\b|\bmba\b|\bmph\b|doctora|\bphd\b|\bmd\b|4-year degree|four-year degree|undergraduate degree|associate degree|associate'?s degree|\badn\b)\b/i;
+
+// True when a role's credential is below a bachelor's. Title match is decisive;
+// otherwise a description that names a sub-degree requirement AND omits any
+// degree requirement. Reads title + description (desc only when a source scanned it).
+function isSubDegreeRole(j){
+  const title = (j && j.title) || '';
+  if(SUBDEGREE_TITLE_RX.test(title)) return true;
+  const desc = (j && (j.description || j.descriptionTeaser || j.snippet)) || '';
+  if(desc && SUBDEGREE_REQ_RX.test(desc) && !DEGREE_REQ_RX.test(desc)) return true;
+  return false;
+}
+
 // "Manager" is senior EXCEPT for genuine new-grad manager titles (APM etc.).
 // Checked separately so we don't nuke "Associate Product Manager".
 const MANAGER_SENIOR_RX = /\bmanager\b/i;
@@ -3234,6 +3256,7 @@ function previewFilter(all, o){
   const out = [];
   for(const j of all){
     if(!j) continue;
+    if(isSubDegreeRole(j)) continue;   // sub-degree roles never shown (all sources, all levels)
     const key = [
       (j.url || '').split('?')[0].toLowerCase(),
       (j.title || '').toLowerCase().replace(/\s+/g,' ').trim(),
@@ -3643,6 +3666,11 @@ async function search(){
       // years including 2 in a specialty. Both are hidden by default and both
       // are revealed by the same toggle — a student who wants to see the tier
       // above them still can, but it isn't the default view.
+      // Sub-degree roles (LVN/CNA/tech) are dropped for EVERY source at ALL levels —
+      // this tool serves degree-seekers, so these never belong, regardless of the
+      // experienced toggle or the Level selection.
+      if(isSubDegreeRole(j)) return false;
+
       if(!showExperienced && (isSeniorTitle(t) || beyondEarlyCareer(j))) return false;
 
       // Level gate — screen OUT seniority, don't require a level keyword IN the
