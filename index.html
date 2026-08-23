@@ -1312,11 +1312,13 @@ const DEGREE_REQ_RX = /\b(bachelor'?s?|baccalaureate|\bbsn\b|\bbs\b|\bba\b|maste
 // otherwise a description that names a sub-degree requirement AND omits any
 // degree requirement. Reads title + description (desc only when a source scanned it).
 function isSubDegreeRole(j){
+  // TITLE-ONLY. The description heuristic was removed: "high school diploma or
+  // equivalent" appears as the stated minimum on a huge share of ordinary
+  // entry-level postings across every sector, so matching it dropped most
+  // real early-career jobs, not just sub-degree healthcare roles. The curated
+  // title list is specific and safe; that's the sole signal now.
   const title = (j && j.title) || '';
-  if(SUBDEGREE_TITLE_RX.test(title)) return true;
-  const desc = (j && (j.description || j.descriptionTeaser || j.snippet)) || '';
-  if(desc && SUBDEGREE_REQ_RX.test(desc) && !DEGREE_REQ_RX.test(desc)) return true;
-  return false;
+  return SUBDEGREE_TITLE_RX.test(title);
 }
 
 // "Manager" is senior EXCEPT for genuine new-grad manager titles (APM etc.).
