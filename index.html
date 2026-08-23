@@ -1267,7 +1267,7 @@ const MANUAL_COMPANIES = [
   {name:"Cigna / Evernorth", slug:"cigna", sector:"healthcare", priority:78, atsType:"workday", url:"https://jobs.cigna.com", searchUrl:"https://www.google.com/search?q=site%3Ajobs.cigna.com+{q}", note:"Health-services analyst, finance, pharmacy, and clinical operations roles."},
   // -- Texas / DFW health systems --
   {name:"Baylor Scott & White", slug:"bswhealth", sector:"healthcare", priority:82, atsType:"workday", url:"https://jobs.bswhealth.com", searchUrl:"https://www.google.com/search?q=site%3Ajobs.bswhealth.com+{q}", note:"Largest not-for-profit system in Texas. Nursing, allied health, lab, plus analyst/admin tracks in DFW."},
-  {name:"Texas Health Resources", slug:"thr-health", sector:"healthcare", priority:80, atsType:"workday", url:"https://jobs.texashealth.org", searchUrl:"https://www.google.com/search?q=site%3Ajobs.texashealth.org+{q}", note:"Arlington-based DFW system. Clinical, nurse residency, plus non-clinical analyst/IT/program roles."},
+  {name:"Texas Health Resources", slug:"thr-health", sector:"healthcare", priority:80, atsType:"cbcws", url:"https://jobs.texashealth.org", searchUrl:"https://www.google.com/search?q=site%3Ajobs.texashealth.org+{q}", note:"Arlington-based DFW system. Clinical, nurse residency, plus non-clinical analyst/IT/program roles."},
   {name:"Cook Children's (Fort Worth)", slug:"cooks", sector:"healthcare", priority:78, atsType:"workday", url:"https://jobs.cookchildrens.org", searchUrl:"https://www.google.com/search?q=site%3Ajobs.cookchildrens.org+{q}", note:"Fort Worth pediatric system. Nursing, therapy, child-life, lab, and administrative roles."},
   {name:"Children's Health (Dallas)", slug:"childrens-health", sector:"healthcare", priority:78, atsType:"workday", url:"https://jobs.childrens.com", searchUrl:"https://www.google.com/search?q=site%3Ajobs.childrens.com+{q}", note:"Dallas pediatric system. Clinical, allied health, plus data/analyst and program tracks."},
   {name:"Methodist Health System (Dallas)", slug:"methodist-dallas", sector:"healthcare", priority:76, atsType:"icims", url:"https://jobs.methodisthealthsystem.org", searchUrl:"https://www.google.com/search?q=site%3Ajobs.methodisthealthsystem.org+{q}", note:"DFW system. Nursing, allied health, lab/imaging, and business-office roles."},
@@ -2090,6 +2090,41 @@ async function fetchCareerOneStop(keyword, location){
   }
 }
 
+// Fetch CareerBuilder-CWS employers (e.g. Texas Health Resources) via our
+// /mcloud function. That endpoint (jobsapi-internal.m-cloud.io) is CareerBuilder's
+// shared, key-free JSON API, keyed by Organization + ats_portalid facet — one
+// function serves every CareerBuilder-CWS employer in the server-side roster.
+// Descriptions arrive inline (excluded from checkjobs enrichment, like Muse/Adzuna).
+// Returns [] on any failure so it never breaks the rest of the search.
+async function fetchMCloud(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('q', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/mcloud?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    if(!(data && Array.isArray(data.jobs))) return [];
+    return data.jobs
+      .filter(j => j && j.url)
+      .map(j => ({
+        title: j.title || 'Untitled role',
+        company: j.company || 'Employer',
+        board: j._employer || j.company || '',
+        sector: j.category || '',
+        location: j.location || '—',
+        url: j.url,
+        posted: j.postedDate || null,
+        salary: j.salary || '',
+        source: 'mcloud',
+        id: (j.id != null ? j.id : ('mcloud-' + (j.url||''))),
+        ats: 'cbcws'
+      }));
+  } catch(e){
+    return [];
+  }
+}
+
 // ---- Workday-hosted employers -------------------------------------------
 // Workday powers the careers site of a huge share of large employers. Every
 // Workday tenant is backed by the same JSON endpoint, so ONE Netlify function
@@ -2863,6 +2898,7 @@ function renderJob(j, kw, loc){
             ${j.source === 'usajobs' ? '<span class="tag gray">USAJOBS</span>' : ''}
             ${j.source === 'themuse' ? '<span class="tag gray">The Muse</span>' : ''}
             ${j.source === 'careeronestop' ? '<span class="tag gray">CareerOneStop (DOL)</span>' : ''}
+            ${j.source === 'mcloud' ? '<span class="tag gray">CareerBuilder</span>' : ''}
             ${j.source === 'workday' ? '<span class="tag gray">Workday</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
@@ -3332,7 +3368,7 @@ async function search(){
     const directOnlySelection = company !== 'any' && selectedDirect.length > 0 && pool.length === 0 && !ibmLiveSelection && !workdayOnlySelection;
 
     let jobs = [];
-    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, workday:0 };
+    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, mcloud:0, workday:0 };
     let okCos = 0, failCos = 0;
 
     // ---- (1) All six sources start NOW, in parallel ---------------------------
@@ -3390,6 +3426,7 @@ async function search(){
       apiSource('smartrecruiters',fetchSmartRecruiters),
       apiSource('themuse',        fetchTheMuse),
       apiSource('careeronestop',  fetchCareerOneStop),
+      apiSource('mcloud',         fetchMCloud),
       apiSource('workday',        fetchWorkday),
     ]));
 
@@ -3822,6 +3859,7 @@ async function search(){
       { label: 'SmartRecruiters', key: 'smartrecruiters' },
       { label: 'The Muse',        key: 'themuse' },
       { label: 'CareerOneStop',   key: 'careeronestop' },
+      { label: 'CareerBuilder',   key: 'mcloud' },
       { label: 'Workday',         key: 'workday' },
     ];
     const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + ${API_SOURCES.map(s=>s.label).join(' + ')} searched`;
@@ -3871,6 +3909,7 @@ async function search(){
       smartrecruiters: sourceStats.smartrecruiters,
       themuse: sourceStats.themuse,
       careeronestop: sourceStats.careeronestop,
+      mcloud: sourceStats.mcloud,
       workday: sourceStats.workday,
       adzunaResolved: sourceStats.adzunaResolved || 0,
       boardsOk: okCos, boardsFail: failCos,
