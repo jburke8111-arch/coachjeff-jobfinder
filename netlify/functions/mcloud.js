@@ -60,6 +60,28 @@ function isSubDegreeRole(job) {
   return false;
 }
 
+// Advanced-cert timing gate: a new grad is only blocked when an advanced cert
+// (ACLS/PALS/TNCC/ATCN/CCRN/etc.) must be held BEFORE/AT hire. "within N days/
+// months of hire" is fine (they earn it after starting), and "preferred" never
+// blocks. Reads the job description; returns true only for a genuine before-hire wall.
+const _ADV_CERT = /\b(acls|pals|tncc|atcn|nrp|ccrn|\bcen\b|scrn|advanced cardiac life support|pediatric advanced life support|trauma nursing core|advanced trauma care)\b/i;
+const _BEFORE_HIRE = /\b(upon hire|at hire|prior to hire|before hire|at time of hire|must (?:have|possess|hold)|required (?:upon|at|prior to|before) hire|by (?:start|hire) date)\b/i;
+const _GRACE = /\bwithin\s+\d+\s*(?:day|days|week|weeks|month|months)\b/i;
+function requiresCertBeforeHire(job) {
+  const title = (job && job.title) || "";
+  if (!/\b(nurse|nursing|\brn\b)\b/i.test(title)) return false;
+  const desc = j.description || "";
+  if (!desc) return false;
+  const clauses = String(desc).split(/[.\n;\u2022]/).map(c => c.trim()).filter(Boolean);
+  for (const c of clauses) {
+    if (!_ADV_CERT.test(c)) continue;
+    if (/preferred/i.test(c)) continue;
+    if (_GRACE.test(c)) continue;
+    if (_BEFORE_HIRE.test(c)) return true;
+  }
+  return false;
+}
+
 function passesExperience(job, levelMode) {
   if (!levelMode || levelMode === "all") return true;
   const title = (job.title || "").toString();
@@ -235,6 +257,7 @@ exports.handler = async (event) => {
       if (!matchesKeywords(j, tokens)) continue;
       if (!matchesLocations(j, locs)) continue;
       if (!passesExperience(j, levelMode)) continue;
+      if (requiresCertBeforeHire(j)) continue;   // advanced cert required before hire -> not new-grad reachable
       seen.add(key);
       results.push(normalize(j, r.emp.name));
     }
