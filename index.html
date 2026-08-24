@@ -1305,6 +1305,13 @@ const ADVANCED_CRED_RX = /\b(nurse practitioner|advanced practice|advanced pract
 // "associate" is intentionally absent (ambiguous: associate DEGREE vs associate
 // job title); associate/ADN nursing is protected via DEGREE_REQ below.
 const SUBDEGREE_TITLE_RX = /\b(lvn|licensed vocational nurse|lpn|licensed practical nurse|cna|certified nursing assistant|nurse aide|nursing assistant|patient care (tech|technician|assistant)|\bpct\b|medical assistant|certified medical assistant|\bcma\b|clinical medical assistant|phlebotom(y|ist)|pharmacy tech(nician)?|pharmacy clerk|\bemt\b|emergency medical technician|paramedic|medical lab(oratory)? tech(nician)?|\bmlt\b|radiologic technologist|x-?ray tech(nologist|nician)?|mri tech(nologist|nician)?|\bct tech(nologist|nician)?|surgical tech(nologist|nician)?|surg tech|scrub tech|sterile processing|central sterile|dialysis tech(nician)?|ekg tech(nician)?|cardiovascular tech(nologist|nician)?|occupational therapy assistant|\bcota\b|physical therapist assistant|physical therapy assistant|\bpta\b|dental assistant|ophthalmic tech(nician)?|optometric tech(nician)?|medical records (specialist|tech(nician)?)|health information tech(nician)?|medical coding specialist|medical coder|medical billing specialist|patient access (rep|representative)|patient registration (rep|representative)|patient services (rep|representative)|unit secretary|health unit coordinator|medical receptionist|medical scheduler|care coordinator|home health aide|\bhha\b|personal care aide|behavioral health tech(nician)?|psychiatric tech(nician)?|mental health tech(nician)?|rehab(ilitation)? tech(nician)?|hospital supply tech(nician)?|nurse extern|monitor tech|telemetry tech|caregiver|orderly|dietary aide|environmental services|housekeep)\b/i;
+
+// Nurse roles that REQUIRE years of prior RN experience — a new grad can never
+// hold them, so they're dropped entirely (every level), like sub-degree roles.
+// Charge/lead/supervisor/coordinator nurse roles and house supervisors. NOT
+// gated-to-all-levels (that tier is for roles just above a new grad); these are
+// genuinely out of reach, so they're removed outright.
+const EXPERIENCED_NURSE_RX = /\b(charge nurse|nurse charge|lead nurse|nurse lead|house supervisor \(rn\)|nursing supervisor|nurse supervisor|nurse coordinator|nursing coordinator|nurse preceptor|nurse manager)\b/i;
 const SUBDEGREE_REQ_RX = /\b(high school diploma|hs diploma|ged|vocational (certificate|program|school|diploma)|certificate program|certified (nurse|nursing|medical)|licensed vocational|licensed practical|completion of an? (accredited )?(certificate|vocational|diploma) program)\b/i;
 const DEGREE_REQ_RX = /\b(bachelor'?s?|baccalaureate|\bbsn\b|\bbs\b|\bba\b|master'?s?|\bmsn\b|\bmba\b|\bmph\b|doctora|\bphd\b|\bmd\b|4-year degree|four-year degree|undergraduate degree|associate degree|associate'?s degree|\badn\b)\b/i;
 
@@ -1314,11 +1321,13 @@ const DEGREE_REQ_RX = /\b(bachelor'?s?|baccalaureate|\bbsn\b|\bbs\b|\bba\b|maste
 function isSubDegreeRole(j){
   // TITLE-ONLY. The description heuristic was removed: "high school diploma or
   // equivalent" appears as the stated minimum on a huge share of ordinary
-  // entry-level postings across every sector, so matching it dropped most
-  // real early-career jobs, not just sub-degree healthcare roles. The curated
-  // title list is specific and safe; that's the sole signal now.
+  // entry-level postings across every sector, so matching it dropped most real
+  // early-career jobs, not just sub-degree healthcare roles. The curated title
+  // list is specific and safe; that's the sole signal now.
+  // Also drops experience-required nurse roles (charge/lead/supervisor/coordinator)
+  // — genuinely out of reach for a new grad, so removed at every level.
   const title = (j && j.title) || '';
-  return SUBDEGREE_TITLE_RX.test(title);
+  return SUBDEGREE_TITLE_RX.test(title) || EXPERIENCED_NURSE_RX.test(title);
 }
 
 // "Manager" is senior EXCEPT for genuine new-grad manager titles (APM etc.).
@@ -1331,7 +1340,12 @@ const MANAGER_EXEMPT_RX = /\b(associate (product |program |project )?manager|apm
 // are hidden unless the user checks "Show experienced jobs."
 function isSeniorTitle(title){
   const t = title || '';
-  if(SENIOR_RX.test(t)) return true;
+  // "Staff Nurse" is a standard floor/bedside RN title, NOT a seniority signal —
+  // the word "staff" here means the opposite of senior. Exempt it before the
+  // SENIOR_RX check so these entry-level RN roles aren't wrongly gated. (RN II/III
+  // are still caught by the ii/iii markers below, which is intended.)
+  const staffNurseExempt = /\bstaff (nurse|rn)\b/i.test(t) && !/\b(ii|iii|iv|senior|sr\.?|lead|charge|manager|director|supervisor)\b/i.test(t);
+  if(!staffNurseExempt && SENIOR_RX.test(t)) return true;
   if(MANAGER_SENIOR_RX.test(t) && !MANAGER_EXEMPT_RX.test(t)) return true;
   // Advanced-practice / advanced-cert healthcare roles are beyond new-grad reach
   // (grad degree + specialty licensure), so gate them like senior roles: hidden
@@ -1442,7 +1456,7 @@ const GIGWORK_RX = /\b(train ai models?|ai training|expert network|join our (exp
 // "Analyst" in the title, so every early-career title regex fires on it while
 // the actual requirement is a master's degree plus board certification and
 // supervised fieldwork hours.
-const LICENSED_RX = /\b(board certified|board[- ]eligible|licensed|registered|certified) (behavior|behaviour|nurse|nursing|midwife|dietitian|counselor|counsellor|therapist|social worker|pharmacist|physician|surgeon|anesthe)|(\bbcba\b|\bbcaba\b|\bcpa\b|\bpe\b license|\bp\.e\.\b|\brn\b|\blcsw\b|\blmft\b|\blpc\b|\bcfa\b charter)/i;
+const LICENSED_RX = /\b(board certified|board[- ]eligible|licensed|registered|certified) (behavior|behaviour|dietitian|counselor|counsellor|therapist|social worker|pharmacist|physician|surgeon|anesthe)|(\bbcba\b|\bbcaba\b|\bcpa\b|\bpe\b license|\bp\.e\.\b|\blcsw\b|\blmft\b|\blpc\b|\bcfa\b charter)/i;
 
 const CLINICAL_RX = /\b(nurse|nursing|rn\b|lpn|lvn|np\b|nurse practitioner|physician|doctor|md\b|surgeon|surgical|sterile processing|pharmacist|pharmacy|therap(ist|y)|physical therap|occupational therap|respiratory|radiolog|imaging|sonograph|laboratory|lab (tech|scientist)|clinical|patient care|medical (assistant|technologist|laboratory)|technologist|dietitian|nutritionist|counselor|social work|psycholog|paramedic|emt\b|sterile|anesthe|cardiac|dental hygien|optometr|audiolog|speech|genetic counsel|perfusion|histolog|cytolog|phlebotom)\b/i;
 
