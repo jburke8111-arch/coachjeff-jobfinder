@@ -6,6 +6,7 @@
 <meta name="google-site-verification" content="UvSx3JNmC06bBb-PposrVoCBYkXVRzZFklco-yvN1oA" />
 <title>Free Job Finder for New Grads — No Signup | Coach Jeff</title>
 <meta name="description" content="A free job finder for new graduates and early-career job seekers. Search internships and entry-level roles across employer career sites and major job-data sources, filtered to skip senior roles. Built by Coach Jeff, Experience Career System.">
+<link rel="canonical" href="https://coachjeff-jobfinder.netlify.app/">
 <!-- Social sharing (Open Graph + Twitter) — controls how the link looks when shared on LinkedIn, etc.
      Requires preview.png (1200x630) in the site root, deployed alongside this file. -->
 <meta property="og:type" content="website">
@@ -17,6 +18,19 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Coach Jeff's Job Finder — free early-career job search, no signup required">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Coach Jeff's Job Finder",
+  "url": "https://coachjeff-jobfinder.netlify.app/",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Any",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "description": "A free job finder for new graduates and early-career job seekers. Searches entry-level roles across employer career sites and major job-data sources, filtered to skip senior roles.",
+  "author": { "@type": "Organization", "name": "Experience Career System" }
+}
+</script>
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://coachjeff-jobfinder.netlify.app/preview.png">
 <meta name="twitter:title" content="Coach Jeff's Job Finder — Early-Career Jobs for New Grads">
@@ -975,52 +989,7 @@
 
 </div>
 
-<!--
-  DEV NOTES (not shown to users):
-  • Edit the COMPANIES array in the script below to add/remove employers.
-    Greenhouse slug: boards.greenhouse.io/{slug}   ats:"gh"
-    Lever slug:      jobs.lever.co/{slug}           ats:"lever"
-  • To add USAJobs (federal) and Adzuna (broad aggregator): both require an
-    API key that can't live in browser code. Add a Netlify serverless function
-    to hold the key and proxy the request. Build this after July 5 (credits).
 
-  • ⚠ HEADLINE PROMISE — "No senior roles in disguise."
-    This claim is NOT fully backed yet. The tool filters by TITLE only, so a
-    role titled "Associate" or "Data Analyst" that actually requires 3+ years
-    (stated only in the description) still slips through. Before promoting this
-    tool widely, build the server-side description filter:
-      1. Netlify function fetches each job's full description.
-      2. Scan for experience gates: /\b([2-9]|1[0-9])\+?\s*years?\b/,
-         "minimum N years", "N+ years of experience", etc.
-      3. Drop or down-rank those so the early-career claim is literally true.
-    Until then, the headline is aspirational. Keep distribution limited, or
-    soften the copy to "senior titles screened out" (purpose, not guarantee).
-
-  • ⚠ NON-DEGREE / NON-PROFESSIONAL ROLES — same root cause (title-only filter).
-    The degree-track filter passes anything that isn't an obvious trade/service
-    title. But hourly-ops roles use professional-sounding titles whose REAL
-    requirements only appear in the description.
-
-    CONFIRMED TEST CASE (must be caught by the July-5 server-side filter):
-      Company: gopuff (Lever)   Title: "Operations Associate"   Loc: College Station, TX
-      URL: https://jobs.lever.co/gopuff/1dd11b7b-6756-44fb-9d1a-d310eaf697c7
-      Why it should be REMOVED (from its qualifications, not its title):
-        - "High School Diploma or GED Equivalent"   <- no degree required
-        - "Lift up to 49 pounds"                    <- physical/hourly
-        - "Stand and walk for the duration of a shift"
-        - "1st, 2nd, 3rd shifts" / "mornings, evenings, weekends, nights, holidays"
-      Title alone ("Operations Associate") looks like a legit early-career role,
-      so NO title regex can reliably catch it. Description fetch is required.
-
-    SERVER-SIDE NON-DEGREE SCAN (add alongside the experience-gate scan):
-      Drop / down-rank a role when the description matches things like:
-        /\bhigh school diploma\b/i, /\bged\b/i, /no (college )?degree required/i,
-        /lift (up to )?\d+\s*(lbs?|pounds)/i, /stand (and walk|for the duration)/i,
-        /\b(1st|2nd|3rd)\s*shift/i, /overnight shift/i, /\bhourly\b/i,
-        /must be able to (lift|stand|walk|bend)/i
-      Combine with the experience-gate scan; either match disqualifies the role
-      from the early-career / college-grad buckets.
--->
 
 <script>
 
@@ -4285,7 +4254,9 @@ function logSourceHealth(rec){
         `[jobfinder] "${rec.kw||'(all)'}"${rec.loc?(' @ '+rec.loc):''} — ` +
         `boards ${rec.direct} (ok ${rec.boardsOk}/fail ${rec.boardsFail}), ` +
         `USAJobs ${rec.usajobs}, Adzuna ${rec.adzuna}, Ashby ${rec.ashby}, ` +
-        `Greenhouse ${rec.greenhouse}, SmartRecruiters ${rec.smartrecruiters||0}, The Muse ${rec.themuse||0} → ${rec.matched} matched`
+        `Greenhouse ${rec.greenhouse}, Lever ${rec.lever||0}, SmartRecruiters ${rec.smartrecruiters||0}, ` +
+        `The Muse ${rec.themuse||0}, CareerOneStop ${rec.careeronestop||0}, CareerBuilder ${rec.mcloud||0}, ` +
+        `Hospital systems ${rec.phenom||0}, Workday ${rec.workday||0} → ${rec.matched} matched`
       );
     }
   } catch(e){ /* storage full or blocked — ignore, never break search */ }
@@ -4306,7 +4277,11 @@ function computeHealthSummary(){
     ['Greenhouse','greenhouse'],
     ['Lever','lever'],
     ['SmartRecruiters','smartrecruiters'],
-    ['The Muse','themuse']
+    ['The Muse','themuse'],
+    ['CareerOneStop','careeronestop'],
+    ['CareerBuilder','mcloud'],
+    ['Hospital systems','phenom'],
+    ['Workday','workday']
   ];
   const rows = sources.map(([label,key])=>{
     const vals = log.map(r => Number(r[key])||0);
@@ -4342,8 +4317,10 @@ function coachJeffHealth(showRecent){
       when: (r.t||'').replace('T',' ').slice(0,16),
       keyword: r.kw||'(all)', location: r.loc||'',
       boards: r.direct, USAJobs: r.usajobs, Adzuna: r.adzuna,
-      Ashby: r.ashby, Greenhouse: r.greenhouse,
+      Ashby: r.ashby, Greenhouse: r.greenhouse, Lever: r.lever||0,
       SmartRecruiters: r.smartrecruiters||0, 'The Muse': r.themuse||0,
+      CareerOneStop: r.careeronestop||0, CareerBuilder: r.mcloud||0,
+      'Hospital systems': r.phenom||0, Workday: r.workday||0,
       matched: r.matched
     }));
     console.log(`%cLast ${k} searches`, 'font-weight:bold');
@@ -5543,12 +5520,14 @@ document.getElementById('reset').addEventListener('click', ()=>{
 <p><strong>Changes.</strong> These tools are a work in progress and may change or be discontinued at any time. Continued use means you accept the current terms.</p>
 <p><strong>Contact.</strong> Questions? Reach Jeff Burke at <a href="mailto:jburke8111@gmail.com">jburke8111@gmail.com</a>.</p></div>
     <div id="cj-privacy"><h3>Privacy Policy</h3>
-<p class="cj-meta">Last updated: August 21, 2026</p>
-<p>These tools are built to work without accounts, logins, or tracking. Here&rsquo;s exactly what that means.</p>
-<p><strong>What runs in your browser.</strong> When you paste or type your resume, a job posting, or personal details, that information is processed locally in your own web browser to generate your results. It is not transmitted to or stored on our servers, and we cannot see it. If you close or refresh the page, anything saved on your device for convenience can be cleared through your browser.</p>
-<p><strong>What we don&rsquo;t collect.</strong> We don&rsquo;t require an account, we don&rsquo;t ask for a login, and we don&rsquo;t run advertising or third-party analytics trackers. We don&rsquo;t sell, rent, or share your personal information &mdash; because in the normal use of these tools, we never receive it.</p>
-<p><strong>Third-party services.</strong> Your job searches send only your search terms (such as keyword and location) to public job-listing services &mdash; including USAJOBS, Adzuna, The Muse, CareerOneStop (U.S. Department of Labor / National Labor Exchange), and employer career sites &mdash; to return matching openings. These searches don&rsquo;t include your name, resume, or contact information. Recent searches and the optional feedback form are the only data leaving your browser; recent searches are saved locally on your device.</p>
-<p><strong>Your choices.</strong> Because your information stays on your device, you&rsquo;re in control of it. Clearing your browser&rsquo;s site data removes anything the tool saved locally.</p>
+<p class="cj-meta">Last updated: August 24, 2026</p>
+<p>These tools are built to work without accounts or logins and to minimize the personal information sent off your device. Here&rsquo;s exactly what that means.</p>
+<p><strong>What runs in your browser.</strong> When you paste or type a resume, job posting, or personal details into tools that process that content locally, that information stays in your own web browser unless a feature clearly requires an external service. Information saved for convenience, such as saved searches or saved jobs, is stored locally on your device and can be removed by clearing the site&rsquo;s browser data.</p>
+<p><strong>What we don&rsquo;t collect.</strong> We don&rsquo;t require an account or login, and we don&rsquo;t use advertising trackers or sell, rent, or share your personal information for advertising purposes.</p>
+<p><strong>Basic site analytics.</strong> We use GoatCounter, a privacy-focused analytics service, to understand basic site usage such as page visits. It is used for aggregate traffic measurement, not advertising or cross-site profiling.</p>
+<p><strong>Job-search services.</strong> When you run a Job Finder search, your search terms (such as keyword and location) are sent through our Netlify serverless functions and/or to public job-listing services and employer career systems &mdash; including sources such as USAJOBS, Adzuna, The Muse, CareerOneStop (U.S. Department of Labor / National Labor Exchange), and employer-hosted job boards &mdash; so matching openings can be returned. These searches do not include your name, resume, or contact information unless you put that information into a search field yourself.</p>
+<p><strong>Feedback form.</strong> If you choose to submit feedback, the message you enter and any optional email address you provide are transmitted so the feedback can be received and, if requested, answered.</p>
+<p><strong>Your choices.</strong> Clearing your browser&rsquo;s site data removes information the tool saved locally on that device. You can also use the tools without creating an account.</p>
 <p><strong>Contact.</strong> Questions about privacy? Reach Jeff Burke at <a href="mailto:jburke8111@gmail.com">jburke8111@gmail.com</a> or through the feedback form on the homepage.</p></div>
     <div id="cj-disclaimer"><h3>Disclaimer</h3>
 <p>This free tool is for informational and educational purposes only and provides no guarantee of employment or any specific outcome. It is not legal, financial, tax, immigration, or employment advice. Review and verify everything before you use it.</p></div>
