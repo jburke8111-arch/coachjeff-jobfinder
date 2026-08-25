@@ -286,7 +286,11 @@ const SUBDEGREE_TITLE_RX = /\b(lvn|licensed vocational nurse|lpn|licensed practi
 // Charge/lead/supervisor/coordinator nurse roles and house supervisors. NOT
 // gated-to-all-levels (that tier is for roles just above a new grad); these are
 // genuinely out of reach, so they're removed outright.
-const EXPERIENCED_NURSE_RX = /\b(charge (registered )?nurse|charge rn|nurse charge|lead (registered )?nurse|lead rn|nurse lead|house supervisor \(rn\)|nursing supervisor|nurse supervisor|nurse coordinator|nursing coordinator|nurse preceptor|nurse manager|travel (registered )?nurse|travel rn|travel nursing|traveling (registered )?nurse|traveling rn)\b/i;
+// The two trailing alternatives catch mid-title "charge" (e.g. "Registered Nurse -
+// Charge - Behavioral Health"), where charge sits between words rather than directly
+// before "nurse". Adjacency ([\s-]+) keeps billing-sense titles ("Charge Capture
+// Specialist", "Charge Account Analyst") from matching — they have no nurse token.
+const EXPERIENCED_NURSE_RX = /\b(charge (registered )?nurse|charge rn|nurse charge|lead (registered )?nurse|lead rn|nurse lead|house supervisor \(rn\)|nursing supervisor|nurse supervisor|nurse coordinator|nursing coordinator|nurse preceptor|nurse manager|travel (registered )?nurse|travel rn|travel nursing|traveling (registered )?nurse|traveling rn)\b|\b(registered nurse|rn|nurse)\b[\s-]+charge\b|\bcharge\b[\s-]+\b(registered nurse|rn|nurse)\b/i;
 const SUBDEGREE_REQ_RX = /\b(high school diploma|hs diploma|ged|vocational (certificate|program|school|diploma)|certificate program|certified (nurse|nursing|medical)|licensed vocational|licensed practical|completion of an? (accredited )?(certificate|vocational|diploma) program)\b/i;
 const DEGREE_REQ_RX = /\b(bachelor'?s?|baccalaureate|\bbsn\b|\bbs\b|\bba\b|master'?s?|\bmsn\b|\bmba\b|\bmph\b|doctora|\bphd\b|\bmd\b|4-year degree|four-year degree|undergraduate degree|associate degree|associate'?s degree|\badn\b)\b/i;
 
@@ -307,7 +311,7 @@ function isSubDegreeRole(j){
 
 // "Manager" is senior EXCEPT for genuine new-grad manager titles (APM etc.).
 // Checked separately so we don't nuke "Associate Product Manager".
-const MANAGER_SENIOR_RX = /\bmanager\b/i;
+const MANAGER_SENIOR_RX = /\b(manager|mgr)\b/i;
 const MANAGER_EXEMPT_RX = /\b(associate (product |program |project )?manager|apm|assistant manager|manager (trainee|in training)|management (trainee|associate|development program))\b/i;
 
 // Single source of truth for "is this title senior / not early-career?"
