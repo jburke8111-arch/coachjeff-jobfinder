@@ -12,8 +12,17 @@
  *  - Bumping CACHE_VERSION on deploy retires the old cache automatically.
  */
 
-const CACHE_VERSION = 'jobfinder-v1';
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest'];
+const CACHE_VERSION = 'jobfinder-v2';
+const APP_SHELL = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/jobfinder-data.js',
+  '/jobfinder-core.js',
+  '/jobfinder-ui.js',
+  '/jobfinder-storage.js',
+  '/jobfinder-init.js',
+];
 
 self.addEventListener('install', (event) => {
   // Pre-cache the shell so a returning offline user still gets the UI. Failure
