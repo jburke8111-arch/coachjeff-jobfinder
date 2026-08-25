@@ -820,6 +820,16 @@ function normalizeLocationText(s){
     .toLowerCase()
     .replace(/\bremote[- ]?us\b/g, 'remote united states')
     .replace(/&/g, ' and ')
+    // Reconcile "St." / "St " with "Saint" BEFORE punctuation is stripped, so a
+    // user typing "St. Louis" or "St Louis" matches job data that reads "Saint
+    // Louis" (Phenom health systems spell it out), and vice-versa. Runs on both
+    // the typed input and the job location since both pass through here, so all
+    // three spellings collapse to one. Also handles "Ste." (Sainte) and "Mt."
+    // (Mount), which appear in the same city data. Matched only before a letter
+    // so it never touches a trailing "st" like "1st" or "Ernst".
+    .replace(/\bst\.?\s+(?=[a-z])/g, 'saint ')
+    .replace(/\bste\.?\s+(?=[a-z])/g, 'sainte ')
+    .replace(/\bmt\.?\s+(?=[a-z])/g, 'mount ')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
