@@ -31,7 +31,32 @@ const PHENOM_EMPLOYERS = [
   // Add more: open the careers page, Ctrl+F "phenompeople", read refNum from the
   // cdn.phenompeople.com/CareerConnectResources/prod/XXXX/ path. localePath is the
   // segment before /search-results (usually "global/en" or "us/en").
-  // { name: "GE Aerospace", domain: "careers.geaerospace.com", refNum: "GAOGAYGLOBAL", localePath: "global/en", regions: [], national: true },
+
+  // ===== BATCH 2026-08 (refNum/domain/localePath verified against live Phenom
+  // sites; NOT yet endpoint-tested via the /widgets POST — confirm each with
+  // ?diag=1 after deploy and prune any that return 0). =====
+  // ---- health systems / care providers ----
+  { name: "SSM Health", domain: "jobs.ssmhealth.com", refNum: "SHWSHLUS", localePath: "us/en",
+    regions: ["mo","missouri","il","illinois","ok","oklahoma","wi","wisconsin","st louis","st. louis","madison"], national: false },
+  { name: "Franciscan Health", domain: "jobs.franciscanhealth.org", refNum: "FHBFHYUS", localePath: "us/en",
+    regions: ["in","indiana","il","illinois","indianapolis","lafayette","crown point","michigan city"], national: false },
+  { name: "Bon Secours Mercy Health", domain: "careers.bsmhealth.org", refNum: "BSMBSMUS", localePath: "us/en",
+    regions: [], national: true },
+  { name: "ChenMed", domain: "careers.chenmed.com", refNum: "CHENUS", localePath: "us/en",
+    regions: [], national: true },
+  { name: "Aspen Dental", domain: "careers.aspendental.com", refNum: "ASDEUS", localePath: "us/en",
+    regions: [], national: true },
+  { name: "FOX Rehabilitation", domain: "careers.foxrehab.org", refNum: "FOREUS", localePath: "us/en",
+    regions: [], national: true },
+  { name: "Children's Hospital of Philadelphia", domain: "careers.chop.edu", refNum: "CHOPUS", localePath: "us/en",
+    regions: ["pa","pennsylvania","nj","new jersey","philadelphia","philly"], national: false },
+  // ---- non-healthcare (added by request; different sector than the rest) ----
+  { name: "GE Aerospace", domain: "careers.geaerospace.com", refNum: "GAOGAYGLOBAL", localePath: "global/en",
+    regions: [], national: true },
+  { name: "Truist", domain: "careers.truist.com", refNum: "TBJTBFUS", localePath: "us/en",
+    regions: [], national: true },
+  { name: "Southwest Airlines", domain: "careers.southwestair.com", refNum: "SOUTUS", localePath: "us/en",
+    regions: [], national: true },
 ];
 
 // ---- Tunables (within Netlify's 10s sync limit) -----------------------------
