@@ -494,6 +494,17 @@ function isUSJob(j){
   const title = j.title || '';
   if(TITLE_NONUS_RX.test(title)) return false;
   if(TITLE_FOREIGN_CONVENTION_RX.test(title)) return false;
+  // Workday's list endpoint returns a FACILITY name as the location ("Saint
+  // Joseph Hospital", "TOSH", "West Jordan Clinic"), not a city/state — so
+  // isUSLocation can't see a US marker and wrongly drops it under "US only",
+  // zeroing out facility-name employers like Intermountain. WORKDAY_EMPLOYERS
+  // is a hand-curated all-US roster, so a Workday job is US unless something
+  // actively signals foreign: the two title checks above already ran, and
+  // NONUS_RX still catches a location that names a foreign place. Same spirit
+  // as the Adzuna "City, County" and bare-"Remote" carve-outs in isUSLocation.
+  if(j.ats === 'workday' || j.source === 'workday'){
+    return !NONUS_RX.test(j.location || '');
+  }
   return isUSLocation(j.location);
 }
 
