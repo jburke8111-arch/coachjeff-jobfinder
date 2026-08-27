@@ -538,6 +538,7 @@ const WORKDAY_EMPLOYERS = [
   { name:'Saint Francis Health System', slug:'wd-saintfrancis', tenant:'saintfrancis', wd:'115',site:'External',        sector:'healthcare'  },
   { name:'Ochsner Health',   slug:'wd-ochsner',      tenant:'ochsner',      wd:'1',  site:'Ochsner',                 sector:'healthcare'  },
   { name:'Presbyterian Healthcare Services', slug:'wd-phs', tenant:'phsorg', wd:'1',  site:'Careers',                 sector:'healthcare'  },
+  { name:'Banner Health',    slug:'wd-banner',       tenant:'bannerhealth', wd:'108',site:'Careers',                 sector:'healthcare'  },
   // Not Workday (verified): American Airlines, Baylor Scott & White, Comerica,
   // Texas Health, Charles Schwab, Intuit — these run Phenom/Taleo/iCIMS/custom
   // and can't use this function; they stay as their existing link-outs.
