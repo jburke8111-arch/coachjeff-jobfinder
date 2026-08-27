@@ -82,10 +82,23 @@ exports.handler = async function (event) {
         resp = await fetch(url, {
           method: 'GET',
           headers: {
-            'Accept': 'application/json',
+            // Talemetry/CSNS returns JSON to XHR requests. The careers page
+            // calls jobs.json via fetch with X-Requested-With, so we mirror a
+            // real in-page XHR as closely as possible — this is what gets a
+            // datacenter request past the WAF that a bare curl-like GET trips.
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
             'User-Agent': BROWSER_UA,
-            'Referer': `${base}/search/jobs`
+            'Referer': `${base}/search/jobs`,
+            'Origin': base,
+            'X-Requested-With': 'XMLHttpRequest',
+            'sec-ch-ua': '"Chromium";v="120", "Not(A:Brand";v="24", "Google Chrome";v="120"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"macOS"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin'
           }
         });
       } catch (e) {
