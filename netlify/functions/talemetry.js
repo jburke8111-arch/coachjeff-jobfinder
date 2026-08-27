@@ -1,47 +1,38 @@
 // netlify/functions/talemetry.js
 //
-// Employer-agnostic proxy for Talemetry / CSNS ("Career Site Next-gen
-// Search") career sites — the platform behind HCA Healthcare and other
-// large employers whose careers page ships a `window.csns.paths` block.
+// Employer-agnostic proxy for Talemetry / StandOut ("CSNS") career sites —
+// the platform behind HCA Healthcare and other large employers whose careers
+// page ships a `window.csns.paths` block.
 //
-// These sites self-document a clean JSON search endpoint:
+// TWO ENDPOINTS EXIST; we prefer the one that survives the datacenter WAF:
 //
-//     GET https://{host}/search/jobs.json?keyword=...&page=N
+//   (A) INTERACTIVE JSON  /search/jobs.json?keyword=&page=&per_page=
+//       Clean + keyword-searchable, BUT HCA's WAF 403s datacenter (Netlify/
+//       AWS-Lambda) IPs on this path regardless of headers. Kept as a fallback
+//       but usually blocked.
 //
-// (the path comes from window.csns.paths.search_jobs_json = "/search/jobs.json").
-// It returns structured JSON — NO auth, NO key, NO cookie required:
+//   (B) AGGREGATOR XML    /jobs.xml   <-- PREFERRED
+//       The StandOut aggregator feed (<standoutxml><jobs><job>...). Built to be
+//       downloaded whole by Indeed/Google, so it's typically served from static/
+//       CDN infra that is NOT behind the interactive WAF — i.e. it may return 200
+//       to Netlify where jobs.json returns 403. It is the WHOLE job list (not
+//       keyword-filtered server-side), so we fetch once and filter here.
 //
-//     { current_page, per_page, total_entries,
-//       entries: [ { id, permalink, title,
-//                    location:{ locality, region_abbr, region_full,
-//                               postal_code, country, ... } }, ... ] }
+// The host, company label, and sector are query params, so one function serves
+// EVERY Talemetry employer — adding one is a one-line client roster entry.
 //
-// One function serves EVERY Talemetry employer — the host, company label,
-// and sector are passed in as query params, so adding a new employer is a
-// one-line client roster entry, not new code here (same design as workday.js).
+// XML fields per <job>: title (CDATA), id, detail_url, apply_url, updated_at
+// (a REAL posted date — better than the JSON feed), category (CDATA),
+// location{locality,region,country,postal_code}, description (CDATA, Word-HTML).
 //
-// WHY THIS IS A LIVE PER-SEARCH SOURCE (not a roster fetch-all):
-//   HCA alone is ~16,700 postings. We never pull the whole board. The user's
-//   keyword is passed straight to the endpoint (server-side search), so each
-//   query returns a small, focused set. We page a few times within budget and
-//   stop. Like Phenom, this is queried live on every search.
-//
-// FIELD NOTES:
-//   * location is STRUCTURED (locality + region_abbr + region_full + country)
-//     — cleaner than Workday's free text. We build "City, ST" for display,
-//     which means US-filtering and city search both work naturally. No
-//     facility-name problem.
-//   * job URL = {host}/jobs/{permalink}  (permalink is the SEO slug; the
-//     numeric id also resolves at /jobs/{id}, but permalink links are cleaner).
-//   * per_page defaults to 25 and is honored up to ~100 — we ask for 100 to
-//     cover more ground per call inside the time budget.
-//   * total_entries drifts by 1 between pages as postings open/close; that's
-//     normal, we only use it to know when to stop paging.
-//
+// SIZE GUARD: the full feed can be large. We cap how many bytes we read and how
+// many jobs we parse, and we keyword-filter as we go so memory stays bounded.
 // Returns [] safe on any failure so it can never break search.
 
-const MAX_PAGES  = 3;    // 3 x 100 = up to 300 focused roles per search
-const PAGE_SIZE  = 100;  // Talemetry honors per_page up to ~100
+const MODE_DEFAULT = 'xml';       // 'xml' (aggregator, WAF-resistant) | 'json'
+const MAX_BYTES    = 25_000_000;  // hard read cap (~25MB) so a giant feed can't OOM
+const MAX_JOBS     = 4000;        // stop parsing after this many <job> blocks
+const RETURN_CAP   = 400;         // max jobs returned to the client per search
 const TIME_BUDGET_MS = 9000;
 
 const BROWSER_UA =
@@ -51,163 +42,146 @@ const BROWSER_UA =
 
 exports.handler = async function (event) {
   const qs = event.queryStringParameters || {};
-  const keyword = (qs.keyword || '').trim();
+  const keyword = (qs.keyword || '').trim().toLowerCase();
   const host    = (qs.host    || '').trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
   const company = (qs.company || 'Employer').trim();
   const sector  = (qs.sector  || '').trim();
+  const mode    = (qs.mode    || MODE_DEFAULT).trim();
   const diag    = qs.diag === '1';
 
-  if (!host) {
-    return json(400, { ok: false, error: 'missing host', jobs: [] });
-  }
+  if (!host) return json(400, { ok:false, error:'missing host', jobs:[] });
 
-  const base     = `https://${host}`;
-  const endpoint = `${base}/search/jobs.json`;
-  const started  = Date.now();
-
-  const errors = [];
-  let all = [];
-  let total = null;
-  let loggedShape = false;
+  const base = `https://${host}`;
+  const started = Date.now();
+  const kwTokens = keyword ? keyword.split(/\s+/).filter(Boolean) : [];
 
   try {
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      if (Date.now() - started > TIME_BUDGET_MS) break;
-
-      const url = `${endpoint}?keyword=${encodeURIComponent(keyword)}` +
-                  `&page=${page}&per_page=${PAGE_SIZE}`;
-
-      let resp;
-      try {
-        resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            // Talemetry/CSNS returns JSON to XHR requests. The careers page
-            // calls jobs.json via fetch with X-Requested-With, so we mirror a
-            // real in-page XHR as closely as possible — this is what gets a
-            // datacenter request past the WAF that a bare curl-like GET trips.
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'User-Agent': BROWSER_UA,
-            'Referer': `${base}/search/jobs`,
-            'Origin': base,
-            'X-Requested-With': 'XMLHttpRequest',
-            'sec-ch-ua': '"Chromium";v="120", "Not(A:Brand";v="24", "Google Chrome";v="120"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"macOS"',
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-origin'
-          }
-        });
-      } catch (e) {
-        errors.push(`page ${page}: fetch ${String(e && e.message)}`);
-        break;
-      }
-
-      if (!resp.ok) {
-        let snippet = '';
-        try { snippet = (await resp.text()).slice(0, 200); } catch (e) {}
-        console.log(`[talemetry:${host}] upstream ${resp.status} body: ${snippet}`);
-        errors.push(`page ${page}: upstream ${resp.status}`);
-        if (page === 1) {
-          return json(200, {
-            ok: false, error: `talemetry upstream ${resp.status}`,
-            host, jobs: [], ...(diag ? { errors } : {})
-          });
+    const url = `${base}/jobs.xml`;
+    let resp;
+    try {
+      resp = await fetch(url, {
+        headers: {
+          'Accept': 'application/xml, text/xml, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'User-Agent': BROWSER_UA
         }
-        break;
-      }
-
-      let data;
-      try { data = await resp.json(); }
-      catch (e) { errors.push(`page ${page}: bad json`); break; }
-
-      const entries = Array.isArray(data.entries) ? data.entries : [];
-      if (total == null && typeof data.total_entries === 'number') {
-        total = data.total_entries;
-      }
-
-      if (!loggedShape && entries.length) {
-        console.log(`[talemetry:${host}] first entry: ` +
-          JSON.stringify(entries[0]).slice(0, 400));
-        loggedShape = true;
-      }
-
-      if (!entries.length) break;
-
-      all = all.concat(
-        entries.map(e => mapEntry(e, base, company, sector)).filter(Boolean)
-      );
-
-      const perPage = Number(data.per_page) || PAGE_SIZE;
-      if (entries.length < perPage) break;                 // last page
-      if (total != null && page * perPage >= total) break; // covered all
+      });
+    } catch (e) {
+      return json(200, { ok:false, error:`xml fetch ${String(e && e.message)}`, jobs:[] });
     }
 
-    // De-dupe by url.
-    const seen = new Set();
-    const jobs = all.filter(j => {
-      if (seen.has(j.url)) return false;
-      seen.add(j.url);
-      return true;
-    });
+    if (!resp.ok) {
+      let snippet = '';
+      try { snippet = (await resp.text()).slice(0, 200); } catch (e) {}
+      console.log(`[talemetry:${host}] jobs.xml upstream ${resp.status} body: ${snippet}`);
+      return json(200, {
+        ok:false, error:`talemetry xml upstream ${resp.status}`,
+        host, jobs:[], ...(diag ? { note:'jobs.xml blocked too' } : {})
+      });
+    }
+
+    // Stream-read with a byte cap so a huge feed can't blow memory.
+    const reader = resp.body && resp.body.getReader ? resp.body.getReader() : null;
+    let xml = '';
+    if (reader) {
+      const dec = new TextDecoder();
+      let bytes = 0;
+      while (true) {
+        if (Date.now() - started > TIME_BUDGET_MS) break;
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.length;
+        xml += dec.decode(value, { stream: true });
+        if (bytes > MAX_BYTES) { console.log(`[talemetry:${host}] hit MAX_BYTES`); break; }
+      }
+    } else {
+      xml = await resp.text();
+    }
+
+    const jobs = parseJobsXml(xml, { base, company, sector, kwTokens, cap: RETURN_CAP });
 
     return json(200, {
-      ok: true, count: jobs.length, total, jobs,
-      ...(diag ? { host, pagesTried: MAX_PAGES, errors } : {})
+      ok: true, count: jobs.length, jobs,
+      ...(diag ? { host, bytes: xml.length, parsedCapped: jobs.length >= RETURN_CAP } : {})
     });
   } catch (e) {
     console.error(`[talemetry:${host}] error`, e && e.message);
-    return json(200, { ok: false, error: String(e && e.message), jobs: [] });
+    return json(200, { ok:false, error:String(e && e.message), jobs:[] });
   }
 };
 
 // ---- helpers ----------------------------------------------------------
 
-function mapEntry(e, base, company, sector) {
-  if (!e || typeof e !== 'object') return null;
+function parseJobsXml(xml, { base, company, sector, kwTokens, cap }) {
+  const out = [];
+  if (!xml) return out;
 
-  const permalink = e.permalink || e.id;
-  if (!permalink) return null;
-  const url = `${base}/jobs/${permalink}`;
+  // Split on <job> boundaries; regex is fine here (flat, predictable feed).
+  const blocks = xml.split(/<job\b[^>]*>/i);
+  let scanned = 0;
 
-  const title = e.title || 'Untitled role';
+  for (let i = 1; i < blocks.length && out.length < cap && scanned < MAX_JOBS; i++) {
+    scanned++;
+    const b = blocks[i];
 
-  // Structured location -> "City, ST" (falls back gracefully).
-  const loc = e.location || {};
-  let location = '';
-  const city = (loc.locality || '').trim();
-  const st   = (loc.region_abbr || loc.region_full || '').trim();
-  if (city && st) location = `${city}, ${st}`;
-  else if (city)  location = city;
-  else if (st)    location = st;
-  else if (loc.country) location = String(loc.country);
-  else location = '—';
+    const title = tag(b, 'title');
+    if (!title) continue;
 
-  return {
-    title: String(title),
-    company: company,
-    board: company,
-    sector: sector || '',
-    location: String(location),
-    url: url,
-    posted: null,     // list carries no reliable posted date
-    salary: '',
-    source: 'talemetry',
-    id: String(e.id || permalink),
-    ats: 'talemetry'
-  };
+    // keyword-AND on the title (feed isn't server-filtered)
+    if (kwTokens.length) {
+      const t = title.toLowerCase();
+      if (!kwTokens.every(k => t.includes(k))) continue;
+    }
+
+    const id  = tag(b, 'id');
+    const url = tag(b, 'detail_url') || tag(b, 'apply_url') ||
+                (id ? `${base}/jobs/${id}` : '');
+    if (!url) continue;
+
+    const locality = tag(b, 'locality');
+    const region   = tag(b, 'region');
+    const country  = tag(b, 'country');
+    let location = '';
+    if (locality && region) location = `${locality}, ${region}`;
+    else if (locality) location = locality;
+    else if (region)   location = region;
+    else if (country)  location = country;
+    else location = '—';
+
+    const updated = tag(b, 'updated_at') || null;
+
+    out.push({
+      title: decodeEntities(title),
+      company, board: company, sector: sector || '',
+      location: decodeEntities(location),
+      url, posted: updated, salary: '',
+      source: 'talemetry', id: String(id || url), ats: 'talemetry'
+    });
+  }
+  return out;
+}
+
+// Pull the inner text of <name>...</name>, unwrapping optional CDATA.
+function tag(block, name) {
+  const m = block.match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)</${name}>`, 'i'));
+  if (!m) return '';
+  let v = m[1].trim();
+  const cd = v.match(/<!\[CDATA\[([\s\S]*?)\]\]>/i);
+  if (cd) v = cd[1].trim();
+  return v;
+}
+
+function decodeEntities(s) {
+  return String(s)
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .trim();
 }
 
 function json(statusCode, obj) {
   return {
     statusCode,
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=300'
-    },
+    headers: { 'Content-Type':'application/json', 'Cache-Control':'public, max-age=600' },
     body: JSON.stringify(obj)
   };
 }
