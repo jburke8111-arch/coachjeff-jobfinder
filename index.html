@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="google-site-verification" content="UvSx3JNmC06bBb-PposrVoCBYkXVRzZFklco-yvN1oA" />
 <title>Free Job Finder for New Grads — No Signup | Coach Jeff</title>
-<meta name="description" content="A free job finder for new graduates and early-career job seekers. Search internships and entry-level roles across employer career sites and major job-data sources, filtered to skip senior roles. Built by Coach Jeff, Experience Career System.">
+<meta name="description" content="A free job finder for new graduates and early-career job seekers. Search internships and entry-level roles across employer career sites and major job-data sources, filtered to skip senior roles. Built by Coach Jeff, Experience Career System™.">
 <link rel="canonical" href="https://coachjeff-jobfinder.netlify.app/">
 <!-- Social sharing (Open Graph + Twitter) — controls how the link looks when shared on LinkedIn, etc.
      Requires preview.png (1200x630) in the site root, deployed alongside this file. -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Coach Jeff's Job Finder — Early-Career Jobs for New Grads">
-<meta property="og:description" content="Search internships and entry-level roles across employer career sites and major job-data sources, filtered for new graduates. Free, from Experience Career System.">
+<meta property="og:description" content="Search internships and entry-level roles across employer career sites and major job-data sources, filtered for new graduates. Free, from Experience Career System™.">
 <meta property="og:site_name" content="Experience Career System">
 <meta property="og:url" content="https://coachjeff-jobfinder.netlify.app/">
 <meta property="og:image" content="https://coachjeff-jobfinder.netlify.app/preview.png">
@@ -41,7 +41,7 @@
      deployed to the site root alongside this file. All additive — if any are
      missing, the site works exactly as before (install prompt just won't show). -->
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#1c3257">
+<meta name="theme-color" content="#1d2d3d">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -52,17 +52,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --navy:#12203a;        /* primary ink */
-    --navy-bar:#1c3257;    /* brand bar */
-    --navy-deep:#0d1830;   /* hover */
-    --paper:#fbfaf7;       /* page */
+    --navy:#1d1f20;        /* primary ink */
+    --navy-bar:#1d2d3d;    /* brand bar */
+    --navy-deep:#14212c;   /* hover */
+    --paper:#f2f2f3;       /* page */
     --card:#ffffff;
-    --amber:#d98a2b;       /* single accent */
-    --amber-deep:#b6701c;
-    --line:#e4e1d9;
-    --line-strong:#cfd3da;
-    --mute:#5d6470;
-    --faint:#8a8f99;
+    --amber:#5980a6;       /* single accent */
+    --amber-deep:#47688a;
+    --line:#d6d6d8;
+    --line-strong:#b9b9bd;
+    --mute:#6d7073;
+    --faint:#8b8e91;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{
@@ -93,13 +93,13 @@
     line-height:1.45;text-wrap:balance}
 
   /* Controls */
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  .panel{background:var(--card);border:1px solid var(--line);border-radius: 0;
     padding:22px 22px 20px;box-shadow:0 1px 2px rgba(18,32,58,.04),0 8px 24px rgba(18,32,58,.05)}
   .controls{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 16px;align-items:end}
   .field{display:flex;flex-direction:column;gap:6px;min-width:0}
   label{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
   input,select{font-family:inherit;font-size:16px;padding:10px 12px;
-    border:1px solid var(--line-strong);background:#fff;border-radius:7px;color:var(--navy);
+    border:1px solid var(--line-strong);background:#fff;border-radius: 0;color:var(--navy);
     width:100%;height:42px;transition:border-color .12s,box-shadow .12s}
   input::placeholder{color:#aab0ba}
   input:focus,select:focus{outline:none;border-color:var(--amber);
@@ -108,7 +108,7 @@
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%235d6470' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
     background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
   button{font-family:inherit;font-size:14.5px;font-weight:600;border:none;
-    background:var(--navy);color:#fff;border-radius:7px;cursor:pointer;
+    background:var(--navy);color:#fff;border-radius: 0;cursor:pointer;
     width:100%;height:42px;transition:background .12s,transform .02s;letter-spacing:.01em}
   button:hover{background:var(--navy-deep)}
   button:active{transform:translateY(1px)}
@@ -127,11 +127,11 @@
     color:var(--navy);cursor:pointer;line-height:1.35}
   .hint{font-size:12px;color:var(--faint);line-height:1.4;max-width:42ch}
 
-  .quickbar,.savedbar,.profilebar,.coach-picks{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .quickbar,.savedbar,.profilebar,.coach-picks{background:#fff;border:1px solid var(--line);border-radius: 0;padding:14px 16px;margin-bottom:14px}
   .quickbar-title,.savedbar-title,.profilebar-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
   .quickchips,.savedchips{display:flex;flex-wrap:wrap;gap:8px}
   .savedbar-help{margin:-4px 0 11px;max-width:70ch}
-  .chip{width:auto;height:auto;padding:7px 10px;border-radius:999px;background:#fff;color:var(--navy);border:1px solid var(--line-strong);font-size:13px;font-weight:600}
+  .chip{width:auto;height:auto;padding:7px 10px;border-radius: 0;background:#fff;color:var(--navy);border:1px solid var(--line-strong);font-size:13px;font-weight:600}
   .chip.saved{display:inline-flex;align-items:center;gap:6px;padding:0;overflow:hidden;cursor:default}
   .chip.saved .chip-run{padding:7px 4px 7px 12px;cursor:pointer}
   .chip.saved .chip-del{border:none;background:transparent;color:var(--faint);font-size:16px;line-height:1;
@@ -151,11 +151,11 @@
   .stale{opacity:.45;transition:opacity .15s}
   .stale-note{font-size:12.5px;font-weight:600;color:var(--amber-deep);
     background:rgba(217,138,43,.1);border:1px solid rgba(217,138,43,.3);
-    border-radius:7px;padding:8px 12px;margin:10px 0}
+    border-radius: 0;padding:8px 12px;margin:10px 0}
   .role-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;min-height:20px;align-items:center}
   .role-chips-hint{font-size:12px;color:var(--faint)}
   .role-chip{display:inline-flex;align-items:center;gap:4px;padding:0;overflow:hidden;
-    min-height:34px;border-radius:999px;background:var(--navy);color:#fff;border:1px solid var(--navy);
+    min-height:34px;border-radius: 0;background:var(--navy);color:#fff;border:1px solid var(--navy);
     font-size:13px;font-weight:600;white-space:nowrap}
   .role-chip .role-chip-label{padding:7px 2px 7px 14px;white-space:nowrap}
   .role-chip .role-chip-del{border:none;background:transparent;color:rgba(255,255,255,.75);
@@ -167,7 +167,7 @@
   .loc-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;min-height:0;align-items:center}
   .loc-chips:empty{margin-top:0}
   .loc-chip{display:inline-flex;align-items:center;gap:4px;padding:0;overflow:hidden;
-    border-radius:999px;background:var(--navy-bar);color:#fff;font-size:13px;font-weight:600}
+    border-radius: 0;background:var(--navy-bar);color:#fff;font-size:13px;font-weight:600}
   .loc-chip .loc-chip-label{padding:7px 2px 7px 14px;white-space:nowrap}
   .loc-chip .loc-chip-del{border:none;background:transparent;color:rgba(255,255,255,.75);
     font-size:16px;line-height:1;padding:7px 12px 7px 6px;cursor:pointer}
@@ -178,27 +178,27 @@
   .profile-grid .field{gap:4px}
   @media(max-width:760px){.profile-grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:440px){.profile-grid{grid-template-columns:1fr}}
-  .match-badge{display:inline-flex;align-items:center;justify-content:center;min-width:70px;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;color:#fff;background:var(--navy);flex-shrink:0;white-space:nowrap}
-  .match-badge.good{background:#1f7a4d}.match-badge.mid{background:#b6701c}.match-badge.low{background:#6b7280}
+  .match-badge{display:inline-flex;align-items:center;justify-content:center;min-width:70px;border-radius: 0;padding:5px 9px;font-size:12px;font-weight:800;color:#fff;background:var(--navy);flex-shrink:0;white-space:nowrap}
+  .match-badge.good{background:#1f7a4d}.match-badge.mid{background:#47688a}.match-badge.low{background:#6b7280}
   .job-meta-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
-  .why{margin-top:10px;background:#fbfaf7;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:12.5px;color:var(--mute)}
+  .why{margin-top:10px;background:#f2f2f3;border:1px solid var(--line);border-radius: 0;padding:9px 11px;font-size:12.5px;color:var(--mute)}
   .why strong{color:var(--navy);font-size:12px;letter-spacing:.03em;text-transform:uppercase}
   .why-list{display:flex;gap:7px 14px;flex-wrap:wrap;margin-top:5px}
   .why-list span{white-space:nowrap}
   .salary{font-size:12.5px;color:var(--mute);margin-top:6px}
   .save-empty{font-size:12.5px;color:var(--faint)}
   .more-wrap{display:flex;justify-content:center;margin:22px 0 6px}
-  .more-wrap button.secondary{width:auto;padding:0 22px;height:42px;border:1px solid var(--line-strong);border-radius:7px;background:#fff;color:var(--navy)}
+  .more-wrap button.secondary{width:auto;padding:0 22px;height:42px;border:1px solid var(--line-strong);border-radius: 0;background:#fff;color:var(--navy)}
   .more-wrap button.secondary:hover{border-color:var(--navy);background:var(--paper)}
 
-  .hero-search{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:14px;box-shadow:0 1px 2px rgba(18,32,58,.04),0 8px 24px rgba(18,32,58,.05)}
+  .hero-search{background:#fff;border:1px solid var(--line);border-radius: 0;padding:22px;margin-bottom:14px;box-shadow:0 1px 2px rgba(18,32,58,.04),0 8px 24px rgba(18,32,58,.05)}
   /* .hero-grid retired in V21 — the keyword/location/actions row was split into
      bands 2 and 3, which use .grid2. .hero-actions is still live (band 3). */
   .hero-actions{display:flex;gap:8px;align-items:end;flex-wrap:wrap;justify-content:flex-end}
   .hero-actions button{width:auto;padding:0 14px;white-space:nowrap}
   .quickbar{background:transparent;border:none;padding:0;margin:14px 0 0;box-shadow:none}
   .quickbar-title{margin-bottom:8px}
-  .advancedbar{background:#fff;border:1px solid var(--line);border-radius:10px;padding:0;margin-bottom:14px}
+  .advancedbar{background:#fff;border:1px solid var(--line);border-radius: 0;padding:0;margin-bottom:14px}
   .advancedbar summary,.profilebar summary{cursor:pointer;padding:14px 16px;font-size:13.5px;font-weight:700;color:var(--navy);list-style:none;user-select:none}
   .advancedbar summary::-webkit-details-marker,.profilebar summary::-webkit-details-marker{display:none}
   .advancedbar summary::before,.profilebar summary::before{content:"▸ ";color:var(--faint)}
@@ -218,7 +218,7 @@
   .results{padding:6px 0 64px}
   /* Post-result filter bar. Inline layout on desktop; collapses to a single
      tap-to-expand button on narrow screens (the two mockups, unified). */
-  .resultfilter{margin:14px 2px 0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .resultfilter{margin:14px 2px 0;background:var(--card);border:1px solid var(--line);border-radius: 0;padding:12px 14px}
   .rf-toggle{display:none;width:100%;height:auto;align-items:center;gap:9px;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;font-size:14px;color:var(--navy);font-weight:400;letter-spacing:0}
   .rf-toggle .rf-t-label{font-weight:700}
   .rf-toggle .rf-t-active{font-size:12px;color:var(--amber-deep);font-weight:700}
@@ -234,7 +234,7 @@
   .rf-glabel{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
     color:var(--mute);margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid var(--line)}
   .rf-chips{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
-  .rf-chip{font-size:12px;padding:5px 11px;border-radius:14px;border:1px solid var(--line-strong);
+  .rf-chip{font-size:12px;padding:5px 11px;border-radius: 0;border:1px solid var(--line-strong);
     background:#fff;color:var(--navy);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;line-height:1.2;
     width:auto;height:auto;font-weight:500;letter-spacing:0}
   .rf-chip:hover{background:var(--paper);border-color:var(--mute)}
@@ -245,13 +245,13 @@
   .rf-more-wrap{display:inline-flex;flex-wrap:wrap;gap:7px;align-items:center}
   .rf-more-chips{display:contents}
   .rf-more-chips[hidden]{display:none}
-  .rf-more-btn{font-size:12px;padding:5px 11px;border-radius:14px;border:1px dashed var(--line-strong);
+  .rf-more-btn{font-size:12px;padding:5px 11px;border-radius: 0;border:1px dashed var(--line-strong);
     background:transparent;color:var(--mute);cursor:pointer;font-family:inherit;font-weight:500;
     line-height:1.2;width:auto;height:auto;letter-spacing:0}
   .rf-more-btn:hover{background:var(--paper);border-color:var(--mute);color:var(--navy)}
   .rf-clear{margin-top:11px}
   .rf-clear button{font-size:12px;padding:5px 12px;border:1px solid var(--line-strong);background:#fff;
-    border-radius:7px;cursor:pointer;font-family:inherit;color:var(--navy);
+    border-radius: 0;cursor:pointer;font-family:inherit;color:var(--navy);
     width:auto;height:auto;font-weight:500;letter-spacing:0}
   .rf-clear button:hover{background:var(--paper)}
   @media (max-width:760px){
@@ -263,7 +263,7 @@
     .rf-group{min-width:0;flex-basis:100%}
   }
   .job{border-bottom:1px solid var(--line);padding:18px 2px;display:block;
-    text-decoration:none;color:inherit;transition:background .12s;border-radius:6px}
+    text-decoration:none;color:inherit;transition:background .12s;border-radius: 0}
   .job:hover{background:#fff}
   .job:hover .title{color:var(--amber-deep)}
   .job-top{display:flex;justify-content:space-between;gap:14px;align-items:baseline}
@@ -272,7 +272,7 @@
   .loc{color:var(--mute);font-size:13.5px;margin-top:4px}
   .tag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.06em;
     text-transform:uppercase;background:rgba(217,138,43,.13);color:var(--amber-deep);
-    padding:3px 8px;border-radius:5px;margin-top:9px;margin-right:6px}
+    padding:3px 8px;border-radius: 0;margin-top:9px;margin-right:6px}
   .tag.blue{background:rgba(37,99,168,.12);color:#2563a8}
   .tag.green{background:rgba(31,122,77,.12);color:#1f7a4d}
   .tag.gray{background:#f1f2f4;color:var(--mute)}
@@ -280,11 +280,11 @@
 
   .tag.risk{background:rgba(185,88,35,.12);color:#9a4b1f}
   .tag.strong{background:rgba(31,122,77,.12);color:#1f7a4d}
-  .tag.warn{background:rgba(217,138,43,.15);color:#b6701c}
+  .tag.warn{background:rgba(217,138,43,.15);color:#47688a}
   /* Experience tiers — reuse the existing green/amber/orange palette so the
      chips read as the same family as the sponsorship badges. */
   .tag.tier-ok{background:rgba(31,122,77,.12);color:#1f7a4d}
-  .tag.tier-mid{background:rgba(217,138,43,.15);color:#b6701c}
+  .tag.tier-mid{background:rgba(217,138,43,.15);color:#47688a}
   .tag.tier-warn{background:rgba(185,88,35,.14);color:#9a4b1f}
   /* Above the guide's 3-5yr ceiling. Visually distinct from tier-warn: that
      one means "hard"; this one means "no". Reads as a stop, not a caution. */
@@ -295,7 +295,7 @@
 
   /* --- Employer H-1B sponsorship-history note (on 🟡 unknown jobs) --- */
   .sponsor-history{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:9px 12px;
-    border-radius:8px;font-size:12.5px;line-height:1.5;border:1px solid var(--line-strong);
+    border-radius: 0;font-size:12.5px;line-height:1.5;border:1px solid var(--line-strong);
     background:#faf7f0;color:var(--navy)}
   .sponsor-history.sh-strong{border-color:rgba(31,122,77,.35);background:rgba(31,122,77,.06)}
   .sponsor-history.sh-moderate{border-color:rgba(217,138,43,.35);background:rgba(217,138,43,.07)}
@@ -307,7 +307,7 @@
   /* --- Saved-job / applied controls on each result card --- */
   .job-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
   .jbtn{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;
-    padding:5px 11px;border-radius:999px;border:1px solid var(--line-strong);
+    padding:5px 11px;border-radius: 0;border:1px solid var(--line-strong);
     background:#fff;color:var(--navy);cursor:pointer;transition:all .12s;line-height:1.2;
     width:auto;flex:0 0 auto;white-space:nowrap}
   .jbtn:hover{border-color:var(--amber);color:var(--amber-deep)}
@@ -328,7 +328,7 @@
   /* --- On-screen source-health panel (dev instrument) --- */
   .health-panel{position:fixed;inset:0;z-index:1000;background:rgba(20,28,40,.45);
     display:flex;align-items:center;justify-content:center;padding:18px}
-  .health-card{background:#fff;border-radius:14px;max-width:440px;width:100%;
+  .health-card{background:#fff;border-radius: 0;max-width:440px;width:100%;
     max-height:82vh;overflow:auto;box-shadow:0 18px 50px rgba(0,0,0,.28);
     padding:18px 20px 20px}
   .health-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -345,7 +345,7 @@
   .hp-table td{padding:7px 6px;border-bottom:1px solid var(--line)}
   .hp-src{font-weight:600;color:var(--navy)}
   .hp-num{text-align:right;color:var(--navy);font-variant-numeric:tabular-nums}
-  .hp-rate{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px}
+  .hp-rate{display:inline-block;padding:2px 8px;border-radius: 0;font-weight:700;font-size:12px}
   .hp-note{font-size:12px;color:var(--mute);line-height:1.5;margin:12px 0 4px}
   .hp-note strong{color:var(--navy)}
   .hp-actions{display:flex;gap:8px;margin-top:12px}
@@ -368,18 +368,18 @@
   .savedjobs-cue-wrap{margin:2px 0 4px}
   .install-banner{display:flex;align-items:center;justify-content:space-between;gap:14px;
     flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-left:3px solid var(--amber);
-    border-radius:10px;padding:12px 16px;margin-bottom:14px}
+    border-radius: 0;padding:12px 16px;margin-bottom:14px}
   .install-banner .ib-text{font-size:13.5px;color:var(--navy);line-height:1.4}
   .install-banner .ib-text b{color:var(--amber-deep)}
   .install-banner .ib-actions{display:flex;gap:8px;flex:none}
-  .install-banner .ib-install{background:var(--navy);color:#fff;border:none;border-radius:7px;
+  .install-banner .ib-install{background:var(--navy);color:#fff;border:none;border-radius: 0;
     padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
   .install-banner .ib-install:hover{background:var(--navy-deep)}
   .install-banner .ib-dismiss{background:transparent;color:var(--mute);border:none;
     padding:8px 8px;font-size:13px;cursor:pointer}
   .install-banner .ib-dismiss:hover{color:var(--navy)}
   .savedjobs-cue{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;
-    padding:6px 13px;border-radius:999px;border:1px solid var(--line-strong);background:#fff;
+    padding:6px 13px;border-radius: 0;border:1px solid var(--line-strong);background:#fff;
     color:var(--navy);cursor:pointer;transition:all .12s;line-height:1.2}
   .savedjobs-cue:hover{border-color:var(--amber);color:var(--amber-deep)}
   .savedjobs-cue .sjc-star{color:var(--amber-deep);font-size:14px;line-height:1}
@@ -392,34 +392,34 @@
      leads the toolbar; CSV stays as the unlimited-size fallback. */
   .jbtn.primary-tool{background:#eaf4ec;border-color:#1f7a4d;color:#1f7a4d;font-weight:700}
   .jbtn.primary-tool:hover{background:#d9ecdf}
-  .savedjobs-warn{border-left:3px solid #b6701c;padding-left:10px}
+  .savedjobs-warn{border-left:3px solid #47688a;padding-left:10px}
 
   /* (7) Top-level sponsorship toggle — deliberately quiet. It sits under the
      search row as an amber-tinted card so it reads as an available option for
      the students who need it, without shouting at the ~90% who don't. */
   .sponsor-toplevel{margin-top:14px}
   .sponsor-toggle{display:flex;align-items:flex-start;gap:11px;padding:12px 15px;
-    background:#fdf3e6;border:1px solid #e8c99a;border-left:4px solid #b6701c;
-    border-radius:9px;cursor:pointer;max-width:760px}
+    background:#fdf3e6;border:1px solid #e8c99a;border-left:4px solid #47688a;
+    border-radius: 0;cursor:pointer;max-width:760px}
   .sponsor-toggle:hover{background:#fcecd9}
   .sponsor-toggle input{margin-top:3px;flex:0 0 auto;cursor:pointer;
-    width:17px;height:17px;accent-color:#b6701c}
+    width:17px;height:17px;accent-color:#47688a}
   .sponsor-toggle-text{display:block;line-height:1.45}
   .sponsor-toggle-text b{color:#8a4a1a;font-size:15px}
   .sponsor-pill{display:inline-block;margin-left:9px;font-size:10.5px;font-weight:600;
     letter-spacing:.04em;text-transform:uppercase;color:#7a5a12;background:#f0dfba;
-    border:1px solid #d9bd7f;padding:2px 8px;border-radius:20px;vertical-align:middle}
+    border:1px solid #d9bd7f;padding:2px 8px;border-radius: 0;vertical-align:middle}
   .sponsor-toggle-text .hint{display:block;margin-top:3px}
-  .sponsor-toggle:focus-within{outline:2px solid #b6701c;outline-offset:2px}
+  .sponsor-toggle:focus-within{outline:2px solid #47688a;outline-offset:2px}
   @media (max-width:640px){
     .sponsor-toggle{padding:11px 13px}
     .sponsor-toggle-text b{font-size:14px}
   }
   .sponsor-filter label{font-size:12px;color:var(--mute);margin-right:6px}
   .sponsor-filter select{font-size:16px;padding:4px 8px;border:1px solid var(--line-strong);
-    border-radius:6px;background:#fff;color:var(--navy)}
+    border-radius: 0;background:#fff;color:var(--navy)}
   .sponsor-note{margin-top:6px;font-size:12.5px;font-weight:400;color:var(--mute);
-    background:#f4f1ea;padding:8px 12px;border-radius:8px;line-height:1.5}
+    background:#f4f1ea;padding:8px 12px;border-radius: 0;line-height:1.5}
   .job.direct{background:#fff;border:1px solid var(--line);padding-left:14px;padding-right:14px;margin-top:10px}
   .direct-heading{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:24px 0 4px}
 
@@ -427,7 +427,7 @@
   .searchlink-note{font-size:13.5px;color:var(--mute);max-width:76ch;margin:0 0 12px}
   .searchlink-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   @media(max-width:700px){.searchlink-grid{grid-template-columns:1fr}}
-  .searchlink-card{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid var(--line);border-radius:8px;padding:13px 14px}
+  .searchlink-card{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid var(--line);border-radius: 0;padding:13px 14px}
   .searchlink-card:hover{border-color:var(--amber);background:#fff}
   .searchlink-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:3px}
   .searchlink-arrow{color:var(--amber-deep);font-weight:700;transition:transform .12s;display:inline-block}
@@ -437,7 +437,7 @@
   .suggestions{margin-top:28px;border-top:1px solid var(--line);padding-top:20px}
   .suggestion-note{font-size:13.5px;color:var(--mute);max-width:72ch;margin:0 0 12px}
   .suggestion-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-  .suggestion-card{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid var(--line);border-radius:8px;padding:13px 14px}
+  .suggestion-card{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid var(--line);border-radius: 0;padding:13px 14px}
   .suggestion-card:hover{border-color:var(--amber);background:#fff}
   .suggestion-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:3px}
   .suggestion-meta{font-size:12.5px;color:var(--mute);line-height:1.35}
@@ -466,7 +466,7 @@
   .wrap details.profilebar{
     background:#fff !important;
     border:1px solid var(--line) !important;
-    border-radius:10px !important;
+    border-radius: 0 !important;
     box-shadow:none !important;
     margin:14px 0 !important;
     padding:0 !important;
@@ -557,7 +557,7 @@
     height:44px !important;
     font-size:16px !important;
     padding:9px 34px 9px 12px !important;
-    border-radius:7px !important;
+    border-radius: 0 !important;
   }
 
   .wrap details.advancedbar .advanced-body{
@@ -596,12 +596,12 @@
   }
 
 
-  .thin-note{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;color:var(--mute);font-size:13.5px}
+  .thin-note{background:#fff;border:1px solid var(--line);border-radius: 0;padding:14px 16px;margin:14px 0;color:var(--mute);font-size:13.5px}
   .thin-note strong{color:var(--navy)}
 
 
   .empty-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:16px auto 0;max-width:720px}
-  .loosen-btn{width:auto;height:auto;padding:8px 12px;border:1px solid var(--line-strong);border-radius:999px;background:#fff;color:var(--navy);font-size:13px;font-weight:600}
+  .loosen-btn{width:auto;height:auto;padding:8px 12px;border:1px solid var(--line-strong);border-radius: 0;background:#fff;color:var(--navy);font-size:13px;font-weight:600}
   .loosen-btn:hover{border-color:var(--amber);color:var(--amber-deep);background:#fff}
 
 
@@ -609,7 +609,7 @@
   .empty h2,.empty h3{font-size:20px;line-height:1.25;margin-bottom:6px;color:var(--navy)}
   .empty p{font-size:14px;line-height:1.45;color:var(--mute);max-width:620px;margin:0 auto 12px}
   .empty-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px auto 0;max-width:720px}
-  .loosen-btn{width:auto;height:auto;padding:8px 12px;border:1px solid var(--line-strong);border-radius:999px;background:#fff;color:var(--navy);font-size:13px;font-weight:600}
+  .loosen-btn{width:auto;height:auto;padding:8px 12px;border:1px solid var(--line-strong);border-radius: 0;background:#fff;color:var(--navy);font-size:13px;font-weight:600}
   .loosen-btn:hover{border-color:var(--amber);color:var(--amber-deep);background:#fff}
 
   /* Brand-bar coaching link */
@@ -620,13 +620,13 @@
 
   /* Slim coaching prompt below results */
   .coaching-prompt{display:flex;align-items:center;gap:18px;justify-content:space-between;
-    background:var(--navy-bar);color:#fff;border-radius:12px;padding:18px 24px;margin:24px 0 8px;
+    background:var(--navy-bar);color:#fff;border-radius: 0;padding:18px 24px;margin:24px 0 8px;
     text-decoration:none;transition:all .12s;flex-wrap:wrap}
   .coaching-prompt:hover{background:var(--navy-deep)}
   .coaching-prompt .cp-text{font-size:14px;line-height:1.55;color:#dbe3ef;max-width:70ch}
   .coaching-prompt .cp-text strong{color:#fff}
   .coaching-prompt .cp-go{flex:none;font-size:13.5px;font-weight:700;color:#1a1a1a;
-    background:var(--amber);padding:9px 18px;border-radius:8px;white-space:nowrap}
+    background:var(--amber);padding:9px 18px;border-radius: 0;white-space:nowrap}
   .coaching-prompt:hover .cp-go{background:#e89a3c}
 
 
@@ -675,6 +675,21 @@
 </style>
 
 <script data-goatcounter="https://coachjeff-jobfinder.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap" />
+<style id="cj-industry-skin">
+  :root { --cj-accent:#5980a6; --cj-ink:#1d1f20; --cj-ground:#f2f2f3; }
+  body { background: var(--cj-ground) !important; color: var(--cj-ink);
+         font-family: 'Barlow', system-ui, sans-serif !important; }
+  h1,h2,h3,h4,h5,h6,button,select { font-family: 'Barlow Condensed','Barlow',sans-serif !important; letter-spacing: .01em; }
+  button, a[style], input, select, textarea { border-radius: 0 !important; }
+  button, a.btn { min-height: 44px; }
+  input, select, textarea { min-height: 44px; }
+  *:focus-visible { outline: 2px solid var(--cj-accent) !important; outline-offset: 2px; }
+  ::selection { background: rgba(89,128,166,.22); }
+  ::-webkit-scrollbar-thumb { background: #b9b9bd !important; border-radius: 0 !important; }
+</style>
 </head>
 <body>
 <div class="brandbar">
@@ -960,17 +975,17 @@
   </a>
 
   <div style="margin:8px 0 0;padding-top:24px;border-top:1px solid #e2e8f0;">
-    <div style="margin:0 0 32px;padding:18px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+    <div style="margin:0 0 32px;padding:18px 20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius: 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
       <div style="font-weight:600;font-size:15px;color:#1e293b;margin-bottom:4px;">Quick feedback on the Job Finder?</div>
       <div style="font-size:15px;color:#64748b;margin-bottom:14px;">Tell me what worked or what you'd change — I read every note.</div>
       <form name="jobfinder-feedback" method="POST" action="/thanks.html" data-netlify="true" netlify-honeypot="bot-field" id="jf-fb-form">
         <input type="hidden" name="form-name" value="jobfinder-feedback" />
         <input type="hidden" name="tool" value="job-finder" />
         <p style="display:none"><label>Skip: <input name="bot-field" /></label></p>
-        <textarea name="message" required placeholder="Your feedback…" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:16px;color:#1e293b;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:9px;min-height:70px;resize:vertical;background:#fff;"></textarea>
+        <textarea name="message" required placeholder="Your feedback…" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:16px;color:#1e293b;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius: 0;min-height:70px;resize:vertical;background:#fff;"></textarea>
         <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center;">
-          <input type="email" name="email" placeholder="Email (optional, for a reply)" style="flex:1;min-width:180px;box-sizing:border-box;font-family:inherit;font-size:16px;color:#1e293b;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;" />
-          <button type="submit" style="font-family:inherit;font-weight:600;font-size:14px;color:#fff;background:#1f5c8f;border:none;padding:10px 20px;border-radius:9px;cursor:pointer;">Send</button>
+          <input type="email" name="email" placeholder="Email (optional, for a reply)" style="flex:1;min-width:180px;box-sizing:border-box;font-family:inherit;font-size:16px;color:#1e293b;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius: 0;background:#fff;" />
+          <button type="submit" style="font-family:inherit;font-weight:600;font-size:14px;color:#fff;background:#1f5c8f;border:none;padding:10px 20px;border-radius: 0;cursor:pointer;">Send</button>
         </div>
       </form>
     </div>
@@ -1006,14 +1021,14 @@
 .cj-legal-links a:hover{opacity:.75}
 .cj-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:flex-start;justify-content:center;background:rgba(15,23,42,.55);padding:5vh 16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .cj-modal.cj-open{display:flex}
-.cj-modal-card{background:#fff;color:#1e293b;max-width:680px;width:100%;border-radius:16px;box-shadow:0 20px 60px rgba(15,23,42,.3);padding:28px 30px 34px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.6}
+.cj-modal-card{background:#fff;color:#1e293b;max-width:680px;width:100%;border-radius: 0;box-shadow:0 20px 60px rgba(15,23,42,.3);padding:28px 30px 34px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.6}
 .cj-modal-card h2{font-size:1.35rem;margin:0 0 4px}
-.cj-modal-card h3{font-size:1.08rem;margin:26px 0 6px;color:#12203a}
+.cj-modal-card h3{font-size:1.08rem;margin:26px 0 6px;color:#1d1f20}
 .cj-modal-card h3:first-of-type{margin-top:14px}
 .cj-modal-card p{font-size:.95rem;margin:0 0 10px;color:#374151}
 .cj-modal-card .cj-meta{font-size:.82rem;color:#64748b;margin-top:-2px}
 .cj-modal-close{float:right;background:none;border:none;font-size:1.5rem;line-height:1;color:#64748b;cursor:pointer;margin:-6px -6px 0 0}
-.cj-modal-close:hover{color:#12203a}
+.cj-modal-close:hover{color:#1d1f20}
 .cj-legal-note{margin-top:22px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:.82rem;color:#64748b}
 </style>
 <div class="cj-modal" id="cj-legal-modal" role="dialog" aria-modal="true" aria-labelledby="cj-legal-title" tabindex="-1">
@@ -1043,7 +1058,7 @@
 <p><strong>Contact.</strong> Questions about privacy? Reach Jeff Burke at <a href="mailto:jburke8111@gmail.com">jburke8111@gmail.com</a> or through the feedback form on the homepage.</p></div>
     <div id="cj-disclaimer"><h3>Disclaimer</h3>
 <p>This free tool is for informational and educational purposes only and provides no guarantee of employment or any specific outcome. It is not legal, financial, tax, immigration, or employment advice. Review and verify everything before you use it.</p></div>
-    <p class="cj-legal-note">These free tools are provided by Jeff Burke &mdash; Experience Career System. This information is general and not a substitute for professional advice.</p>
+    <p class="cj-legal-note">These free tools are provided by Jeff Burke &mdash; Experience Career System™. This information is general and not a substitute for professional advice.</p>
   </div>
 </div>
 <script>
