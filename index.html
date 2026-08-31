@@ -689,6 +689,22 @@
   *:focus-visible { outline: 2px solid var(--cj-accent) !important; outline-offset: 2px; }
   ::selection { background: rgba(89,128,166,.22); }
   ::-webkit-scrollbar-thumb { background: #b9b9bd !important; border-radius: 0 !important; }
+
+  /* Mobile reflow — the app's inline grids are fixed-column and never collapse.
+     These overrides only apply under 820px and only relax layout, never restyle. */
+  @media (max-width: 820px) {
+    html, body { overflow-x: hidden; }
+    [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+    [style*="display: flex"] { flex-wrap: wrap !important; }
+    [style*="min-width"] { min-width: 0 !important; }
+    [style*="white-space: nowrap"] { white-space: normal !important; }
+    [style*="position: sticky"] { position: static !important; }
+    img, canvas, svg, table, pre { max-width: 100% !important; }
+    input, select, textarea, button { max-width: 100% !important; }
+  }
+  @media (max-width: 480px) {
+    [style*="font-size: 4"], h1 { line-height: 1.06 !important; }
+  }
 </style>
 </head>
 <body>
