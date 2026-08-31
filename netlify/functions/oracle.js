@@ -54,6 +54,7 @@ const SUBDEGREE_TITLE_RX = new RegExp(
     "\\bLVN\\b", "\\bLPN\\b", "\\bCNA\\b", "\\bC\\.N\\.A\\b",
     "certified nursing assistant", "nursing assistant", "nurse assistant",
     "patient care (tech|technician|assistant)", "\\bPCT\\b", "\\bPCA\\b",
+    "nurse tech(nician)?", "nurse extern", "\\bstudent nurse\\b",
     "medical assistant", "\\bMA\\b(?![a-z])", "phlebotom", "\\bEMT\\b",
     "surg(ical)? tech", "surgical technolog", "sterile process",
     "pharmacy tech", "\\bCPhT\\b", "monitor tech", "telemetry tech",
@@ -71,7 +72,7 @@ const DEGREE_REQ_RX = /\b(bachelor|baccalaureate|\bBS\b|\bBSN\b|\bBA\b|master|\b
 
 // ---- Experience gate (early-career default) -------------------------------
 const SENIOR_RX = /\b(senior|sr\.?|lead|principal|staff|manager|mgr|director|head of|vp|vice president|chief|supervisor|coordinator (iii|iv|v)|ii{2,})\b/i;
-const EXPERIENCED_NURSE_RX = /\b(charge nurse|nurse examiner|forensic nurse|sexual assault nurse|nurse manager|clinical nurse (specialist|lead)|nurse practitioner|\bNP\b|\bCRNA\b)\b/i;
+const EXPERIENCED_NURSE_RX = /\b(charge nurse|nurse examiner|forensic nurse|sexual assault nurse|nurse manager|nurse educator|clinical nurse (specialist|lead|educator)|nurse practitioner|\bNP\b|\bCRNA\b)\b/i;
 const EARLY_HINT_RX = /\b(new grad|new graduate|resident|residency|entry.?level|early career|associate|\bi\b|\bintern\b|internship|junior|jr\.?|graduate program|trainee)\b/i;
 
 function isEarlyCareer(title) {
@@ -174,13 +175,11 @@ function passesFilters(job, { keyword, level }) {
     if (!isEarlyCareer(job.title)) return false;
   }
 
-  // Keyword AND-match on title (Oracle already keyword-filtered server-side,
-  // but we re-assert token-AND locally for consistency with other sources).
-  if (keyword && keyword.trim()) {
-    const toks = keyword.toLowerCase().split(/\s+/).filter(Boolean);
-    const hay = job.title.toLowerCase();
-    if (!toks.every((t) => hay.includes(t))) return false;
-  }
+  // NOTE: no local keyword re-filter. Oracle's finder already keyword-filters
+  // server-side, and it matches across title + description + category — broader
+  // than the title text. Re-asserting title-only AND-match here wrongly cut
+  // good early-career roles ("RN Resident", "Graduate Nurse") whose titles
+  // don't contain the literal search token. Trust the server keyword filter.
 
   return true;
 }
