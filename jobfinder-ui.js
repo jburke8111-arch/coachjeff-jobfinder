@@ -600,6 +600,7 @@ function renderJob(j, kw, loc){
             ${j.source === 'careeronestop' ? '<span class="tag gray">CareerOneStop (DOL)</span>' : ''}
             ${j.source === 'mcloud' ? '<span class="tag gray">CareerBuilder</span>' : ''}
             ${j.source === 'phenom' ? '<span class="tag gray">Hospital System</span>' : ''}
+            ${j.source === 'oracle' ? '<span class="tag gray">Hospital System</span>' : ''}
             ${j.source === 'workday' ? '<span class="tag gray">Workday</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
@@ -1080,7 +1081,7 @@ async function search(){
     const directOnlySelection = company !== 'any' && selectedDirect.length > 0 && pool.length === 0 && !ibmLiveSelection && !workdayOnlySelection;
 
     let jobs = [];
-    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, mcloud:0, phenom:0, workday:0 };
+    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, mcloud:0, phenom:0, oracle:0, workday:0 };
     let okCos = 0, failCos = 0;
 
     // ---- (1) All six sources start NOW, in parallel ---------------------------
@@ -1140,6 +1141,7 @@ async function search(){
       apiSource('careeronestop',  fetchCareerOneStop),
       apiSource('mcloud',         fetchMCloud),
       apiSource('phenom',         fetchPhenom),
+      apiSource('oracle',         fetchOracle),
       apiSource('workday',        fetchWorkday),
     ]));
 
@@ -1579,6 +1581,7 @@ async function search(){
       { label: 'CareerOneStop',   key: 'careeronestop' },
       { label: 'CareerBuilder',   key: 'mcloud' },
       { label: 'Hospital Systems', key: 'phenom' },
+      { label: 'Hospital (Oracle)', key: 'oracle' },
       { label: 'Workday',         key: 'workday' },
     ];
     const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + ${API_SOURCES.map(s=>s.label).join(' + ')} searched`;
@@ -1630,6 +1633,7 @@ async function search(){
       careeronestop: sourceStats.careeronestop,
       mcloud: sourceStats.mcloud,
       phenom: sourceStats.phenom,
+      oracle: sourceStats.oracle,
       workday: sourceStats.workday,
       adzunaResolved: sourceStats.adzunaResolved || 0,
       boardsOk: okCos, boardsFail: failCos,
@@ -1909,7 +1913,7 @@ function logSourceHealth(rec){
         `USAJobs ${rec.usajobs}, Adzuna ${rec.adzuna}, Ashby ${rec.ashby}, ` +
         `Greenhouse ${rec.greenhouse}, Lever ${rec.lever||0}, SmartRecruiters ${rec.smartrecruiters||0}, ` +
         `The Muse ${rec.themuse||0}, CareerOneStop ${rec.careeronestop||0}, CareerBuilder ${rec.mcloud||0}, ` +
-        `Hospital systems ${rec.phenom||0}, Workday ${rec.workday||0} → ${rec.matched} matched`
+        `Hospital systems ${rec.phenom||0}, Hospital-Oracle ${rec.oracle||0}, Workday ${rec.workday||0} → ${rec.matched} matched`
       );
     }
   } catch(e){ /* storage full or blocked — ignore, never break search */ }
@@ -1934,6 +1938,7 @@ function computeHealthSummary(){
     ['CareerOneStop','careeronestop'],
     ['CareerBuilder','mcloud'],
     ['Hospital systems','phenom'],
+    ['Hospital (Oracle)','oracle'],
     ['Workday','workday']
   ];
   const rows = sources.map(([label,key])=>{
@@ -1973,7 +1978,7 @@ function coachJeffHealth(showRecent){
       Ashby: r.ashby, Greenhouse: r.greenhouse, Lever: r.lever||0,
       SmartRecruiters: r.smartrecruiters||0, 'The Muse': r.themuse||0,
       CareerOneStop: r.careeronestop||0, CareerBuilder: r.mcloud||0,
-      'Hospital systems': r.phenom||0, Workday: r.workday||0,
+      'Hospital systems': r.phenom||0, 'Hospital (Oracle)': r.oracle||0, Workday: r.workday||0,
       matched: r.matched
     }));
     console.log(`%cLast ${k} searches`, 'font-weight:bold');
