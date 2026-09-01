@@ -276,6 +276,41 @@ async function fetchPhenom(keyword, location){
   }
 }
 
+// Fetch Oracle Fusion / Oracle Cloud Recruiting (ORC) employers via our /oracle
+// function. Like Phenom, one function serves every employer in the server-side
+// ORACLE_EMPLOYERS roster (Providence seeded — fills the California gap across
+// AK/CA/MT/NM/OR/TX/WA). The Candidate Experience API is public/keyless. List
+// descriptions are truncated, so these are inline (no checkjobs enrich).
+// Returns [] on any failure so it never breaks the rest of the search.
+async function fetchOracle(keyword, location){
+  try {
+    const params = new URLSearchParams();
+    if(keyword) params.set('keyword', keyword);
+    if(location) params.set('location', location);
+    const resp = await fetch('/.netlify/functions/oracle?' + params.toString());
+    if(!resp.ok) return [];
+    const data = await resp.json();
+    if(!(data && Array.isArray(data.jobs))) return [];
+    return data.jobs
+      .filter(j => j && j.url)
+      .map(j => ({
+        title: j.title || 'Untitled role',
+        company: j.employer || 'Employer',
+        board: j.employer || '',
+        sector: 'healthcare',
+        location: j.location || '—',
+        url: j.url,
+        posted: j.postedDate || null,
+        salary: '',
+        source: 'oracle',
+        id: (j.id != null ? j.id : ('oracle-' + (j.url||''))),
+        ats: 'orc'
+      }));
+  } catch(e){
+    return [];
+  }
+}
+
 // ---- Workday-hosted employers -------------------------------------------
 // Workday powers the careers site of a huge share of large employers. Every
 // Workday tenant is backed by the same JSON endpoint, so ONE Netlify function

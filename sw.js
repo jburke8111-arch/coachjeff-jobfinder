@@ -12,7 +12,7 @@
  *  - Bumping CACHE_VERSION on deploy retires the old cache automatically.
  */
 
-const CACHE_VERSION = 'jobfinder-v2';
+const CACHE_VERSION = 'jobfinder-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
