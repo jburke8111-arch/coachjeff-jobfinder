@@ -47,6 +47,25 @@ const ORACLE_EMPLOYERS = [
   // The site number (CX_1, CX_2, ...) is in that URL path.
 ];
 
+// ---- State name <-> abbreviation maps (for location filtering) ------------
+// Oracle stores "City, ST, United States"; users type full state names.
+const STATE_TO_ABBR = {
+  "alabama":"al","alaska":"ak","arizona":"az","arkansas":"ar","california":"ca",
+  "colorado":"co","connecticut":"ct","delaware":"de","florida":"fl","georgia":"ga",
+  "hawaii":"hi","idaho":"id","illinois":"il","indiana":"in","iowa":"ia",
+  "kansas":"ks","kentucky":"ky","louisiana":"la","maine":"me","maryland":"md",
+  "massachusetts":"ma","michigan":"mi","minnesota":"mn","mississippi":"ms","missouri":"mo",
+  "montana":"mt","nebraska":"ne","nevada":"nv","new hampshire":"nh","new jersey":"nj",
+  "new mexico":"nm","new york":"ny","north carolina":"nc","north dakota":"nd","ohio":"oh",
+  "oklahoma":"ok","oregon":"or","pennsylvania":"pa","rhode island":"ri","south carolina":"sc",
+  "south dakota":"sd","tennessee":"tn","texas":"tx","utah":"ut","vermont":"vt",
+  "virginia":"va","washington":"wa","west virginia":"wv","wisconsin":"wi","wyoming":"wy",
+  "district of columbia":"dc",
+};
+const ABBR_TO_STATE = Object.fromEntries(
+  Object.entries(STATE_TO_ABBR).map(([name, abbr]) => [abbr, name])
+);
+
 // ---- Sub-degree exclusion (ported from mcloud.js) -------------------------
 // Jeff's audience is degree-seekers; drop credentials below a bachelor's.
 const SUBDEGREE_TITLE_RX = new RegExp(
@@ -276,9 +295,28 @@ exports.handler = async (event) => {
 
   // Optional location post-filter (Oracle facets are richer, but keep a simple
   // client-parity contains-match here for typed city/state).
+  // IMPORTANT: Oracle stores locations as "City, ST, United States" (abbrev),
+  // but users type full state names ("California"). Expand each token to include
+  // its state-abbrev counterpart (and vice versa) so both match. Without this,
+  // "California" -> 0 while "CA" -> many (confirmed bug, Aug 31).
   let jobs = Array.from(byId.values());
   if (location && location.trim()) {
-    const locToks = location.toLowerCase().split(/[\s,]+/).filter(Boolean);
+    const baseToks = location.toLowerCase().split(/[\s,]+/).filter(Boolean);
+    const expanded = new Set(baseToks);
+    // full state name -> abbrev
+    for (const t of baseToks) {
+      if (STATE_TO_ABBR[t]) expanded.add(STATE_TO_ABBR[t]);
+      if (ABBR_TO_STATE[t]) {
+        // abbrev -> full name tokens (e.g. "ca" -> "california")
+        for (const w of ABBR_TO_STATE[t].split(" ")) expanded.add(w);
+      }
+    }
+    // handle two-word state names typed in full (e.g. "new york") by also
+    // mapping the joined phrase to its abbrev
+    const joined = baseToks.join(" ");
+    if (STATE_TO_ABBR[joined]) expanded.add(STATE_TO_ABBR[joined]);
+
+    const locToks = Array.from(expanded);
     jobs = jobs.filter((j) => {
       const hay = (j.allLocations.join(" ")).toLowerCase();
       return locToks.some((t) => hay.includes(t));
