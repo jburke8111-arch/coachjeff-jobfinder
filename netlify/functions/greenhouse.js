@@ -462,12 +462,12 @@ export default async (request) => {
           }
 
           if (location) {
+            // Only "remote" is honored server-side; all other location matching
+            // is delegated to the client's locationMatches() (full state-alias
+            // map, OR across multi-site strings). A naive searchable.includes(
+            // location) broke on "California" vs "…, CA". Mirrors workday.js.
             const isRemoteSearch = location === "remote";
-            if (isRemoteSearch) {
-              if (!/remote/i.test(loc)) continue;
-            } else if (!searchable.includes(location)) {
-              continue;
-            }
+            if (isRemoteSearch && !/remote/i.test(loc)) continue;
           }
 
           out.push({

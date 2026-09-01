@@ -268,7 +268,10 @@ export default async (request) => {
             const terms = keyword.split(/\s+/).filter(Boolean);
             if (!terms.every(t => text.includes(t))) continue;
           }
-          if (location && location !== "remote" && !text.includes(location)) continue;
+          // Location is NOT filtered here — the client's locationMatches() is the
+          // single source of truth (full 50-state alias map, OR across multi-site
+          // strings). A naive server-side text.includes(location) broke on
+          // "California" vs "…, CA" data. Mirrors workday.js / themuse.js.
 
           let salary = "";
           if (j.compensation && j.compensation.scrapeableCompensationSalarySummary) {

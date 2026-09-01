@@ -119,14 +119,14 @@ function matchesKeywords(job, tokens) {
   return tokens.every(t => hay.includes(t));
 }
 
-// --- Location filter (optional; matches city/state/zip substrings) ------------
+// --- Location filter (DELEGATED to client) ------------------------------------
+// Server-side location filtering is intentionally disabled: the client's
+// locationMatches() is the single source of truth (full 50-state alias map, OR
+// across multi-site strings). A naive hay.includes(location) broke on
+// "California" vs "…, CA" data. Mirrors workday.js / themuse.js. Kept as a
+// no-op so the call site and diag output are unchanged.
 function matchesLocations(job, locs) {
-  if (!locs.length) return true;
-  const hay = [
-    job.primary_city, job.primary_state, job.primary_zip, job.primary_country,
-    job.primary_location, job.addtnl_locations
-  ].filter(Boolean).join(" ").toLowerCase();
-  return locs.some(l => hay.includes(l));
+  return true;
 }
 
 function withTimeout(promise, ms, tag) {

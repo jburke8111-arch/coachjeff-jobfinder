@@ -158,13 +158,64 @@ function normalize(j, emp) {
   };
 }
 
+// State name <-> abbreviation, so a user typing "California" matches an
+// employer whose regions list only has "ca" (and vice versa). Region lists are
+// authored inconsistently (some have both forms, some one), so we expand the
+// typed location to include BOTH forms before matching. This is employer
+// SELECTION, not job filtering — Phenom can't defer this to the client (an
+// unqueried employer returns no jobs for the client to filter), so unlike the
+// other connectors the state logic has to live here.
+const _ST_TO_ABBR = {
+  "alabama":"al","alaska":"ak","arizona":"az","arkansas":"ar","california":"ca",
+  "colorado":"co","connecticut":"ct","delaware":"de","florida":"fl","georgia":"ga",
+  "hawaii":"hi","idaho":"id","illinois":"il","indiana":"in","iowa":"ia","kansas":"ks",
+  "kentucky":"ky","louisiana":"la","maine":"me","maryland":"md","massachusetts":"ma",
+  "michigan":"mi","minnesota":"mn","mississippi":"ms","missouri":"mo","montana":"mt",
+  "nebraska":"ne","nevada":"nv","new hampshire":"nh","new jersey":"nj","new mexico":"nm",
+  "new york":"ny","north carolina":"nc","north dakota":"nd","ohio":"oh","oklahoma":"ok",
+  "oregon":"or","pennsylvania":"pa","rhode island":"ri","south carolina":"sc",
+  "south dakota":"sd","tennessee":"tn","texas":"tx","utah":"ut","vermont":"vt",
+  "virginia":"va","washington":"wa","west virginia":"wv","wisconsin":"wi","wyoming":"wy",
+  "district of columbia":"dc",
+};
+const _ABBR_TO_ST = Object.fromEntries(Object.entries(_ST_TO_ABBR).map(([n,a]) => [a,n]));
+
+// Return the set of location tokens to match against employer regions: the raw
+// typed string plus any state-name/abbrev counterparts it implies.
+function expandLocationTokens(loc) {
+  const out = new Set();
+  if (!loc) return out;
+  out.add(loc);
+  const words = loc.split(/[\s,]+/).filter(Boolean);
+  for (const w of words) {
+    out.add(w);
+    if (_ST_TO_ABBR[w]) out.add(_ST_TO_ABBR[w]);
+    if (_ABBR_TO_ST[w]) for (const p of _ABBR_TO_ST[w].split(" ")) out.add(p);
+  }
+  if (_ST_TO_ABBR[loc]) out.add(_ST_TO_ABBR[loc]);          // full two-word name -> abbrev
+  if (_ABBR_TO_ST[loc]) _ABBR_TO_ST[loc].split(" ").forEach(p => out.add(p));
+  return out;
+}
+
 // pick which employers to query
 function selectEmployers(locStr) {
   const loc = (locStr || "").toLowerCase().trim();
   const national = PHENOM_EMPLOYERS.filter(e => e.national);
   const regional = PHENOM_EMPLOYERS.filter(e => !e.national);
   if (loc) {
-    const matched = regional.filter(e => (e.regions||[]).some(r => loc.includes(r) || r.includes(loc)));
+    const locTokens = expandLocationTokens(loc);
+    const matched = regional.filter(e =>
+      (e.regions || []).some(r =>
+        Array.from(locTokens).some(lt => {
+          // 2-char tokens (state abbrevs) must match EXACTLY — substring
+          // matching on "or"/"in"/"ma" etc. produces false hits inside city
+          // and state names. Longer tokens keep the contains-either behavior
+          // so "houston" matches a "houston" region and partial names work.
+          if (lt.length === 2 || r.length === 2) return lt === r;
+          return lt.includes(r) || r.includes(lt);
+        })
+      )
+    );
     return { list: [...national, ...matched], mode: "location" };
   }
   // blank location: national + rotating slice of regionals (day-based rotation)

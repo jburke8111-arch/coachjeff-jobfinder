@@ -288,13 +288,14 @@ export default async (request) => {
           }
 
           if (location) {
+            // Only the "remote" search is honored server-side (it keys off
+            // structured workplaceType, not a fragile text match). All other
+            // location matching is delegated to the client's locationMatches()
+            // — the single source of truth with the full state-alias map.
+            // A naive text.includes(location) broke on "California" vs "…, CA".
             const isRemoteSearch = location === "remote";
             const remoteish = j.workplaceType === "remote" || /remote/i.test(loc);
-            if (isRemoteSearch) {
-              if (!remoteish) continue;
-            } else if (!text.includes(location)) {
-              continue;
-            }
+            if (isRemoteSearch && !remoteish) continue;
           }
 
           // Scan BOTH description fields — Lever splits requirements across
