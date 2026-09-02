@@ -600,7 +600,6 @@ function renderJob(j, kw, loc){
             ${j.source === 'careeronestop' ? '<span class="tag gray">CareerOneStop (DOL)</span>' : ''}
             ${j.source === 'mcloud' ? '<span class="tag gray">CareerBuilder</span>' : ''}
             ${j.source === 'phenom' ? '<span class="tag gray">Hospital System</span>' : ''}
-            ${j.source === 'oracle' ? '<span class="tag gray">Hospital System</span>' : ''}
             ${j.source === 'workday' ? '<span class="tag gray">Workday</span>' : ''}
           </div>
           ${(()=>{ const sal = salaryEstimate(j); return sal ? `<div class="salary">${esc(sal)}</div>` : ''; })()}
@@ -950,6 +949,13 @@ function previewFilter(all, o){
 // call site (main filter, previewFilter, RF filter, scoreJob) passes its `loc`
 // straight through unchanged and gets correct OR behavior for free. The single
 // matcher below is the original function, renamed — its logic is untouched.
+// A genuine remote / location-flexible signal in a job's location text.
+// Deliberately EXCLUDES bare country names ("united states", "usa", "united
+// states of america") — those are country suffixes on normal on-site
+// locations, not remote indicators. Matching the country name here caused every
+// out-of-state job to surface on every state search.
+const REMOTE_SIGNAL_RX = /\b(remote|work from home|work-from-home|wfh|nationwide|anywhere in the (us|u\.s\.|country)|virtual|telework|telecommute)\b/;
+
 function locationMatches(locText, input){
   const list = splitLocations(input);
   if(list.length <= 1) return locationMatchesOne(locText, list[0] || input);
@@ -993,16 +999,22 @@ function locationMatchesOne(locText, input){
 
   // State-only search (e.g. "texas"): match if any alias of that state appears.
   if(!parsed.city && parsed.stateAliases){
-    // Broad remote/US postings are surfaced too, so a state search doesn't hide
-    // remote-US roles a student could take from that state.
-    if(/\b(remote|united states)\b/.test(loc)) return true;
+    // Surface genuinely location-flexible roles (remote / work-from-home /
+    // nationwide) on a state search, so a student isn't hidden from roles they
+    // could take from that state. IMPORTANT: match a real REMOTE signal only —
+    // NOT the bare country name. Many feeds append "United States of America"
+    // to a normal on-site location ("Toledo, Ohio, United States of America"),
+    // and treating that country suffix as "remote" surfaced every out-of-state
+    // job on every state search (confirmed bug: 129 non-TX jobs leaking into a
+    // "texas" search, all ending in "united states of america").
+    if(REMOTE_SIGNAL_RX.test(loc)) return true;
     return parsed.stateAliases.some(has);
   }
 
-  // Plain single term (a lone city, or free text). Treat broad remote/US
+  // Plain single term (a lone city, or free text). Treat genuinely-remote
   // postings as potentially relevant unless the user typed a 2-letter state.
   const term = parsed.city || parsed.terms[0];
-  if(/\b(remote|united states)\b/.test(loc) && term && term.length > 2
+  if(REMOTE_SIGNAL_RX.test(loc) && term && term.length > 2
      && !Object.values(STATE_ALIASES).some(arr => arr.includes(term))){
     return loc.includes(term);
   }
@@ -1081,7 +1093,7 @@ async function search(){
     const directOnlySelection = company !== 'any' && selectedDirect.length > 0 && pool.length === 0 && !ibmLiveSelection && !workdayOnlySelection;
 
     let jobs = [];
-    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, mcloud:0, phenom:0, oracle:0, workday:0 };
+    const sourceStats = { direct:0, usajobs:0, adzuna:0, ashby:0, greenhouse:0, lever:0, smartrecruiters:0, themuse:0, careeronestop:0, mcloud:0, phenom:0, workday:0 };
     let okCos = 0, failCos = 0;
 
     // ---- (1) All six sources start NOW, in parallel ---------------------------
@@ -1141,7 +1153,6 @@ async function search(){
       apiSource('careeronestop',  fetchCareerOneStop),
       apiSource('mcloud',         fetchMCloud),
       apiSource('phenom',         fetchPhenom),
-      apiSource('oracle',         fetchOracle),
       apiSource('workday',        fetchWorkday),
     ]));
 
@@ -1581,7 +1592,6 @@ async function search(){
       { label: 'CareerOneStop',   key: 'careeronestop' },
       { label: 'CareerBuilder',   key: 'mcloud' },
       { label: 'Hospital Systems', key: 'phenom' },
-      { label: 'Hospital (Oracle)', key: 'oracle' },
       { label: 'Workday',         key: 'workday' },
     ];
     const sourceLine = `${okCos} employer board${okCos===1?'':'s'} + ${API_SOURCES.map(s=>s.label).join(' + ')} searched`;
@@ -1633,7 +1643,6 @@ async function search(){
       careeronestop: sourceStats.careeronestop,
       mcloud: sourceStats.mcloud,
       phenom: sourceStats.phenom,
-      oracle: sourceStats.oracle,
       workday: sourceStats.workday,
       adzunaResolved: sourceStats.adzunaResolved || 0,
       boardsOk: okCos, boardsFail: failCos,
@@ -1913,7 +1922,7 @@ function logSourceHealth(rec){
         `USAJobs ${rec.usajobs}, Adzuna ${rec.adzuna}, Ashby ${rec.ashby}, ` +
         `Greenhouse ${rec.greenhouse}, Lever ${rec.lever||0}, SmartRecruiters ${rec.smartrecruiters||0}, ` +
         `The Muse ${rec.themuse||0}, CareerOneStop ${rec.careeronestop||0}, CareerBuilder ${rec.mcloud||0}, ` +
-        `Hospital systems ${rec.phenom||0}, Hospital-Oracle ${rec.oracle||0}, Workday ${rec.workday||0} → ${rec.matched} matched`
+        `Hospital systems ${rec.phenom||0}, Workday ${rec.workday||0} → ${rec.matched} matched`
       );
     }
   } catch(e){ /* storage full or blocked — ignore, never break search */ }
@@ -1938,7 +1947,6 @@ function computeHealthSummary(){
     ['CareerOneStop','careeronestop'],
     ['CareerBuilder','mcloud'],
     ['Hospital systems','phenom'],
-    ['Hospital (Oracle)','oracle'],
     ['Workday','workday']
   ];
   const rows = sources.map(([label,key])=>{
@@ -1978,7 +1986,7 @@ function coachJeffHealth(showRecent){
       Ashby: r.ashby, Greenhouse: r.greenhouse, Lever: r.lever||0,
       SmartRecruiters: r.smartrecruiters||0, 'The Muse': r.themuse||0,
       CareerOneStop: r.careeronestop||0, CareerBuilder: r.mcloud||0,
-      'Hospital systems': r.phenom||0, 'Hospital (Oracle)': r.oracle||0, Workday: r.workday||0,
+      'Hospital systems': r.phenom||0, Workday: r.workday||0,
       matched: r.matched
     }));
     console.log(`%cLast ${k} searches`, 'font-weight:bold');
