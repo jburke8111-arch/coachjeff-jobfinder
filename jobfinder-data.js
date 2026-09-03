@@ -539,6 +539,11 @@ const WORKDAY_EMPLOYERS = [
   { name:'Ochsner Health',   slug:'wd-ochsner',      tenant:'ochsner',      wd:'1',  site:'Ochsner',                 sector:'healthcare'  },
   { name:'Presbyterian Healthcare Services', slug:'wd-phs', tenant:'phsorg', wd:'1',  site:'Careers',                 sector:'healthcare'  },
   { name:'Banner Health',    slug:'wd-banner',       tenant:'bannerhealth', wd:'108',site:'Careers',                 sector:'healthcare'  },
+  // Advocate Health = the unified "aah" (Advocate Aurora Health) Workday tenant,
+  // parent of Atrium Health (NC/SC/GA/AL), Advocate (IL/IN), Aurora (WI/MI) +
+  // Wake Forest. One tenant covers the whole southeast + midwest footprint.
+  // Tenant coords from the External applicant login: aah.wd5.myworkdayjobs.com/External
+  { name:'Advocate Health',  slug:'wd-advocate',     tenant:'aah',          wd:'5',  site:'External',                sector:'healthcare'  },
   // Not Workday (verified): American Airlines, Baylor Scott & White, Comerica,
   // Texas Health, Charles Schwab, Intuit — these run Phenom/Taleo/iCIMS/custom
   // and can't use this function; they stay as their existing link-outs.
