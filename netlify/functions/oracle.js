@@ -42,6 +42,17 @@ const ORACLE_EMPLOYERS = [
     national: true,                     // 52 hospitals across 7 states
     regions: ["AK", "CA", "MT", "NM", "OR", "TX", "WA"],
   },
+  {
+    name: "Northwell Health",
+    host: "eppr.fa.us2.oraclecloud.com",
+    site: "CX_2",
+    sector: "healthcare",
+    national: true,                     // largest NY employer, ~61k, 21+ hospitals
+    regions: ["NY", "CT"],
+    // Careers front end is jobs.northwell.edu (Symphony Talent WordPress wrapper);
+    // real ATS is Oracle CE, found via apply_join_ats_url in the page config.
+    // Live ?diag test: TotalJobsCount 1292, clean "City, County/State, United States".
+  },
   // Add more Oracle Fusion employers here once each passes the live ?diag=1 test.
   // Find them: a careers apply flow that lands on *.oraclecloud.com/hcmUI/CandidateExperience/...
   // The site number (CX_1, CX_2, ...) is in that URL path.
