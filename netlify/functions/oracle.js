@@ -25,7 +25,7 @@
 
 const DEFAULT_TIME_BUDGET_MS = 9000;   // Netlify sync function hard limit is 10s
 const PER_REQUEST_TIMEOUT_MS = 3500;
-const POOL_SIZE = 6;                    // continuous-concurrency pool cap
+const POOL_SIZE = 8;                    // continuous-concurrency pool cap (raised from 6 so multiple employers' early pages run at once)
 const PAGE_LIMIT = 200;                 // Oracle accepts large page sizes; cuts round-trips
 const MAX_PAGES_PER_EMPLOYER = 6;       // safety cap (1200 reqs/employer) within budget
 
@@ -266,13 +266,15 @@ exports.handler = async (event) => {
   const employers = selectEmployers(userState);
   const diagInfo = { employers: employers.map((e) => e.name), errors: [], perEmployer: {} };
 
-  // Build one task per (employer, page). We do page 0 first to learn totals,
-  // then fan out remaining pages — but to keep it simple & within budget we
-  // just request MAX_PAGES_PER_EMPLOYER pages in parallel per employer and
-  // stop early when a page returns short.
+  // Build one task per (employer, page), INTERLEAVED page-major: every
+  // employer's page 0 before any employer's page 1, etc. Employer-major
+  // ordering let the first employer (Providence) saturate the POOL_SIZE
+  // worker pool and hit the deadline before later employers (Northwell) ran,
+  // so a 2nd employer silently returned nothing. Interleaving guarantees each
+  // employer gets an early worker slot.
   const tasks = [];
-  for (const emp of employers) {
-    for (let p = 0; p < MAX_PAGES_PER_EMPLOYER; p++) {
+  for (let p = 0; p < MAX_PAGES_PER_EMPLOYER; p++) {
+    for (const emp of employers) {
       tasks.push(async () => {
         const { list, total } = await fetchPage(emp.host, emp.site, {
           limit: PAGE_LIMIT,
