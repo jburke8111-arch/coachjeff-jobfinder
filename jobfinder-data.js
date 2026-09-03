@@ -544,6 +544,11 @@ const WORKDAY_EMPLOYERS = [
   // Wake Forest. One tenant covers the whole southeast + midwest footprint.
   // Tenant coords from the External applicant login: aah.wd5.myworkdayjobs.com/External
   { name:'Advocate Health',  slug:'wd-advocate',     tenant:'aah',          wd:'5',  site:'External',                sector:'healthcare'  },
+  // Sanford Health = largest US rural health system (~53k, 56 hospitals) across
+  // the Upper Midwest: SD/ND/MN/IA/WI/WY + MI Upper Peninsula. Includes Good
+  // Samaritan + Marshfield brands under the same tenant. Fills the emptiest region.
+  // Tenant coords from window.workday config: sanford.wd5.myworkdayjobs.com/SanfordHealth
+  { name:'Sanford Health',   slug:'wd-sanford',      tenant:'sanford',      wd:'5',  site:'SanfordHealth',           sector:'healthcare'  },
   // Not Workday (verified): American Airlines, Baylor Scott & White, Comerica,
   // Texas Health, Charles Schwab, Intuit — these run Phenom/Taleo/iCIMS/custom
   // and can't use this function; they stay as their existing link-outs.
