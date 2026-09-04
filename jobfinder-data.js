@@ -549,6 +549,7 @@ const WORKDAY_EMPLOYERS = [
   // Samaritan + Marshfield brands under the same tenant. Fills the emptiest region.
   // Tenant coords from window.workday config: sanford.wd5.myworkdayjobs.com/SanfordHealth
   { name:'Sanford Health',   slug:'wd-sanford',      tenant:'sanford',      wd:'5',  site:'SanfordHealth',           sector:'healthcare'  },
+  { name:'Mass General Brigham', slug:'wd-mgb',        tenant:'massgeneralbrigham', wd:'1', site:'MGBExternal',           sector:'healthcare'  },
   // Not Workday (verified): American Airlines, Baylor Scott & White, Comerica,
   // Texas Health, Charles Schwab, Intuit — these run Phenom/Taleo/iCIMS/custom
   // and can't use this function; they stay as their existing link-outs.
