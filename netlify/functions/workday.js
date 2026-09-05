@@ -153,6 +153,25 @@ exports.handler = async function (event) {
 
 // ---- helpers ----------------------------------------------------------
 
+// Sub-degree exclusion (ported from mcloud.js / oracle.js). Jeff's audience is
+// degree-seekers, so drop roles whose credential is BELOW a bachelor's —
+// LVN/LPN/CNA/medical-assistant/phlebotomy/surg-tech/EMT/patient-care-tech/
+// pharmacy-tech, etc. Workday's LIST endpoint gives only the title (no
+// description), so this is a title-only gate — which is what SUBDEGREE_TITLE
+// keys on anyway. "associate" is deliberately NOT blocked so associate-degree
+// nursing (ADN/RN) survives; DEGREE_REQ_RX protects any title that names a
+// bachelor's+ credential or RN/registered-nurse/new-grad/residency.
+const SUBDEGREE_TITLE_RX = /\b(lvn|licensed vocational nurse|lpn|licensed practical nurse|cna|certified nursing assistant|nurse aide|nursing assistant|nurse tech(nician)?|nurse extern|student nurse|patient care (tech|technician|assistant)|pct\b|pca\b|medical assistant|\bma\b|phlebotom(y|ist)|\bemt\b|paramedic|emergency (department )?tech(nician)?|\bed tech(nician)?\b|surgical tech(nologist|nician)?|surg tech|sterile process(ing)?|monitor tech|telemetry tech|pharmacy tech(nician)?|\bcpht\b|dental assistant|home health aide|\bhha\b|caregiver|orderly|dietary aide|environmental services?|\bevs\b|housekeep|transporter|\bscribe\b|care partner|health unit coordinator|unit secretary|\bcma\b|anesthesia tech(nician)?|endoscop(y|ic) tech(nician)?)\b/i;
+
+// A title that names a bachelor's+ credential or RN/new-grad survives even if a
+// sub-degree word appears incidentally (e.g. "Nurse Practitioner supervising CNAs").
+const DEGREE_REQ_RX = /\b(bachelor|baccalaureate|\bbsn\b|\bbs\b|\bba\b|master|\bmsn\b|\bmba\b|doctora|\bphd\b|\bmd\b|degree required|\brn\b|registered nurse|new grad|new-grad|residency|resident|fellow)\b/i;
+
+function isSubDegreeTitle(title) {
+  const t = String(title || '');
+  return SUBDEGREE_TITLE_RX.test(t) && !DEGREE_REQ_RX.test(t);
+}
+
 function mapPosting(p, base, site, company, sector) {
   if (!p || typeof p !== 'object') return null;
 
@@ -170,6 +189,10 @@ function mapPosting(p, base, site, company, sector) {
     : base + '/' + site + (path.startsWith('/') ? '' : '/') + path;
 
   const title = p.title || p.jobPostingTitle || 'Untitled role';
+
+  // Sub-degree gate: drop below-bachelor's clinical/support roles for the
+  // degree-seeking audience (returns null → dropped by the caller's filter).
+  if (isSubDegreeTitle(title)) return null;
 
   // locationsText is Workday's display string; fall back to bulletFields
   // (some tenants stash the location there).
