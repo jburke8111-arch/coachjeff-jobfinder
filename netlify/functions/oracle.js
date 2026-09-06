@@ -53,6 +53,18 @@ const ORACLE_EMPLOYERS = [
     // real ATS is Oracle CE, found via apply_join_ats_url in the page config.
     // Live ?diag test: TotalJobsCount 1292, clean "City, County/State, United States".
   },
+  {
+    name: "Inova Health",
+    host: "elar.fa.us2.oraclecloud.com",
+    site: "CX_1",
+    sector: "healthcare",
+    national: true,                     // 5 hospitals, Northern VA / DC metro
+    regions: ["VA", "DC", "MD"],
+    // Dominant Northern Virginia system (Inova Fairfax, ~20k employees).
+    // Fills the Mid-Atlantic gap the legacy giants (Hopkins/UPMC/MedStar) couldn't.
+    // Tenant coords from the careers page <base> tag: elar host, CX_1.
+    // Live ?diag test: TotalJobsCount 690, clean "City, VA, United States".
+  },
   // Add more Oracle Fusion employers here once each passes the live ?diag=1 test.
   // Find them: a careers apply flow that lands on *.oraclecloud.com/hcmUI/CandidateExperience/...
   // The site number (CX_1, CX_2, ...) is in that URL path.
