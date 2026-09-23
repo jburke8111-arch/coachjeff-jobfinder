@@ -69,7 +69,9 @@ export default async (request, context) => {
     // USAJOBS uses PayGradeLow/High for GS grades.
     api.searchParams.set("PayGradeLow", "05");
     api.searchParams.set("PayGradeHigh", "09");
-    api.searchParams.set("ResultsPerPage", "25");
+    // 50 (not 25) because the hiring-path and pay-plan filters below drop
+    // many results; live tests kept only ~10 of 25.
+    api.searchParams.set("ResultsPerPage", "50");
 
     const apiResp = await fetch(api.toString(), {
       headers: {
@@ -108,6 +110,17 @@ export default async (request, context) => {
       const paths = (d.UserArea && d.UserArea.Details && d.UserArea.Details.HiringPath) || d.HiringPath;
       if (!Array.isArray(paths) || paths.length === 0) return true; // unknown -> keep
       return paths.some((p) => OK_PATHS.includes(String(p).toLowerCase()));
+    });
+
+    // Drop U.S. Public Health Service Commissioned Corps billets (pay plan "CC").
+    // These are uniformed-service positions, not civilian jobs, and they post a
+    // misleading "$1–$150,000" salary range.
+    const EXCLUDED_PAY_PLANS = ["CC"];
+    items = items.filter((item) => {
+      const d = (item && item.MatchedObjectDescriptor) || {};
+      const plan =
+        (Array.isArray(d.JobGrade) && d.JobGrade[0] && d.JobGrade[0].Code) || "";
+      return !EXCLUDED_PAY_PLANS.includes(String(plan).toUpperCase());
     });
 
     // Normalize into the same simple shape the rest of the site uses,
