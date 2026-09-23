@@ -6,6 +6,10 @@
 // running this on the server.
 //
 // The browser calls this at:  /.netlify/functions/usajobs?keyword=data%20analyst&location=Texas
+// Optional series filter (OPM occupational series codes, comma-separated):
+//   /.netlify/functions/usajobs?series=0685,0601,0343&location=Texas
+// The UI shows plain-English series names and sends the codes behind the scenes.
+// A series-only search (no keyword) is allowed.
 //
 // Required environment variables (set these in the Netlify UI, NOT in code):
 //   USAJOBS_API_KEY   -> the key from the second USAJOBS email
@@ -47,11 +51,20 @@ export default async (request, context) => {
     const url = new URL(request.url);
     const keyword = url.searchParams.get("keyword") || "";
     const location = url.searchParams.get("location") || "";
+    // Series codes: keep only valid 4-digit codes, dedupe, cap at 20.
+    const series = [...new Set(
+      (url.searchParams.get("series") || "")
+        .split(/[,;\s]+/)
+        .map((c) => c.trim())
+        .filter((c) => /^\d{4}$/.test(c))
+    )].slice(0, 20);
 
     // Build the USAJOBS API request
     const api = new URL("https://data.usajobs.gov/api/search");
     if (keyword) api.searchParams.set("Keyword", keyword);
     if (location) api.searchParams.set("LocationName", location);
+    // USAJOBS takes multiple series codes separated by semicolons.
+    if (series.length) api.searchParams.set("JobCategoryCode", series.join(";"));
     // Bias toward entry-level federal grades (GS-05/07/09) that fit new grads.
     // USAJOBS uses PayGradeLow/High for GS grades.
     api.searchParams.set("PayGradeLow", "05");
@@ -87,7 +100,9 @@ export default async (request, context) => {
     // student / recent-graduate Pathways paths) and drop internal-only,
     // competitive-service-only, land-management, and senior-executive postings.
     // If HiringPath is missing, we keep the job (fail-open, don't hide good ones).
-    const OK_PATHS = ["public", "student", "recent-graduate"];
+    // "graduates" is the API's code for the Recent Graduates path; "recent-graduate"
+    // kept too in case older responses use it.
+    const OK_PATHS = ["public", "student", "graduates", "recent-graduate"];
     items = items.filter((item) => {
       const d = (item && item.MatchedObjectDescriptor) || {};
       const paths = (d.UserArea && d.UserArea.Details && d.UserArea.Details.HiringPath) || d.HiringPath;
@@ -106,11 +121,30 @@ export default async (request, context) => {
         "—";
       const pay =
         (d.PositionRemuneration && d.PositionRemuneration[0]) || null;
-      const salary = pay
+      const payRange = pay
         ? `$${Math.round(pay.MinimumRange).toLocaleString()}–$${Math.round(
             pay.MaximumRange
           ).toLocaleString()} (federal, posted)`
         : "";
+
+      // Grade, e.g. "GS-9" or "GS-7/9". The grade is the single most useful
+      // fact for a new grad, so it leads the salary line (shows up on cards
+      // with no UI change).
+      const det = (d.UserArea && d.UserArea.Details) || {};
+      const plan =
+        (Array.isArray(d.JobGrade) && d.JobGrade[0] && d.JobGrade[0].Code) || "";
+      const lo = parseInt(det.LowGrade, 10);
+      const hi = parseInt(det.HighGrade, 10);
+      let grade = "";
+      if (plan && !isNaN(lo)) {
+        grade = !isNaN(hi) && hi !== lo ? `${plan}-${lo}/${hi}` : `${plan}-${lo}`;
+      }
+      const salary = [grade, payRange].filter(Boolean).join(" · ");
+
+      // Occupational series, e.g. [{ code: "0343", name: "Management And Program Analysis" }]
+      const seriesInfo = (Array.isArray(d.JobCategory) ? d.JobCategory : [])
+        .filter((c) => c && c.Code)
+        .map((c) => ({ code: String(c.Code), name: c.Name || "" }));
 
       return {
         title: d.PositionTitle || "Federal position",
@@ -122,6 +156,8 @@ export default async (request, context) => {
           ? Date.parse(d.PublicationStartDate)
           : null,
         salary,
+        grade,              // "GS-7/9" (also leads the salary string)
+        series: seriesInfo, // for a result-card line like "Management & Program Analysis (0343)"
         source: "usajobs",
       };
     });
