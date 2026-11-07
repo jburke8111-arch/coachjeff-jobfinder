@@ -4,46 +4,6 @@
 > **Basis:** direct inspection of every file at commit `cf051d7` on `main`. Claims below cite `file:line`.
 > **Last verified:** 2026-09-28
 
----
-
-## ⚠️ Read This First: There Is No DOC or DOCX Code In This Repository
-
-If you were handed this repo to perform a **"DOC → DOCX standardization,"** stop and re-scope before writing any code.
-
-I grepped the entire tree for `docx`, `.doc`, `msword`, `officedocument`, `wordprocessing`, `altChunk`, `mammoth`, `docxtemplater`, `jszip`, `pizzip`, `html-docx`, `filesaver`, `jspdf`, `FileReader`, `FormData`, `multipart`, and `<input type="file">`.
-
-**Results: zero matches for anything Word- or document-related.** Specifically:
-
-| Capability | Present? | Evidence |
-|---|---|---|
-| DOCX generation | **No** | No matches anywhere |
-| DOC generation | **No** | No matches anywhere |
-| PDF generation | **No** | No matches anywhere |
-| File **upload** of any kind | **No** | No `<input type="file">`, no `FormData`, no `FileReader`, no `multipart` |
-| File **conversion** | **No** | No matches anywhere |
-| Resume parsing | **No** | "resume" appears only in marketing copy and disclaimers |
-
-The **only** two file-producing code paths in the entire codebase are:
-
-1. **CSV export** of saved jobs — [`jobfinder-storage.js:391-414`](jobfinder-storage.js#L391) (`exportSavedJobsCsv`), hand-rolled CSV string + `Blob` + `a.download`. No library.
-2. **Markdown export** of the ATS test log — [`ats-tools.html:786-790`](ats-tools.html#L786), `Blob` + `a.download`. No library.
-
-Neither is a Word document, and neither is on a DOC→DOCX migration path.
-
-### Where the document work almost certainly lives
-
-This repo is one of **three sibling Netlify deployments**. The other two are linked from [`coaching.html:169-170`](coaching.html#L169) and are the ones that plausibly generate resumes and cover letters:
-
-```
-https://coachjeff-resume-optimizer.netlify.app/     ← "ATS Resume Builder"
-https://coachjeff-coverletter.netlify.app/          ← "Cover Letter Builder"
-```
-
-**Action:** before any DOCX work, obtain the repositories backing those two URLs. They are not in this tree, not in `.git` (single remote: `github.com/jburke8111-arch/coachjeff-jobfinder`), and not referenced by any build config. A DOCX standardization scoped to *this* repo has no files to change.
-
-The section **"Files Relevant To DOC → DOCX Standardization"** below is filled in honestly with that conclusion rather than a fabricated file list.
-
----
 
 ## 1. Project Summary
 
@@ -104,13 +64,12 @@ A **free, no-signup job search tool for new graduates and early-career seekers**
 node -v      # need 18+ for netlify-cli
 npm -v
 ```
-> On the machine this doc was written on, `node` was **not on PATH** (only `npm 8.19.2`). Install Node 18+ before proceeding if you hit the same.
 
 ### Option A — UI only, no live job results (fastest)
 No install needed. Functions will 404, every source fails soft and returns `[]`, so you get the full UI with zero results.
 
 ```bash
-cd /home/woodie/Projects/coachjeff-jobfinder
+cd path/to/coachjeff-jobfinder
 python3 -m http.server 8080
 ```
 Open <http://localhost:8080>.
@@ -181,9 +140,7 @@ In the browser, `netlify dev` serves on **:8888**. Then run a search for `analys
 
 ### `.env.example`
 
-A ready-to-use `.env.example` has been written to the repo root alongside this document.
-
-> **Note:** there is **no `.gitignore` in this repo.** Add one containing `.env` *before* you create a real `.env`, or you will commit your credentials.
+A ready-to-use `.env.example` lives in the repo root. Copy it to `.env` and fill in real values. `.env` is covered by `.gitignore`, so it will not be committed.
 
 ---
 
@@ -206,7 +163,9 @@ coachjeff-jobfinder/
 ├── manifest.webmanifest          PWA manifest
 ├── robots.txt, sitemap.xml       SEO
 ├── icon-*.png, preview.png       PWA icons + OG image
-├── README.md                     One line: "# coachjeff-jobfinder"
+├── README.md
+├── .gitignore
+├── .env.example                  Template for the 7 env vars (§4)
 │
 ├── thr-test.js                 ⚠ MISPLACED — see below
 │
@@ -230,7 +189,7 @@ coachjeff-jobfinder/
 - **Server:** each `netlify/functions/*.js` is its own endpoint.
 
 ### Build / config files
-**There are none.** No `package.json`, no `netlify.toml`, no `.gitignore`, no lockfile, no CI config, no linter or formatter config. Deployment relies entirely on Netlify's zero-config defaults: publish the repo root as static, auto-detect `netlify/functions/`.
+**Minimal.** A `.gitignore` is present; there is no `package.json`, no `netlify.toml`, no lockfile, no CI config, and no linter or formatter config. Deployment relies entirely on Netlify's zero-config defaults: publish the repo root as static, auto-detect `netlify/functions/`.
 
 This is called out in the source itself — [`checkjobs.js:20-23`](netlify/functions/checkjobs.js#L20): *"they live in both files rather than a shared module because the functions directory is flat and there's no package.json / netlify.toml declaring module resolution."*
 
@@ -328,30 +287,16 @@ buildResultFilters() → facet bar; logSourceHealth() → localStorage
 
 ---
 
-## 8. Document Generation Analysis
+## 8. File Exports
 
-Per §0, **there is no document generation, export, upload, or conversion code in this repository.** For completeness, here is every file-producing path that *does* exist:
+Every file-producing path in the repository:
 
 | # | File & line | Function | Library | Produces | Role in workflow |
 |---|---|---|---|---|---|
 | 1 | [`jobfinder-storage.js:391`](jobfinder-storage.js#L391) | `exportSavedJobsCsv()` | **None** — hand-rolled string join, `Blob`, `a.download` | `text/csv` → `coach-jeff-saved-jobs.csv` | User clicks "Export CSV" ([`index.html:954`](index.html#L954)); dumps 9 columns of saved jobs |
 | 2 | [`ats-tools.html:786`](ats-tools.html#L786) | inline export-log handler | **None** — `Blob`, `a.download` | `text/markdown` → `ats-test-log.md` | Operator exports the ATS test history from the internal tool |
 
-**Document upload: no code path exists.** There is no `<input type="file">`, no drag-and-drop handler, no `FormData`, no `FileReader`, no `multipart` parsing anywhere in the tree. The only inbound user data is form fields and the Netlify feedback form.
-
-### Files Relevant To DOC → DOCX Standardization
-
-**In this repository: none.**
-
-No file in this repo reads, writes, converts, uploads, or emits `.doc` or `.docx`. A DOCX migration scoped here has zero files to change. To avoid a wasted sprint, do this first:
-
-1. **Locate the real codebases.** Get the repos behind `coachjeff-resume-optimizer.netlify.app` and `coachjeff-coverletter.netlify.app` (linked at [`coaching.html:169-170`](coaching.html#L169)). Those products generate resumes and cover letters and are the only plausible home for DOC/DOCX output.
-2. **Confirm with the stakeholder** which product the "DOC → DOCX" requirement refers to. The phrase does not match anything in this repo.
-3. **If the requirement is genuinely about this repo**, then it is a *new feature*, not a standardization — most likely "export saved jobs as DOCX in addition to CSV." In that case the files to touch would be:
-   - [`jobfinder-storage.js:391-414`](jobfinder-storage.js#L391) — the only existing export function; a DOCX writer would sit beside it
-   - [`index.html:954`](index.html#L954) — the Export CSV button; a second button goes here
-   - [`sw.js:12-21`](sw.js#L12) — `APP_SHELL` + `CACHE_VERSION`; **bump the version** if you add a script
-   - A new dependency would be the project's **first ever** — it would require creating `package.json`, and for a browser-side DOCX writer, either a CDN `<script>` or introducing a bundler. That is a significant architectural change for a repo that currently has zero dependencies and zero build step. Flag it before starting.
+**File upload: no code path exists.** There is no `<input type="file">`, no drag-and-drop handler, no `FormData`, no `FileReader`, no `multipart` parsing anywhere in the tree. The only inbound user data is form fields and the Netlify feedback form.
 
 ---
 
@@ -384,9 +329,7 @@ for f in greenhouse lever ashby smartrecruiters themuse oracle phenom mcloud car
 done
 ```
 
-**Testing document generation:** not applicable — no such feature. To test the **CSV export**: save 2+ jobs (include one with a comma and one with a `"` in the title), click Export CSV, open in a spreadsheet, confirm quoting is intact ([`jobfinder-storage.js:396-399`](jobfinder-storage.js#L396) doubles `"` and wraps on `[",\n]`).
-
-**Testing uploads:** not applicable — no upload feature exists.
+**Testing the CSV export:** save 2+ jobs (include one with a comma and one with a `"` in the title), click Export CSV, open in a spreadsheet, confirm quoting is intact ([`jobfinder-storage.js:396-399`](jobfinder-storage.js#L396) doubles `"` and wraps on `[",\n]`).
 
 ### Recommended regression tests
 Highest value first, given zero current coverage:
@@ -478,11 +421,9 @@ function safeUrl(u){
 **② Unauthenticated SSRF / open proxy.** [`ats-detect.js:35-47`](netlify/functions/ats-detect.js#L35) fetches **any** URL from `?url=`, follows redirects, and returns findings. No allowlist, no private-IP or `localhost` blocking, no cloud-metadata-endpoint blocking, no response size cap (`await resp.text()` on the full body), no auth, no rate limit. Anyone on the internet can use your Netlify account to probe internal addresses. A second, narrower instance is [`checkjobs.js:283`](netlify/functions/checkjobs.js#L283), which fetches job URLs from the POST body.
 **Fix:** allowlist schemes and hostnames, block RFC1918/loopback/link-local (incl. `169.254.169.254`), cap the response body, and gate `ats-detect` — it is an internal operator tool that does not need to be public.
 
-**③ No `.gitignore`.** Nothing prevents committing a `.env`. Given the repo's history is 224 commits of "Add files via upload" (GitHub web UI), this is a realistic hazard. **Add one before creating `.env`.**
+**③ No security headers.** No `netlify.toml` means no CSP, `X-Frame-Options`, `X-Content-Type-Options`, or `Referrer-Policy`. A CSP would also mitigate ①.
 
-**④ No security headers.** No `netlify.toml` means no CSP, `X-Frame-Options`, `X-Content-Type-Options`, or `Referrer-Policy`. A CSP would also mitigate ①.
-
-**⑤ Debug file published.** `thr-test.js` is world-readable at `/thr-test.js` (§5).
+**④ Debug file published.** `thr-test.js` is world-readable at `/thr-test.js` (§5).
 
 ### 12.2 Potential bugs
 
@@ -508,7 +449,7 @@ function safeUrl(u){
 - **Git history is unusable** — 224 commits, nearly all "Add files via upload" or "Update <file>.js". No branches, no PRs, no rationale. **`git log` will not help you**; the inline comments are the real changelog, and they are unusually good.
 
 ### 12.4 Missing documentation
-No README content, no setup instructions, no env var documentation (the 7 variables were discoverable only by grepping `process.env`), no architecture overview, no source-onboarding guide, no deployment runbook, no API contract for the `Job` object, no `.env.example`. This document plus the accompanying `.env.example` are the first of these.
+No README content, no setup instructions, no env var documentation (the 7 variables were discoverable only by grepping `process.env`), no architecture overview, no source-onboarding guide, no deployment runbook, no API contract for the `Job` object. This document and the `.env.example` template are the first of these.
 
 ### 12.5 Areas that look AI-generated and deserve human review
 
@@ -528,7 +469,6 @@ Signals: uniform multi-paragraph explanatory comment blocks in a house voice; se
 ## Appendix: First-Week Checklist
 
 **Do immediately (low risk, high value):**
-- [ ] Add `.gitignore` with `.env`, `.netlify/`, `node_modules/`
 - [ ] Delete `netlify/functions/jobfinder-ui.js` (stale duplicate, deployed)
 - [ ] Delete `netlify/functions/fetchOracle-client.js` (not a function, deployed broken)
 - [ ] Delete or relocate `thr-test.js` (published as a static asset)
@@ -540,7 +480,3 @@ Signals: uniform multi-paragraph explanatory comment blocks in a house voice; se
 - [ ] Add `package.json` + a test runner; write tests for `locationMatches()` first
 - [ ] Gate or allowlist `ats-detect.js` (§12.1 ②)
 - [ ] Give `lever.js` an overall time budget, modeled on `greenhouse.js:332`
-
-**Do before the DOCX work:**
-- [ ] **Confirm which product the requirement targets.** It is not this one (§0).
-- [ ] Obtain the `coachjeff-resume-optimizer` and `coachjeff-coverletter` repositories.
