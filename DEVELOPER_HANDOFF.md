@@ -3,6 +3,7 @@
 > **Audience:** a developer taking over this repo with no access to the original author.
 > **Basis:** direct inspection of every file at commit `cf051d7` on `main`. Claims below cite `file:line`.
 > **Last verified:** 2026-09-28
+> **Amended 2026-11-14** at `521cab9`: the three misplaced files of §5 have been deleted. Sections 5, 9, 10, 11, 12.1 and 12.2 updated accordingly; all other claims still date from the 2026-09-28 pass.
 
 
 ## 1. Project Summary
@@ -167,8 +168,6 @@ coachjeff-jobfinder/
 ├── .gitignore
 ├── .env.example                  Template for the 7 env vars (§4)
 │
-├── thr-test.js                 ⚠ MISPLACED — see below
-│
 ├── Docs/                         ATS research notes (Markdown, human-written)
 │   ├── workday.md, oracle.md, phenom-successfactors.md, others.md
 │   └── ATS                     ⚠ 1-byte empty placeholder file
@@ -178,10 +177,9 @@ coachjeff-jobfinder/
     ├── mcloud.js  oracle.js  phenom.js  smartrecruiters.js  themuse.js
     ├── usajobs.js  workday.js          ← 12 real job sources
     ├── checkjobs.js                    ← POST enrichment (descriptions)
-    ├── ats-detect.js                   ← ATS fingerprinting for ats-tools.html
-    ├── fetchOracle-client.js         ⚠ NOT a function — browser code, no handler export
-    └── jobfinder-ui.js               ⚠ STALE 128 KB duplicate of the root UI file
+    └── ats-detect.js                   ← ATS fingerprinting for ats-tools.html
 ```
+**14 files, all real endpoints.** Three misplaced files documented in the 2026-09-28 pass have since been deleted — see below.
 
 ### Entry points
 - **Users:** `index.html` → loads the 5 scripts in strict order at [`index.html:1026-1030`](index.html#L1026). **Order matters** — no module system, everything is a global. `jobfinder-data.js` must load first (constants), `jobfinder-init.js` last (wires listeners to functions defined earlier).
@@ -193,11 +191,17 @@ coachjeff-jobfinder/
 
 This is called out in the source itself — [`checkjobs.js:20-23`](netlify/functions/checkjobs.js#L20): *"they live in both files rather than a shared module because the functions directory is flat and there's no package.json / netlify.toml declaring module resolution."*
 
-### Three misplaced files (all currently deployed)
+### Three misplaced files — ✅ resolved 2026-11-14
 
-1. **`netlify/functions/jobfinder-ui.js`** — a 128 KB stale copy of the root `jobfinder-ui.js`. It is **not** identical: it still contains a **bug that was already fixed** in the root copy. The root version has `REMOTE_SIGNAL_RX` ([`jobfinder-ui.js:958`](jobfinder-ui.js#L958)) which deliberately excludes bare country names; the stale copy still matches `/\b(remote|united states)\b/`. The root file's comment documents the impact: *"129 non-TX jobs leaking into a 'texas' search."* Netlify deploys this file as a bogus function endpoint. **Delete it.**
-2. **`netlify/functions/fetchOracle-client.js`** — browser code with **no export of any kind**. Its own header says *"CLIENT-SIDE source fetcher … Add this to your DATA-SOURCES file."* Superseded: the real `fetchOracle` lives at [`jobfinder-core.js:285`](jobfinder-core.js#L285). Netlify deploys it as a function that errors on invocation. **Delete it.**
-3. **`thr-test.js`** (repo root) — its first line reads `// netlify/functions/thr-test.js`, but it sits at the root. Because of that it is **not** deployed as a function; it is published as a **world-readable static asset** at `https://<site>/thr-test.js`. Harmless (no secrets), but it is a debug scratch file exposing your scraping approach. **Delete or move it.**
+All three were deleted as part of the PR #7 merge. Recorded here because the reasoning still matters if similar files reappear.
+
+1. **`netlify/functions/jobfinder-ui.js`** — a 128 KB stale copy of the root `jobfinder-ui.js`, deployed by Netlify as a bogus function endpoint. It was **not** identical: it still contained a **bug already fixed** in the root copy. The root version has `REMOTE_SIGNAL_RX` ([`jobfinder-ui.js:958`](jobfinder-ui.js#L958)), which deliberately excludes bare country names; the stale copy still matched `/\b(remote|united states)\b/`. The root file's comment documents the impact: *"129 non-TX jobs leaking into a 'texas' search."*
+2. **`netlify/functions/fetchOracle-client.js`** — browser code with **no export of any kind**, deployed as a function that errored on invocation. Its own header said *"CLIENT-SIDE source fetcher … Add this to your DATA-SOURCES file."* Superseded by the real `fetchOracle` at [`jobfinder-core.js:285`](jobfinder-core.js#L285).
+3. **`thr-test.js`** (repo root) — its first line read `// netlify/functions/thr-test.js` but it sat at the root, so it was never deployed as a function; it was published as a **world-readable static asset** at `https://<site>/thr-test.js`. No secrets, but it exposed the scraping approach.
+
+> **If these reappear in your working tree, you are on the wrong branch.** They still exist on `docs/add-developer-handoff`, which predates the cleanup. Check `git branch --show-current`.
+
+**Still outstanding:** `Docs/ATS`, a 1-byte empty placeholder.
 
 ---
 
@@ -303,7 +307,7 @@ Every file-producing path in the repository:
 ## 9. Testing Guide
 
 ### Existing tests
-**There is no test suite.** No test framework, no test files, no CI, no assertions. `thr-test.js` is a manual debug probe for one upstream API, not a test.
+**There is no test suite.** No test framework, no test files, no CI, no assertions. (`thr-test.js` was a manual debug probe for one upstream API, not a test; it has since been deleted — §5.)
 
 All verification in this project is manual, via three built-in diagnostic affordances:
 
@@ -352,7 +356,7 @@ Highest value first, given zero current coverage:
 - **Publish directory:** repo root (`.`).
 - **Functions directory:** `netlify/functions` (Netlify's default; auto-detected since there is no `netlify.toml`).
 - **Output location:** none — source files *are* the artifacts.
-- **Production artifacts:** the HTML/JS/CSS/PNG files exactly as committed, plus 15 bundled Lambdas (13 real + 2 broken, see §5).
+- **Production artifacts:** the HTML/JS/CSS/PNG files exactly as committed, plus 14 bundled Lambdas — all real since the §5 cleanup (12 job sources + `checkjobs` + `ats-detect`).
 - **Deployment:** git push to `main` on `github.com/jburke8111-arch/coachjeff-jobfinder` → Netlify auto-deploy.
 
 **The one manual build step that exists:** when you change any file in `APP_SHELL`, you **must** bump `CACHE_VERSION` in [`sw.js:15`](sw.js#L15) (currently `'jobfinder-v4'`). The SW is network-first so staleness is mostly self-correcting, but offline users keep the old shell until the version changes.
@@ -388,7 +392,6 @@ Skip on day one: `index.html` CSS (~700 lines), `ats-tools.html`, `Docs/`.
 |---|---|---|
 | **Unescaped URL → XSS** | [`jobfinder-ui.js:557`](jobfinder-ui.js#L557) | See §12.1 — a live injection vector |
 | **SSRF proxy** | [`ats-detect.js:35-47`](netlify/functions/ats-detect.js#L35) | See §12.2 |
-| **Stale deployed duplicate** | `netlify/functions/jobfinder-ui.js` | Contains an already-fixed bug; an editor could "fix" the wrong copy |
 | **Silent regex regressions** | `jobfinder-data.js` | Zero tests; a bad edit silently hides entire job categories |
 | **10s function ceiling** | `lever.js` especially | No budget; adding a board pushes it further past the limit |
 | **Duplicated `experienceRequirement`** | `ashby.js` + `checkjobs.js` | Comment-enforced only; drift is invisible |
@@ -423,11 +426,11 @@ function safeUrl(u){
 
 **③ No security headers.** No `netlify.toml` means no CSP, `X-Frame-Options`, `X-Content-Type-Options`, or `Referrer-Policy`. A CSP would also mitigate ①.
 
-**④ Debug file published.** `thr-test.js` is world-readable at `/thr-test.js` (§5).
+**④ Debug file published.** ✅ **Resolved** — `thr-test.js` was world-readable at `/thr-test.js`; deleted (§5).
 
 ### 12.2 Potential bugs
 
-1. **Stale duplicate with a regressed fix** — `netlify/functions/jobfinder-ui.js` still has the `/\b(remote|united states)\b/` bug the root file fixed. Not currently executed, but a trap.
+1. ~~**Stale duplicate with a regressed fix**~~ — ✅ **Resolved.** `netlify/functions/jobfinder-ui.js` deleted (§5).
 2. **`lever.js` will time out.** Per-page 7 s timeout × up to 5 pages × 7 boards in `Promise.all`, with **no overall budget** vs. Netlify's 10 s limit. Compare `greenhouse.js:332` which does it correctly.
 3. **`checkjobs` has no method guard.** CORS advertises `POST, OPTIONS` ([`checkjobs.js:297`](netlify/functions/checkjobs.js#L297)) but a GET isn't rejected — it fails at `request.json()` and falls into the catch, returning `200 {ok:false}`. Misleading to debug.
 4. **`workday.js` caches its errors.** `Cache-Control: public, max-age=300` ([`workday.js:233`](netlify/functions/workday.js#L233)) is applied to the 400 and 502 responses too, so a transient upstream failure is cached for 5 minutes.
@@ -446,7 +449,7 @@ function safeUrl(u){
 - **Hardcoded rosters** across 8 files; onboarding an employer means a code change.
 - **All CSS inline** in `index.html` (~700 lines), duplicated in `ats-tools.html`.
 - **`README.md` is one line.** `Docs/ATS` is an empty 1-byte file.
-- **Git history is unusable** — 224 commits, nearly all "Add files via upload" or "Update <file>.js". No branches, no PRs, no rationale. **`git log` will not help you**; the inline comments are the real changelog, and they are unusually good.
+- **Git history is unusable up to `cf051d7`** — 224 commits, nearly all "Add files via upload" or "Update <file>.js", with no branches, PRs, or rationale. **`git log` will not help you** for anything before that point; the inline comments are the real changelog, and they are unusually good. Branch-and-PR workflow begins with PR #7 (2026-11-14); history from there forward is intended to be readable.
 
 ### 12.4 Missing documentation
 No README content, no setup instructions, no env var documentation (the 7 variables were discoverable only by grepping `process.env`), no architecture overview, no source-onboarding guide, no deployment runbook, no API contract for the `Job` object. This document and the `.env.example` template are the first of these.
@@ -457,11 +460,11 @@ Signals: uniform multi-paragraph explanatory comment blocks in a house voice; se
 
 | Area | Why it warrants review |
 |---|---|
-| **[`fetchOracle-client.js`](netlify/functions/fetchOracle-client.js)** | Clearest case. Reads as generated *instructions to the developer* ("Add this to your DATA-SOURCES file", "Mirror however your other fetchers time out") that were committed verbatim into the functions directory instead of being followed. **Delete it.** |
+| ~~`fetchOracle-client.js`~~ ✅ deleted | Clearest case. Read as generated *instructions to the developer* ("Add this to your DATA-SOURCES file", "Mirror however your other fetchers time out") committed verbatim into the functions directory instead of being followed. Kept here as a pattern to watch for elsewhere. |
 | **The giant regexes** — `SUBDEGREE_TITLE_RX`, `EXPERIENCED_NURSE_RX`, `NONDEGREE_RX` ([`jobfinder-data.js:282-437`](jobfinder-data.js#L282)) | Exhaustive alternation lists with 1,500+ characters and no tests. Plausible-looking but unverified; these decide which jobs a student never sees. **Highest-impact area to validate against real postings.** |
 | **`SPONSOR_HISTORY`** ([`jobfinder-data.js:375`](jobfinder-data.js#L375)) | A hand-maintained H-1B tier table stamped `SPONSOR_HISTORY_REVIEWED = '2026-07-09'`. Drives immigration-adjacent badges. Needs a sourced human review and a refresh cadence. |
 | **`salaryEstimate()`** ([`jobfinder-ui.js:350`](jobfinder-ui.js#L350)) | Shows money figures to users. Verify the methodology and that it is labeled an estimate. |
-| **Comment/code drift** | Comments are confident and detailed — and sometimes wrong (`mcloud.js` `keyed:true`; `thr-test.js` claiming a path it isn't at; `matchesLocations()` documented as a no-op). **Verify claims against behavior rather than trusting comments.** |
+| **Comment/code drift** | Comments are confident and detailed — and sometimes wrong (`mcloud.js` `keyed:true`; `matchesLocations()` documented as a no-op; the deleted `thr-test.js` claimed a path it wasn't at). **Verify claims against behavior rather than trusting comments.** |
 | **Fail-soft everywhere** | `return []` / `status: 200` on every error path is a sound product choice, but it means **the app cannot tell you when it is broken** — a misconfigured key and a working source are indistinguishable by status code. Consider structured logging or an alert on sustained zero-return rates. |
 
 ---
@@ -469,9 +472,10 @@ Signals: uniform multi-paragraph explanatory comment blocks in a house voice; se
 ## Appendix: First-Week Checklist
 
 **Do immediately (low risk, high value):**
-- [ ] Delete `netlify/functions/jobfinder-ui.js` (stale duplicate, deployed)
-- [ ] Delete `netlify/functions/fetchOracle-client.js` (not a function, deployed broken)
-- [ ] Delete or relocate `thr-test.js` (published as a static asset)
+- [x] ~~Delete `netlify/functions/jobfinder-ui.js`~~ (stale duplicate, deployed) — done 2026-11-14
+- [x] ~~Delete `netlify/functions/fetchOracle-client.js`~~ (not a function, deployed broken) — done 2026-11-14
+- [x] ~~Delete or relocate `thr-test.js`~~ (published as a static asset) — done 2026-11-14
+- [ ] Delete `Docs/ATS` (1-byte empty placeholder)
 - [ ] Fix the unescaped `href` at [`jobfinder-ui.js:557`](jobfinder-ui.js#L557) (§12.1 ①)
 - [ ] Replace `README.md` with a pointer to this document
 
